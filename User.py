@@ -1,5 +1,17 @@
 class User:
-  def __init__(self, user_id, starting_bal):
-    self.user_id = user_id
-    self.balance = starting_bal
-    self.bet_ids = []
+  def __init__(self, code, color_code, date_created):
+    self.code = code
+    self.color_code = color_code
+
+    #a tuple (bet_id, balance after change, date)
+    #bet_id = start: start balance
+    #bet_id = manual: changed balance with command
+    #bet_id = reset: changed balance with command
+    
+    self.balance = [("start", 500, date_created)]
+    
+    self.active_bet_ids = []
+
+
+  def to_string(self):
+    return "Balance: " + str(self.balance)
