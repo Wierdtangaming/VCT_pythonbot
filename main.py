@@ -1,8 +1,5 @@
 #add moddifacation when no on incorrect match creation
 
-#Match Winner and we are in the TESTING PHAZE LETS GOOOOOOOOOOO
-#bets alsways have team 2 winning
-#betting limit based on balance - active bets
 
 from keepalive import keep_alive
 
@@ -724,8 +721,9 @@ $bet list: to do sends embed of all bets without a winner""")
         return
       match = get_from_list("match", bet.match_id)
       if match.date_closed == None:
-        match.bet_ids.remove(bet.code)
-        replace_in_list("match", match.code, match)
+        
+        #match.bet_ids.remove(bet.code)
+        #replace_in_list("match", match.code, match)
         embedd = await create_match_embedded(match.code)
         await edit_all_messages(match.message_ids, embedd)
         
@@ -736,8 +734,8 @@ $bet list: to do sends embed of all bets without a winner""")
             
             await msg.delete()
           except Exception as e:
-            print("no msg found " + e)
-          await msg.delete() 
+            print("no msg found")
+          
         remove_from_active_ids(bet.user_id, bet.code)
         await ctx.send(remove_from_list("bet", args[1]))
         
@@ -753,7 +751,7 @@ $bet list: to do sends embed of all bets without a winner""")
       await ctx.send("Not valid command. Use $bet help to get list of commands")
       return
 
-    if amount <= 0:
+    if int(amount) <= 0:
       await ctx.send("Cant bet negatives")
       return
     match = get_from_list("match", match_id)
@@ -777,7 +775,7 @@ $bet list: to do sends embed of all bets without a winner""")
       temp_bet = get_from_list("bet", bet_id)
       balance_left -= temp_bet.bet_amount
     if balance_left < 0:
-      await ctx.send("You have bet " + (balance_left * -1) + " more that you have")
+      await ctx.send("You have bet " + str((-balance_left)) + " more that you have")
       return
 
     
@@ -870,23 +868,27 @@ async def back(ctx):
 
 #assign bot spicific action to channel
 @bot.command()
-async def assign(ctx, arg):
-    if arg == "help":
-      await ctx.send(
-      """$assign match creation: where match creation takes place
-$assign match: where the end matches and bets show up
-$assign bet: where the end bets show up""")
-    elif arg == "match creation":
-      db["creation_channel_id"] = ctx.channel.id
-      await ctx.send("This channel is now the match creation channel")
-    elif arg == "matches":
-      db["match_channel_id"] = ctx.channel.id
-      await ctx.send("This channel is now the match list channel")
-    elif arg == "bets":
-      db["bet_channel_id"] = ctx.channel.id
-      await ctx.send("This channel is now the bet list channel")
-    else:
-      await ctx.send("Not a valid command do $assign help for list of commands")
+async def assign(ctx, *args):
+  if not len(args) == 1:
+    await ctx.send("Not a valid command do $assign help for list of commands")
+    return
+  arg = args[0]
+  if arg == "help":
+    await ctx.send(
+    """$assign creation: where match creation takes place
+$assign matches: where the end matches and bets show up
+$assign bets: where the end bets show up""")
+  elif arg == "creation":
+    db["creation_channel_id"] = ctx.channel.id
+    await ctx.send("This channel is now the match creation channel")
+  elif arg == "matches":
+    db["match_channel_id"] = ctx.channel.id
+    await ctx.send("This channel is now the match list channel")
+  elif arg == "bets":
+    db["bet_channel_id"] = ctx.channel.id
+    await ctx.send("This channel is now the bet list channel")
+  else:
+    await ctx.send("Not a valid command do $assign help for list of commands")
 
 
 
@@ -948,8 +950,12 @@ async def cancel(ctx, *arg):
 
 @bot.command()
 async def leaderboard(ctx, *arg):
-  embedd = await create_leaderboard_embedded()
-  await ctx.send(embed=embedd)
+  if arg[0] == "help":
+    await ctx.send("""$leaderboard: shows a learderboard""")
+
+  else:
+    embedd = await create_leaderboard_embedded()
+    await ctx.send(embed=embedd)
 
 
 #season reset command
