@@ -132,6 +132,12 @@ def is_key(key):
   keys = db.keys()
   return key in keys
 
+def is_digit(str):
+    try:
+        int(str)
+        return True
+    except ValueError:
+        return  False
 
 def get_uniqe_code(prefix:str):
   full_keys = db.prefix(prefix + "_")
@@ -243,7 +249,7 @@ async def create_user_embedded(identifier):
     return None
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i:i+2], 16) for i in (0, 2, 4))))
   embed.add_field(name = "Name:", value = (await bot.fetch_user(user.code)).mention, inline = True)
-  embed.add_field(name = "Balance:", value = user.balance[-1][1], inline = True)
+  embed.add_field(name = "Balance:", value = round(user.balance[-1][1]), inline = True)
   return embed
 
 
@@ -259,10 +265,10 @@ async def create_leaderboard_embedded():
     rank = ""
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
-      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(user_rank[1]) , inline = False)
+      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(round(user_rank[1])) , inline = False)
     else:
       rank = emoji.emojize(medals[rank_num - 1])
-      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(user_rank[1]), inline = False)
+      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(round(user_rank[1])), inline = False)
     rank_num += 1
   return embed
 
@@ -386,7 +392,7 @@ async def on_message(message):
         if message.author.id == db["current_user"]:
           s = message.content
           stemp = s.replace('.','')
-          if (stemp.isdigit() and (s.find('.') == -1 or s.find('.') == 1)):
+          if (is_digit(stemp) and (s.find('.') == -1 or s.find('.') == 1)):
             await message.channel.send("What is Team 2's Odds\nEnter in the amount you would get if you bet 1")
         
 
@@ -402,7 +408,7 @@ async def on_message(message):
           s = message.content
           stemp = s.replace('.','')
 
-          if (stemp.isdigit() and (s.find('.') == -1 or s.find('.') == 1)):
+          if (is_digit(stemp) and (s.find('.') == -1 or s.find('.') == 1)):
             await message.channel.send("Do you want to balance the odds?")
       
             db["current_old_t2_odds"] = float(s)
@@ -634,7 +640,7 @@ $match full list: sends embed of all matches without a winner""")
       embedd = await create_match_embedded(match.code)
       await edit_all_messages(match.message_ids, embedd)
       await ctx.send("Betting Opened")
-    elif args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and args[2].isdigit():
+    elif args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
       match = get_from_list("match", args[1])
       if match == None:
         await ctx.send("Identifier Not Found")
@@ -764,7 +770,7 @@ $bet list: to do sends embed of all bets without a winner""")
   elif len(args) == 3:
     match_id, team_num, amount = args
     #$bet [match id] [team_num] [amount]
-    if not amount.isdigit():
+    if not is_digit(amount):
       await ctx.send("Not valid command. Use $bet help to get list of commands")
       return
 
@@ -931,7 +937,7 @@ async def balance(ctx, *args):
       await ctx.send(
       """$balance gives your own balance
 $balance [user's @]: gives balance of that user""")
-    elif uid.isdigit():
+    elif is_digit(uid):
       embedd = await create_user_embedded(int(uid))
       if embedd == None:
         await ctx.send("Identifier Not Found")
@@ -948,13 +954,13 @@ async def award(ctx, *args):
   if len(args) == 1:
     if args[0] == "help":
       await ctx.send(
-      """$award [user @] [amount] "[description]": gives the amount to the user, description needs to be in quotes""")
+      """$award [user @] [amount] "[description]": adds the amount to the user from the bank, description needs to be in quotes. DON'T USE WITHOUT PERMISSION""")
   elif len(args) == 3:
     uid = args[0].replace("<","")
     uid = uid.replace(">","")
     uid = uid.replace("@","")
     uid = uid.replace("!","")
-    if not (uid.isdigit() and args[1].isdigit()):
+    if not (is_digit(uid) and is_digit(args[1])):
       await ctx.send("Not a valid command do $award help for list of commands")
       return
 
@@ -982,7 +988,7 @@ $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
 $leaderboard: gives leaderboard of balances
-$award: gives money to someone.""")
+$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION""")
 
 #cancel
 @bot.command()
@@ -996,13 +1002,17 @@ async def cancel(ctx, *arg):
 
 @bot.command()
 async def leaderboard(ctx, *arg):
-  if arg[0] == "help":
-    await ctx.send("""$leaderboard: shows a learderboard""")
 
-  else:
+  if len(arg) == 0:
     embedd = await create_leaderboard_embedded()
     await ctx.send(embed=embedd)
-
+  elif len(arg) == 1:
+    if len(arg) == "help":
+      await ctx.send("""$leaderboard: shows a learderboard""")
+    else:
+      await ctx.send("Not a valid command do $leaderboard help for list of commands")
+  else:
+    await ctx.send("Not a valid command do $leaderboard help for list of commands")
 
 #season reset command
 @bot.command()
