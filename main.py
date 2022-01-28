@@ -128,9 +128,6 @@ async def edit_all_messages(ids, embedd):
       print("no msg found" + str(e))
     
 
-
-
-
 def is_key(key):
   keys = db.keys()
   return key in keys
@@ -157,6 +154,12 @@ def create_user(user_id):
   user = User(user_id, color_code, datetime.now())
   add_to_list("user", user)
   return user
+
+
+
+
+
+
 
 async def create_match_embedded(identifier):
   match = get_from_list("match", identifier)
@@ -270,8 +273,24 @@ def add_to_active_ids(user_id, bet_id):
 
 def remove_from_active_ids(user_id, bet_id):
   user = get_from_list("user", user_id)
+  print(bet_id)
+  if not bet_id in user.active_bet_ids:
+    print("Bet_id Not Found")
+    return
   user.active_bet_ids.remove(bet_id)
-  replace_in_list("user", user_id, user)
+  print(replace_in_list("user", user.code, user))
+
+def add_balance_user(identifier, change, description):
+  print(identifier)
+  user = get_from_list("user", int(identifier))
+  print("fsdf " + str(user))
+  if user == None:
+    return None
+  user.balance.append((description, round(user.balance[-1][1] + change, 5), datetime.now()))
+  replace_in_list("user", user.code, user)
+  return user
+
+  
 
 async def cancel_match():
   keys = db.keys()
@@ -642,13 +661,11 @@ $match full list: sends embed of all matches without a winner""")
             payout += bet.bet_amount * odds
           user = get_from_list("user", bet.user_id)
           remove_from_active_ids(user.code, bet.code)
-          user.balance.append((bet.code, round(user.balance[-1][1] + payout, 5), datetime.now()))
-          
+          bal = add_balance_user(user.code, payout, bet.code)
           
           replace_in_list("bet", bet.code, bet)
           embedd = await create_bet_embedded(bet.code)
           await edit_all_messages(bet.message_ids, embedd)
-          replace_in_list("user", user.code, user)
 
           embedd = await create_user_embedded(user.code)
           await ctx.send(embed=embedd)
@@ -733,7 +750,7 @@ $bet list: to do sends embed of all bets without a winner""")
             msg = await channel.fetch_message(msg_id[0])
             
             await msg.delete()
-          except Exception as e:
+          except Exception:
             print("no msg found")
           
         remove_from_active_ids(bet.user_id, bet.code)
@@ -920,8 +937,36 @@ $balance [user's @]: gives balance of that user""")
         await ctx.send("Identifier Not Found")
         return
       await ctx.send(embed=embedd)
+    else:
+      await ctx.send("Not a valid command do $balance help for list of commands")
+  else:
+    await ctx.send("Not a valid command do $balance help for list of commands")
     
-  
+#gives points
+@bot.command()
+async def award(ctx, *args):
+  if len(args) == 1:
+    if args[0] == "help":
+      await ctx.send(
+      """$award [user @] [amount] "[description]": gives the amount to the user, description needs to be in quotes""")
+  elif len(args) == 3:
+    uid = args[0].replace("<","")
+    uid = uid.replace(">","")
+    uid = uid.replace("@","")
+    uid = uid.replace("!","")
+    if not (uid.isdigit() and args[1].isdigit()):
+      await ctx.send("Not a valid command do $award help for list of commands")
+      return
+
+    user = add_balance_user(uid, int(args[1]), args[2])
+    if user == None:
+      await ctx.send("User not found")
+    else:
+      embedd = await create_user_embedded(user.code)
+      await ctx.send(embed=embedd)
+
+  else:
+    await ctx.send("Not a valid command do $award help for list of commands")
 
 
 #help
@@ -936,7 +981,8 @@ $cancel: stop match setup
 $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
-$leaderboard: gives leaderboard of balances""")
+$leaderboard: gives leaderboard of balances
+$award: gives money to someone.""")
 
 #cancel
 @bot.command()
@@ -1016,6 +1062,21 @@ async def add_var(ctx):
     user.active_bet_ids = []
     replace_in_list("user", user.code, user)
     
+#debug command
+@bot.command()
+async def update_bet_ids(ctx):
+  users = get_all_objects("user")
+  for user in users:
+    print(user.active_bet_ids)
+    for bal in user.balance:
+      if len(user.balance[user.balance.index(bal)][0]) == 8:
+        print("yes:" + user.balance[user.balance.index(bal)][0])
+        user.balance[user.balance.index(bal)] = (("id_" + str(user.balance[user.balance.index(bal)][0])), user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
+        print("yes:" + user.balance[user.balance.index(bal)][0])
+      else:
+        print("no:" + user.balance[user.balance.index(bal)][0])
+    
+    #replace_in_list("user", user.code, user)
     
   
 

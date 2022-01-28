@@ -4,6 +4,7 @@ class User:
     self.color_code = color_code
 
     #a tuple (bet_id, balance after change, date)
+    #bet_id = id_[bet_id]: bet id
     #bet_id = start: start balance
     #bet_id = manual: changed balance with command
     #bet_id = reset: changed balance with command
