@@ -661,7 +661,7 @@ $match full list: sends embed of all matches without a winner""")
             payout += bet.bet_amount * odds
           user = get_from_list("user", bet.user_id)
           remove_from_active_ids(user.code, bet.code)
-          bal = add_balance_user(user.code, payout, bet.code)
+          add_balance_user(user.code, payout, "id_" + str(bet.code))
           
           replace_in_list("bet", bet.code, bet)
           embedd = await create_bet_embedded(bet.code)
@@ -1065,18 +1065,15 @@ async def add_var(ctx):
 #debug command
 @bot.command()
 async def update_bet_ids(ctx):
+  return
   users = get_all_objects("user")
   for user in users:
     print(user.active_bet_ids)
     for bal in user.balance:
       if len(user.balance[user.balance.index(bal)][0]) == 8:
-        print("yes:" + user.balance[user.balance.index(bal)][0])
         user.balance[user.balance.index(bal)] = (("id_" + str(user.balance[user.balance.index(bal)][0])), user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
-        print("yes:" + user.balance[user.balance.index(bal)][0])
-      else:
-        print("no:" + user.balance[user.balance.index(bal)][0])
     
-    #replace_in_list("user", user.code, user)
+    replace_in_list("user", user.code, user)
     
   
 
