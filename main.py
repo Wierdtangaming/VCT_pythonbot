@@ -205,9 +205,9 @@ async def create_match_embedded(identifier):
   return embed
 
 
-async def create_match_list_embedded(match_ids):
+async def create_match_list_embedded(embed_title, match_ids):
 
-  embed = discord.Embed(title="Matches:", color=discord.Color.red())
+  embed = discord.Embed(title=embed_title, color=discord.Color.red())
 
   for match_id in match_ids:
     match =get_from_list("match", match_id)
@@ -268,10 +268,10 @@ async def create_leaderboard_embedded():
     rank = ""
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
-      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(round(user_rank[1])) , inline = False)
+      embed.add_field(name = rank + f": {(await bot.fetch_user(user_rank[0])).display_name}", value = str(round(user_rank[1])) , inline = False)
     else:
       rank = emoji.emojize(medals[rank_num - 1])
-      embed.add_field(name = rank, value = str((await bot.fetch_user(user_rank[0])).mention) + ": " + str(round(user_rank[1])), inline = False)
+      embed.add_field(name = rank + f":  {(await bot.fetch_user(user_rank[0])).display_name}", value = str(round(user_rank[1])), inline = False)
     rank_num += 1
   return embed
 
@@ -546,6 +546,8 @@ $match close betting [Identifier]: closes betting
 $match open betting [Identifier]: open betting
 $match winner [Identifier] [team]: sets the team's winner and pays out all bets, to do if winner is already set it takes back on all bets (a team of 0 sets the team to none)
 $match delete [Identifier]: deletes match along with all bets connected, can only be done before payout
+$match list: sends a shorter embed of all matches without a winner
+$match new list: sends a shorter embed of all matches that you havent bet on without a winner
 $match full list: sends embed of all matches without a winner""")
 
     elif args[0] == "list":
@@ -558,7 +560,7 @@ $match full list: sends embed of all matches without a winner""")
         await ctx.send("No undecided matches.")
         return
       
-      embedd = await create_match_list_embedded(match_ids)
+      embedd = await create_match_list_embedded("Matches:", match_ids)
       await ctx.send(embed=embedd)
 
 
@@ -603,24 +605,19 @@ $match full list: sends embed of all matches without a winner""")
           print("no msg found" + str(e))
       await ctx.send(remove_from_list("match", args[1]))
 
-    elif args[0] == "full" and args[1] == "list":
+    elif args[0] == "new" and args[1] == "list":
       matches = get_all_objects("match")
       match_ids = []
+      user = get_from_list("user", ctx.author.id)
       for match in matches:
-        if int(match.winner) == 0:
+        if int(match.winner) == 0 and (set(user.active_bet_ids).isdisjoint(match.bet_ids)):
           match_ids.append(match.code)
       if len(match_ids) == 0:
         await ctx.send("No undecided matches.")
+        return
       
-      for match_id in match_ids:
-        embedd = await create_match_embedded(match_id)
-        if embedd == None:
-          await ctx.send("Identifier Not Found")
-          return
-        msg = await ctx.send(embed=embedd)
-        match = get_from_list("match", match_id)
-        match.message_ids.append((msg.id, msg.channel.id))
-        replace_in_list("match", match.code, match)
+      embedd = await create_match_list_embedded(f"{(await bot.fetch_user(user.code)).display_name}'s Match:", match_ids)
+      await ctx.send(embed=embedd)
 
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
