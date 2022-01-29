@@ -797,19 +797,19 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
           odds = match.t2o
           await ctx.send("Winner has been set to " + match.t2)
 
-          payout = -bet.bet_amount
-          if(bet.team_num == int(args[2])):
-            payout += bet.bet_amount * odds
-          user = get_from_list("user", bet.user_id)
-          remove_from_active_ids(user.code, bet.code)
-          add_balance_user(user.code, payout, "id_" + str(bet.code))
-          
-          replace_in_list("bet", bet.code, bet)
-          embedd = await create_bet_embedded(bet.code)
-          await edit_all_messages(bet.message_ids, embedd)
+        payout = -bet.bet_amount
+        if(bet.team_num == int(args[2])):
+          payout += bet.bet_amount * odds
+        user = get_from_list("user", bet.user_id)
+        remove_from_active_ids(user.code, bet.code)
+        add_balance_user(user.code, payout, "id_" + str(bet.code))
+        
+        replace_in_list("bet", bet.code, bet)
+        embedd = await create_bet_embedded(bet.code)
+        await edit_all_messages(bet.message_ids, embedd)
 
-          embedd = await create_user_embedded(user.code)
-          await ctx.send(embed=embedd)
+        embedd = await create_user_embedded(user.code)
+        await ctx.send(embed=embedd)
       return
         
     #$bet [match id] [team_num] [amount]
