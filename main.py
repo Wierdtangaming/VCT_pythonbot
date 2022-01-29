@@ -704,7 +704,8 @@ async def bet(ctx, *args):
       """$bet [match id] [team] [amount]: you make a bet on the match with match id on the team ("1" for first team listed "2" for second team listed) amount is whole numbers only
 $bet cancel [bet id]: removes bet if bets are still open
 $bet [bet id]: replaces your command with bet info
-$bet list: to do sends embed of all bets without a winner""")
+$bet list: to do sends embed of all bets without a winner
+$bet winner: sets the bets winner (mostly after an error)""")
 
     elif args[0] == "list":
       bets = get_all_objects("bet")
@@ -738,13 +739,13 @@ $bet list: to do sends embed of all bets without a winner""")
       await ctx.send("Not valid command. Use $bet help to get list of commands")
 
   elif len(args) == 2:
-    if args[0] == "cancel" and len(args[1]) == 8:
+    if args[0].startswith("cancel") and len(args[1]) == 8:
       bet = get_from_list("bet", args[1])
       if bet == None:
         await ctx.send("Identifier Not Found")
         return
       match = get_from_list("match", bet.match_id)
-      if match.date_closed == None:
+      if match.date_closed == None or args[0] == "cancelforce":
         
         #match.bet_ids.remove(bet.code)
         #replace_in_list("match", match.code, match)
