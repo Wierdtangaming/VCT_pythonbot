@@ -179,6 +179,7 @@ async def create_match_embedded(identifier):
   embed.add_field(name = "Tournament Name:", value = match.tournament_name, inline = True)
   embed.add_field(name = "Odds Source:", value = match.odds_source, inline = True)
   embed.add_field(name = "Creator:", value = (await bot.fetch_user(match.creator)).mention, inline = True)
+  embed.add_field(name = "Bet IDs:", value = str(', '.join(match.bet_ids)), inline = True)
   date_formatted = match.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   embed.add_field(name = "Created On:", value = date_formatted, inline = True)
   if match.date_closed == None:
