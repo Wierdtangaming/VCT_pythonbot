@@ -169,7 +169,6 @@ def create_user(user_id):
 
 async def create_match_embedded(identifier):
   match = get_from_list("match", identifier)
-  print(match)
   if match == None:
     return None
   embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*tuple(int((match.code[0:8])[i:i+2], 16) for i in (0, 2, 4))))
@@ -179,7 +178,10 @@ async def create_match_embedded(identifier):
   embed.add_field(name = "Tournament Name:", value = match.tournament_name, inline = True)
   embed.add_field(name = "Odds Source:", value = match.odds_source, inline = True)
   embed.add_field(name = "Creator:", value = (await bot.fetch_user(match.creator)).mention, inline = True)
-  embed.add_field(name = "Bet IDs:", value = str(', '.join(match.bet_ids)), inline = True)
+  bet_str = str(', '.join(match.bet_ids))
+  if bet_str == "":
+    bet_str = "None"
+  embed.add_field(name = "Bet IDs:", value = bet_str, inline = True)
   date_formatted = match.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   embed.add_field(name = "Created On:", value = date_formatted, inline = True)
   if match.date_closed == None:
@@ -499,7 +501,8 @@ async def on_message(message):
             cmatch = jsonpickle.decode(db["current_match"])
             add_to_list("match", cmatch)
             embedd = await create_match_embedded(cmatch.code)
-            msg = await bot.get_channel(db["match_channel_id"]).send(embed=embedd)
+            print(embedd)
+            msg = await (await bot.fetch_channel(db["match_channel_id"])).send(embed=embedd)
             cmatch.message_ids.append((msg.id, msg.channel.id))
             replace_in_list("match", cmatch.code, cmatch)
 
@@ -553,6 +556,7 @@ $match full list: sends embed of all matches without a winner""")
           match_ids.append(match.code)
       if len(match_ids) == 0:
         await ctx.send("No undecided matches.")
+        return
       
       embedd = await create_match_list_embedded(match_ids)
       await ctx.send(embed=embedd)
@@ -571,6 +575,7 @@ $match full list: sends embed of all matches without a winner""")
 
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
+
   elif len(args) == 2:
     if args[0] == "delete" and len(args[1]) == 8:
       match = get_from_list("match", args[1])
@@ -619,6 +624,7 @@ $match full list: sends embed of all matches without a winner""")
 
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
+
   elif len(args) == 3:
     if args[0] == "close" and args[1] == "betting" and len(args[2]) == 8:
       match = get_from_list("match", args[2])
@@ -631,6 +637,7 @@ $match full list: sends embed of all matches without a winner""")
       await edit_all_messages(match.message_ids, embedd)
 
       await ctx.send("Betting Closed")
+
     elif args[0] == "open" and args[1] == "betting" and len(args[2]) == 8:
       match = get_from_list("match", args[2])
       if match == None:
@@ -641,6 +648,7 @@ $match full list: sends embed of all matches without a winner""")
       embedd = await create_match_embedded(match.code)
       await edit_all_messages(match.message_ids, embedd)
       await ctx.send("Betting Opened")
+
     elif args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
       match = get_from_list("match", args[1])
       if match == None:
@@ -660,22 +668,25 @@ $match full list: sends embed of all matches without a winner""")
           odds = match.t2o
           await ctx.send("Winner has been set to " + match.t2)
 
-        for bet_ids in match.bet_ids:
-          bet = get_from_list("bet", bet_ids)
-          bet.winner = int(match.winner)
-          payout = -bet.bet_amount
-          if(bet.team_num == int(args[2])):
-            payout += bet.bet_amount * odds
-          user = get_from_list("user", bet.user_id)
-          remove_from_active_ids(user.code, bet.code)
-          add_balance_user(user.code, payout, "id_" + str(bet.code))
-          
-          replace_in_list("bet", bet.code, bet)
-          embedd = await create_bet_embedded(bet.code)
-          await edit_all_messages(bet.message_ids, embedd)
+        for bet_id in match.bet_ids:
+          bet = get_from_list("bet", bet_id)
+          if not bet == None:
+            bet.winner = int(match.winner)
+            payout = -bet.bet_amount
+            if(bet.team_num == int(args[2])):
+              payout += bet.bet_amount * odds
+            user = get_from_list("user", bet.user_id)
+            remove_from_active_ids(user.code, bet.code)
+            add_balance_user(user.code, payout, "id_" + str(bet.code))
+            
+            replace_in_list("bet", bet.code, bet)
+            embedd = await create_bet_embedded(bet.code)
+            await edit_all_messages(bet.message_ids, embedd)
 
-          embedd = await create_user_embedded(user.code)
-          await ctx.send(embed=embedd)
+            embedd = await create_user_embedded(user.code)
+            await ctx.send(embed=embedd)
+          else:
+            print(f"where the bet_id from {bet_id}")
         
 
       else:
@@ -705,7 +716,7 @@ async def bet(ctx, *args):
 $bet cancel [bet id]: removes bet if bets are still open
 $bet [bet id]: replaces your command with bet info
 $bet list: to do sends embed of all bets without a winner
-$bet winner: sets the bets winner (mostly after an error)""")
+$bet winner [bet id]: sets the bets winner (mostly after an error)""")
 
     elif args[0] == "list":
       bets = get_all_objects("bet")
@@ -746,12 +757,12 @@ $bet winner: sets the bets winner (mostly after an error)""")
         return
       match = get_from_list("match", bet.match_id)
       if match.date_closed == None or args[0] == "cancelforce":
-        
-        #match.bet_ids.remove(bet.code)
-        #replace_in_list("match", match.code, match)
+        match.bet_ids.remove(bet.code)
+        replace_in_list("match", match.code, match)
         embedd = await create_match_embedded(match.code)
         await edit_all_messages(match.message_ids, embedd)
-        
+
+
         for msg_id in bet.message_ids:
           try:
             channel = await bot.fetch_channel(msg_id[1])
@@ -760,7 +771,6 @@ $bet winner: sets the bets winner (mostly after an error)""")
             await msg.delete()
           except Exception:
             print("no msg found")
-          
         remove_from_active_ids(bet.user_id, bet.code)
         await ctx.send(remove_from_list("bet", args[1]))
         
@@ -771,6 +781,37 @@ $bet winner: sets the bets winner (mostly after an error)""")
     
   elif len(args) == 3:
     match_id, team_num, amount = args
+    if args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
+      bet = get_from_list("bet", args[1])
+      if bet == None:
+        await ctx.send("Identifier Not Found")
+        return
+      
+      match = get_from_list("match", bet.match_id)
+      if int(bet.winner) == 0 or args[0] == "winnerforce":
+        bet.winner = int(args[2])
+        if int(args[2]) == 1:
+          odds = match.t1o
+          await ctx.send("Winner has been set to " + match.t1)
+        else:
+          odds = match.t2o
+          await ctx.send("Winner has been set to " + match.t2)
+
+          payout = -bet.bet_amount
+          if(bet.team_num == int(args[2])):
+            payout += bet.bet_amount * odds
+          user = get_from_list("user", bet.user_id)
+          remove_from_active_ids(user.code, bet.code)
+          add_balance_user(user.code, payout, "id_" + str(bet.code))
+          
+          replace_in_list("bet", bet.code, bet)
+          embedd = await create_bet_embedded(bet.code)
+          await edit_all_messages(bet.message_ids, embedd)
+
+          embedd = await create_user_embedded(user.code)
+          await ctx.send(embed=embedd)
+      return
+        
     #$bet [match id] [team_num] [amount]
     if not is_digit(amount):
       await ctx.send("Not valid command. Use $bet help to get list of commands")
@@ -814,7 +855,7 @@ $bet winner: sets the bets winner (mostly after an error)""")
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
     embedd = await create_bet_embedded(bet.code)
-    msg = await bot.get_channel(db["bet_channel_id"]).send(embed=embedd)
+    msg = await (await bot.fetch_channel(db["bet_channel_id"])).send(embed=embedd)
     
     await edit_all_messages(bet.message_ids, embedd)
     bet.message_ids.append((msg.id, msg.channel.id))

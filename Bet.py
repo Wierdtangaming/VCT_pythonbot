@@ -6,7 +6,6 @@ class Bet:
     self.bet_amount = bet_amount
     self.team_num = int(team_num)
     self.date_created = date_created
-    self.date_closed = None
     #team num of winner
     self.winner = 0
     self.message_ids = []
