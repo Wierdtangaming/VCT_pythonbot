@@ -1,4 +1,6 @@
 #add moddifacation when no on incorrect match creation
+#rename, remove, get all balance_id
+#double check balance rounding
 
 
 from keepalive import keep_alive
@@ -6,11 +8,12 @@ from keepalive import keep_alive
 import discord
 import os
 import random
+import jsonpickle
 from replit import db
 from Match import Match
 from Bet import Bet
 from User import User
-import jsonpickle
+from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects
 import math
 from datetime import datetime
 from discord.ext import commands
@@ -26,97 +29,50 @@ bot = commands.Bot(intents=intents, command_prefix="$")
 #bet is in bet_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
 #logs are log_[ID] holds (log, date)
 
-
-def get_from_list(prefix, identifier):
-  objects = get_all_objects(prefix)
-  if objects == None or objects.count == 0:
+def ambig_to_obj(ambig, prefix):
+  if isinstance(ambig, int) or isinstance(ambig, str):
+    print(ambig)
+    print(prefix)
+    obj = get_from_list(prefix, ambig)
+    print(obj)
+  else:
+    obj = ambig
+  if obj == None:
     return None
-  for obj in objects:
-    if obj.code == identifier:
-      return obj
-
-def add_to_list(prefix, obj):
-  print(jsonpickle.encode(obj))
-  objects = get_all_objects(prefix)
-  if len(objects) == 0:
-    db[prefix + "_list_1"] = list([jsonpickle.encode(obj)])
-    return
-  list_num = math.floor(len(objects) / 50)
-  list_prog = len(objects) % 50
-  if list_prog == 0:
-    db[prefix + "_list_" + str(list_num + 1)] = [jsonpickle.encode(obj)]
-    return
-
-  list_to_add = list(db[prefix + "_list_" + str(list_num + 1)])
-  list_to_add.append(jsonpickle.encode(obj))
-  db[prefix + "_list_" + str(list_num + 1)] = list_to_add
+  return obj
 
 
-def replace_in_list(prefix, identifier, obj):
-  objects = get_all_objects(prefix)
-  objects_e = [jsonpickle.encode(obj) for obj in objects]
-
-  if get_from_list(prefix, identifier) == None:
-    print(prefix + identifier)
-    return "No Identifier Found"
+def rename_balance_id(user_ambig, balance_id, new_balance_id):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return "User not found"
+  indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
+  if len(indices) > 1:
+    return "More than one balance_id found"
+  elif len(indices) == 0:
+    return "No balance_id found"
+  else:
+    balat = user.balance[indices[0]]
+    user.balance[indices[0]] = (new_balance_id, balat[1], balat[2])
+    replace_in_list("user", user.code, user)
     
-  object_to_replace = jsonpickle.encode(get_from_list(prefix, identifier))
-  index = objects_e.index(object_to_replace)
-  list_num = math.floor(index / 50)
+def delete_balance_id(user_ambig, balance_id):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return "User not found"
+  indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
+  if len(indices) > 1:
+    return "More than one balance_id found"
+  elif len(indices) == 0:
+    return "No balance_id found"
+  else:
+    balat = user.balance[indices[0]]
+    user.balance.remove(balat)
+    replace_in_list("user", user.code, user)
+    
+def print_all_balance(user_ambig):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
 
-  list_to_replace = list(db[prefix + "_list_" + str(list_num + 1)])
-  list_to_replace[list_to_replace.index(object_to_replace)] = jsonpickle.encode(obj)
-  db[prefix + "_list_" + str(list_num + 1)] = list_to_replace
-
-
-def remove_from_list(prefix, identifier):
-  objects = get_all_objects(prefix)
-  objects_e = [jsonpickle.encode(obj) for obj in objects]
-
-  if get_from_list(prefix, identifier) == None:
-    return "No Identifier Found"
-
-  object_to_remove = jsonpickle.encode(get_from_list(prefix, identifier))
-  if len(objects_e) == 0 or (not object_to_remove in objects_e):
-    return "No Identifier Found"
-  index = objects_e.index(object_to_remove)
-  list_num = math.floor(index / 50)
-  list_to_add = list(db[prefix + "_list_" + str(list_num + 1)])
-  list_to_add.remove(object_to_remove)
-  if len(list_to_add) == 0:
-    del db[prefix + "_list_" + str(list_num + 1)]
-    return "Removed " + prefix
-  
-  db[prefix + "_list_" + str(list_num + 1)] = list_to_add
-  if list_num + 1 == len(db.prefix(prefix + "_list_")):
-    return "Removed " + prefix
-  for x in range(list_num + 1, len(list(db.prefix(prefix + "_list_")))):
-    list1 = list(db[prefix + "_list_" + str(x)])
-    list2 = list(db[prefix + "_list_" + str(x + 1)])
-    list1.append(list2[0])
-    list2.remove(list2[0])
-    db[prefix + "_list_" + str(x)] = list1
-
-    if len(list2) == 0:
-      del db[prefix + "_list_" + str(x + 1)]
-    else:
-      db[prefix + "_list_" + str(x + 1)] = list2
-
-  return "Removed " + prefix
-
-
-def get_all_objects(prefix):
-  list_keys_unordered = db.prefix(prefix + "_list_")
-  if len(list_keys_unordered) == 0:
-    print("no keys of type " + prefix)
-    return []
-  list_keys = [str(prefix + "_list_" + str(x + 1)) for x in range(len(list_keys_unordered))]
-  lists = [list(db[listt]) for listt in list(list_keys)]
-  list_objects = sum(list(lists), [])
-  objs = [jsonpickle.decode(obj) for obj in list_objects]
-  return objs
-
-
+  [print(bal[0], bal[1]) for bal in user.balance]
 
 async def edit_all_messages(ids, embedd):
   for id in ids:
@@ -139,9 +95,9 @@ def is_digit(str):
     except ValueError:
         return  False
 
-def get_uniqe_code(prefix:str):
-  full_keys = db.prefix(prefix + "_")
-  codes = full_keys[len(prefix) + 1:]
+def get_uniqe_code(prefix):
+  all_objs = get_all_objects(prefix)
+  codes = [k.code for k in all_objs]
   code = ""
   copy = True
   while(copy):
@@ -162,15 +118,10 @@ def create_user(user_id):
   return user
 
 
-
-
-
-
-
-async def create_match_embedded(identifier):
-  match = get_from_list("match", identifier)
-  if match == None:
-    return None
+async def create_match_embedded(match_ambig):
+  match = ambig_to_obj(match_ambig, "match")
+  if match == None: return None
+  
   embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*tuple(int((match.code[0:8])[i:i+2], 16) for i in (0, 2, 4))))
 
   embed.add_field(name = "Teams:", value = match.t1 + " vs " + match.t2, inline = True)
@@ -205,20 +156,36 @@ async def create_match_embedded(identifier):
   return embed
 
 
-async def create_match_list_embedded(embed_title, match_ids):
-
+async def create_match_list_embedded(embed_title, matches_ambig):
   embed = discord.Embed(title=embed_title, color=discord.Color.red())
-
-  for match_id in match_ids:
-    match =get_from_list("match", match_id)
-    embed.add_field(name = "\n" + "Match: " + match.code, value = match.short_to_string() + "\n", inline = False)
+  if all(isinstance(s, str) for s in matches_ambig):
+    for match_id in matches_ambig:
+      match = get_from_list("match", match_id)
+      embed.add_field(name = "\n" + "Match: " + match.code, value = match.short_to_string() + "\n", inline = False)
+  else:
+    for match in matches_ambig:
+      embed.add_field(name = "\n" + "Match: " + match.code, value = match.short_to_string() + "\n", inline = False)
   return embed
 
+async def create_bet_list_embedded(embed_title, bets_ambig):
+  embed = discord.Embed(title=embed_title, color=discord.Color.red())
+  if all(isinstance(s, str) for s in bets_ambig):
+    for bet_id in bets_ambig:
+      bet = get_from_list("bet", bet_id)
+      embed.add_field(name = "\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline = False)
+  else:
+    for bet in bets_ambig:
+      embed.add_field(name = "\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline = False)
+  return embed
   
-async def create_bet_embedded(identifier):
-  bet = get_from_list("bet", identifier)
-  if bet == None:
-    return None
+
+  
+
+  
+async def create_bet_embedded(bet_ambig):
+  bet = ambig_to_obj(bet_ambig, "bet")
+  if bet == None: return None
+
   embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*tuple(int((bet.code[0:8])[i:i+2], 16) for i in (0, 2, 4))))
   embed.add_field(name = "Match Identifier:", value = bet.match_id, inline = True)
   embed.add_field(name = "User:", value = (await bot.fetch_user(bet.user_id)).mention, inline = True)
@@ -246,13 +213,13 @@ async def create_bet_embedded(identifier):
   return embed
 
 
-async def create_user_embedded(identifier):
-  user = get_from_list("user", identifier)
-  if user == None:
-    return None
+async def create_user_embedded(user_ambig):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
+
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i:i+2], 16) for i in (0, 2, 4))))
   embed.add_field(name = "Name:", value = (await bot.fetch_user(user.code)).mention, inline = True)
-  embed.add_field(name = "Balance:", value = round(user.balance[-1][1]), inline = True)
+  embed.add_field(name = "Balance:", value = math.floor(user.balance[-1][1]), inline = True)
   return embed
 
 
@@ -268,37 +235,49 @@ async def create_leaderboard_embedded():
     rank = ""
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
-      embed.add_field(name = rank + f": {(await bot.fetch_user(user_rank[0])).display_name}", value = str(round(user_rank[1])) , inline = False)
+      embed.add_field(name = rank + f": {(await bot.fetch_user(user_rank[0])).display_name}", value = str(math.floor(user_rank[1])) , inline = False)
     else:
       rank = emoji.emojize(medals[rank_num - 1])
-      embed.add_field(name = rank + f":  {(await bot.fetch_user(user_rank[0])).display_name}", value = str(round(user_rank[1])), inline = False)
+      embed.add_field(name = rank + f":  {(await bot.fetch_user(user_rank[0])).display_name}", value = str(math.floor(user_rank[1])), inline = False)
     rank_num += 1
   return embed
 
-def add_to_active_ids(user_id, bet_id):
-  user = get_from_list("user", user_id)
-  user.active_bet_ids.append(bet_id)
-  replace_in_list("user", user_id, user)
+def add_to_active_ids(user_ambig, bet_id):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
 
-def remove_from_active_ids(user_id, bet_id):
-  user = get_from_list("user", user_id)
-  print(bet_id)
+  user.active_bet_ids.append(bet_id)
+  replace_in_list("user", user.code, user)
+
+def remove_from_active_ids(user_ambig, bet_id):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
+
   if not bet_id in user.active_bet_ids:
     print("Bet_id Not Found")
     return
   user.active_bet_ids.remove(bet_id)
   print(replace_in_list("user", user.code, user))
 
-def add_balance_user(identifier, change, description):
-  print(identifier)
-  user = get_from_list("user", int(identifier))
-  print("fsdf " + str(user))
-  if user == None:
-    return None
+def add_balance_user(user_ambig, change, description):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
+
   user.balance.append((description, round(user.balance[-1][1] + change, 5), datetime.now()))
   replace_in_list("user", user.code, user)
   return user
 
+def get_user_unavailable_balance(user_ambig):
+  user = ambig_to_obj(user_ambig, "user")
+  if user == None: return None
+
+  
+  used = 0
+  for bet_id in user.active_bet_ids:
+      temp_bet = get_from_list("bet", bet_id)
+      used += temp_bet.bet_amount
+  
+  return used
   
 
 async def cancel_match():
@@ -499,12 +478,10 @@ async def on_message(message):
           
           if message.content.lower() == "yes":
             cmatch = jsonpickle.decode(db["current_match"])
-            add_to_list("match", cmatch)
-            embedd = await create_match_embedded(cmatch.code)
-            print(embedd)
+            embedd = await create_match_embedded(cmatch)
             msg = await (await bot.fetch_channel(db["match_channel_id"])).send(embed=embedd)
             cmatch.message_ids.append((msg.id, msg.channel.id))
-            replace_in_list("match", cmatch.code, cmatch)
+            add_to_list("match", cmatch)
 
             await message.channel.send("Match Created")
             await cancel_match()
@@ -541,36 +518,40 @@ async def match(ctx, *args):
     if args[0] == "help":
       await ctx.send(
       """$match: starts match creation
+$match cancel: cancels match creation
 $match [Identifier]: replaces message with match info
 $match close betting [Identifier]: closes betting
 $match open betting [Identifier]: open betting
-$match winner [Identifier] [team]: sets the team's winner and pays out all bets, to do if winner is already set it takes back on all bets (a team of 0 sets the team to none)
+$match winner [Identifier] [team]: sets the team's winner and pays out all bets, (to do): if winner is already set it takes back on all bets (a team of 0 sets the team to none)
 $match delete [Identifier]: deletes match along with all bets connected, can only be done before payout
 $match list: sends a shorter embed of all matches without a winner
-$match new list: sends a shorter embed of all matches that you havent bet on without a winner
-$match full list: sends embed of all matches without a winner""")
+$match list new: sends a shorter embed of all matches that you havent bet on without a winner
+$match list full: sends embed of all matches without a winner""")
 
     elif args[0] == "list":
       matches = get_all_objects("match")
-      match_ids = []
+      match_list = []
       for match in matches:
         if int(match.winner) == 0:
-          match_ids.append(match.code)
-      if len(match_ids) == 0:
+          match_list.append(match)
+      if len(match_list) == 0:
         await ctx.send("No undecided matches.")
         return
-      
-      embedd = await create_match_list_embedded("Matches:", match_ids)
+
+      embedd = await create_match_list_embedded("Matches:", match_list)
       await ctx.send(embed=embedd)
 
+    elif args[0] == "cancel":
+      await cancel_match()
+      await ctx.send("Cancelled")
 
     elif len(args[0]) == 8:
-      embedd = await create_match_embedded(args[0])
-      if embedd == None:
+      match = get_from_list("match", args[0])
+      if match == None:
         await ctx.send("Identifier Not Found")
         return
+      embedd = await create_match_embedded(match)
       msg = await ctx.send(embed=embedd)
-      match = get_from_list("match", args[0])
       match.message_ids.append((msg.id, msg.channel.id))
       replace_in_list("match", match.code, match)
       await ctx.message.delete()
@@ -605,19 +586,36 @@ $match full list: sends embed of all matches without a winner""")
           print("no msg found" + str(e))
       await ctx.send(remove_from_list("match", args[1]))
 
-    elif args[0] == "new" and args[1] == "list":
+    elif args[0] == "list" and args[1] == "new":
       matches = get_all_objects("match")
-      match_ids = []
+      match_list = []
       user = get_from_list("user", ctx.author.id)
       for match in matches:
         if int(match.winner) == 0 and (set(user.active_bet_ids).isdisjoint(match.bet_ids)):
-          match_ids.append(match.code)
-      if len(match_ids) == 0:
+          match_list.append(match)
+      if len(match_list) == 0:
         await ctx.send("No undecided matches.")
         return
       
-      embedd = await create_match_list_embedded(f"{(await bot.fetch_user(user.code)).display_name}'s Match:", match_ids)
+      embedd = await create_match_list_embedded(f"{(await bot.fetch_user(user.code)).display_name}'s Match:", match_list)
       await ctx.send(embed=embedd)
+
+    elif args[0] == "list" and args[1] == "full":
+      matches = get_all_objects("match")
+      match_list = []
+      for match in matches:
+        if int(match.winner) == 0:
+          match_list.append(match)
+      if len(match_list) == 0:
+        await ctx.send("No undecided match.")
+      for match in match_list:
+        embedd = await create_match_embedded(match)
+        if embedd == None:
+          await ctx.send("Identifier Not Found")
+          return
+        msg = await ctx.send(embed=embedd)
+        match.message_ids.append((msg.id, msg.channel.id))
+        replace_in_list("match", match.code, match)
 
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
@@ -630,7 +628,7 @@ $match full list: sends embed of all matches without a winner""")
         return
       match.date_closed = datetime.now()
       replace_in_list("match", match.code, match)
-      embedd = await create_match_embedded(match.code)
+      embedd = await create_match_embedded(match)
       await edit_all_messages(match.message_ids, embedd)
 
       await ctx.send("Betting Closed")
@@ -642,7 +640,7 @@ $match full list: sends embed of all matches without a winner""")
         return
       match.date_closed = None
       replace_in_list("match", match.code, match)
-      embedd = await create_match_embedded(match.code)
+      embedd = await create_match_embedded(match)
       await edit_all_messages(match.message_ids, embedd)
       await ctx.send("Betting Opened")
 
@@ -655,7 +653,7 @@ $match full list: sends embed of all matches without a winner""")
         match.winner = int(args[2])
         match.date_closed = datetime.now()
         replace_in_list("match", match.code, match)
-        embedd = await create_match_embedded(match.code)
+        embedd = await create_match_embedded(match)
         await edit_all_messages(match.message_ids, embedd)
         odds = 0.0
         if int(args[2]) == 1:
@@ -665,6 +663,8 @@ $match full list: sends embed of all matches without a winner""")
           odds = match.t2o
           await ctx.send("Winner has been set to " + match.t2)
 
+        msg_ids = []
+        users = []
         for bet_id in match.bet_ids:
           bet = get_from_list("bet", bet_id)
           if not bet == None:
@@ -673,17 +673,25 @@ $match full list: sends embed of all matches without a winner""")
             if(bet.team_num == int(args[2])):
               payout += bet.bet_amount * odds
             user = get_from_list("user", bet.user_id)
-            remove_from_active_ids(user.code, bet.code)
-            add_balance_user(user.code, payout, "id_" + str(bet.code))
+            remove_from_active_ids(user, bet.code)
+            add_balance_user(user, payout, "id_" + str(bet.code))
             
             replace_in_list("bet", bet.code, bet)
-            embedd = await create_bet_embedded(bet.code)
-            await edit_all_messages(bet.message_ids, embedd)
-
-            embedd = await create_user_embedded(user.code)
-            await ctx.send(embed=embedd)
+            embedd = await create_bet_embedded(bet)
+            msg_ids.append((bet.message_ids, embedd))
+            users.append(user.code)
           else:
             print(f"where the bet_id from {bet_id}")
+        
+        no_same_list_user = []
+        [no_same_list_user.append(x) for x in users if x not in no_same_list_user]
+        for user in no_same_list_user:
+          embedd = await create_user_embedded(user)
+          await ctx.send(embed=embedd)
+
+        [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+
+        
         
 
       else:
@@ -712,34 +720,32 @@ async def bet(ctx, *args):
       """$bet [match id] [team] [amount]: you make a bet on the match with match id on the team ("1" for first team listed "2" for second team listed) amount is whole numbers only
 $bet cancel [bet id]: removes bet if bets are still open
 $bet [bet id]: replaces your command with bet info
-$bet list: to do sends embed of all bets without a winner
-$bet winner [bet id]: sets the bets winner (mostly after an error)""")
+$bet list: sends embed with all bets without a winner
+$bet list full: sends embeds of all bets without a winner
+$bet winner [bet id]: sets the bets winner (should mostly only be used after an error)""")
+
+
 
     elif args[0] == "list":
       bets = get_all_objects("bet")
-      bet_ids = []
+      bet_list = []
       for bet in bets:
         if int(bet.winner) == 0:
-          bet_ids.append(bet.code)
-      if len(bet_ids) == 0:
+          bet_list.append(bet)
+      if len(bet_list) == 0:
         await ctx.send("No undecided bets.")
-      for bet_id in bet_ids:
-        embedd = await create_bet_embedded(bet_id)
-        if embedd == None:
-          await ctx.send("Identifier Not Found")
-          return
-        msg = await ctx.send(embed=embedd)
-        bet = get_from_list("bet", bet_id)
-        bet.message_ids.append((msg.id, msg.channel.id))
-        replace_in_list("bet", bet.code, bet)
+        return
+
+      embedd = await create_bet_list_embedded("Bets:", bet_list)
+      await ctx.send(embed=embedd)
 
     elif len(arg) == 8:
-      embedd = await create_bet_embedded(arg)
-      if embedd == None:
+      bet = get_from_list("bet", arg)
+      if bet == None:
         await ctx.send("Identifier Not Found")
         return
+      embedd = await create_bet_embedded(bet)
       msg = await ctx.send(embed=embedd)
-      bet = get_from_list("bet", arg)
       bet.message_ids.append((msg.id, msg.channel.id))
       replace_in_list("bet", bet.code, bet)
       await ctx.message.delete()
@@ -747,7 +753,24 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
       await ctx.send("Not valid command. Use $bet help to get list of commands")
 
   elif len(args) == 2:
-    if args[0].startswith("cancel") and len(args[1]) == 8:
+
+    if args[0] == "list" and args[1] == "full":
+      bets = get_all_objects("bet")
+      bet_list = []
+      for bet in bets:
+        if int(bet.winner) == 0:
+          bet_list.append(bet)
+      if len(bet_list) == 0:
+        await ctx.send("No undecided bets.")
+      for bet in bet_list:
+        embedd = await create_bet_embedded(bet)
+        if embedd == None:
+          await ctx.send("Identifier Not Found")
+          return
+        msg = await ctx.send(embed=embedd)
+        bet.message_ids.append((msg.id, msg.channel.id))
+        replace_in_list("bet", bet.code, bet)
+    elif args[0].startswith("cancel") and len(args[1]) == 8:
       bet = get_from_list("bet", args[1])
       if bet == None:
         await ctx.send("Identifier Not Found")
@@ -756,7 +779,7 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
       if match.date_closed == None or args[0] == "cancelforce":
         match.bet_ids.remove(bet.code)
         replace_in_list("match", match.code, match)
-        embedd = await create_match_embedded(match.code)
+        embedd = await create_match_embedded(match)
         await edit_all_messages(match.message_ids, embedd)
 
 
@@ -798,14 +821,14 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
         if(bet.team_num == int(args[2])):
           payout += bet.bet_amount * odds
         user = get_from_list("user", bet.user_id)
-        remove_from_active_ids(user.code, bet.code)
-        add_balance_user(user.code, payout, "id_" + str(bet.code))
+        remove_from_active_ids(user, bet.code)
+        add_balance_user(user, payout, "id_" + str(bet.code))
         
         replace_in_list("bet", bet.code, bet)
-        embedd = await create_bet_embedded(bet.code)
+        embedd = await create_bet_embedded(bet)
         await edit_all_messages(bet.message_ids, embedd)
 
-        embedd = await create_user_embedded(user.code)
+        embedd = await create_user_embedded(user)
         await ctx.send(embed=embedd)
       return
         
@@ -832,13 +855,12 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
     user = get_from_list("user", ctx.author.id)
     if(user == None):
       user = create_user(ctx.author.id)
+    
+    
 
-    balance_left = user.balance[-1][1] - int(amount)
-    for bet_id in user.active_bet_ids:
-      temp_bet = get_from_list("bet", bet_id)
-      balance_left -= temp_bet.bet_amount
+    balance_left = user.balance[-1][1] - int(amount) - get_user_unavailable_balance(user)
     if balance_left < 0:
-      await ctx.send("You have bet " + str((-balance_left)) + " more that you have")
+      await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
       return
 
     
@@ -847,17 +869,17 @@ $bet winner [bet id]: sets the bets winner (mostly after an error)""")
     
     match.bet_ids.append(bet.code)
     replace_in_list("match", match.code, match)
-    embedd = await create_match_embedded(match.code)
+    embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
-    embedd = await create_bet_embedded(bet.code)
+    embedd = await create_bet_embedded(bet)
     msg = await (await bot.fetch_channel(db["bet_channel_id"])).send(embed=embedd)
     
     await edit_all_messages(bet.message_ids, embedd)
     bet.message_ids.append((msg.id, msg.channel.id))
     replace_in_list("bet", bet.code, bet)
-    if ctx.channel.id == db["bet_channel_id"]:
+    if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
     
   
@@ -871,12 +893,15 @@ async def debug(ctx, *args):
   if len(args) == 1:
     if args[0] == "help":
       await ctx.send(
-      """$debug list [match, user, bet]: gives all info on all of object
+      """IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE PLEASE DON'T BREAK MY DATABASE
+$debug list [match, user, bet]: gives all info on all of object
 $debug keys: gives all keys
 $debug key "[key]": prints key as is (quotes only needed if there is a space)
 $debug reassign "[original key]" "[new key]": replaces the original key with the new key (quotes only needed if there is a space)
 $debug delete key "[key]": deletes key for database (quotes only needed if there is a space)
-IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE""")
+$debug balance print [user @]: prints balance to console
+$debug balance delete [user @] "balance id: delete balance with that ID
+$debug balance rename [user @] "old balance id" "new balance id": replaces balance ID with new ID""")
 
     elif args[0] == "keys":
       await ctx.send(str(db.keys())[1:-1])
@@ -885,6 +910,7 @@ IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE""")
       await ctx.send("Not valid command. Use $debug help to get list of commands")
 
   elif len(args) == 2:
+
     if args[0] == "list" and (args[1] == "match" or args[1] == "user" or args[1] == "bet"):
       objects = get_all_objects(args[1])
       output = ""
@@ -902,6 +928,10 @@ IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE""")
       await ctx.send("Not valid command. Use $debug help to get list of commands")
 
   elif len(args) == 3:  
+    uid = args[2].replace("<","")
+    uid = uid.replace(">","")
+    uid = uid.replace("@","")
+    uid = uid.replace("!","")
     if args[0] == "reassign":
       db[args[2]] = db[args[1]]
       del db[args[1]]
@@ -912,8 +942,24 @@ IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE""")
       del db[args[2]]
       await ctx.send("deleted " + str(args[2]))
     
+    elif args[0] == "balance" and args[1] == "print" and is_digit(uid):
+      print_all_balance(uid)
     else:
       await ctx.send("Not valid command. Use $debug help to get list of commands")
+  elif len(args) == 4:  
+    uid = args[2].replace("<","")
+    uid = uid.replace(">","")
+    uid = uid.replace("@","")
+    uid = uid.replace("!","")
+    if args[0] == "balance" and args[1] == "delete" and is_digit(uid):
+      delete_balance_id(uid, args[3])
+  elif len(args) == 5:  
+    uid = args[2].replace("<","")
+    uid = uid.replace(">","")
+    uid = uid.replace("@","")
+    uid = uid.replace("!","")
+    if args[0] == "balance" and args[1] == "rename" and is_digit(uid):
+      rename_balance_id(uid, args[3], args[4])
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
 
@@ -923,7 +969,7 @@ async def back(ctx):
   if not db["stage"]  == 0:
     db["stage"] = db["stage"] - 1
     print(db["stage"])
-    #to do
+    #to do give the text
     await ctx.send("Backed up for you :)")
   else:
     await ctx.send("Backed all the way up")
@@ -1008,7 +1054,7 @@ async def award(ctx, *args):
     if user == None:
       await ctx.send("User not found")
     else:
-      embedd = await create_user_embedded(user.code)
+      embedd = await create_user_embedded(user)
       await ctx.send(embed=embedd)
 
   else:
@@ -1023,22 +1069,12 @@ async def help(ctx):
   """All commands have their own help. To go to help type $[command] help
 $match: startes match setup and lists match
 $back: goes backwards in match stage
-$cancel: stop match setup
 $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
 $leaderboard: gives leaderboard of balances
 $award: addes the money to someone's account DON'T USE WITHOUT PERMISSION""")
 
-#cancel
-@bot.command()
-async def cancel(ctx, *arg):
-  if arg[0] == "help":
-    await ctx.send("""$cancel: stops match setup""")
-
-  else:
-    await cancel_match()
-    await ctx.send("Cancelled")
 
 @bot.command()
 async def leaderboard(ctx, *arg):
@@ -1057,14 +1093,21 @@ async def leaderboard(ctx, *arg):
 #season reset command
 @bot.command()
 async def reset_season(ctx):
+  #to do make the command also include season name
   return
   users = get_all_objects("user")
   for user in users:
     user.balance.pop()
-    user.balance.append(("reset 1", 500, datetime.now()))
+    user.balance.append(("reset 2", 500, datetime.now()))
     replace_in_list("user", user.code, user)
 
-
+#gives 50 if under 100
+@bot.command()
+async def loan(ctx, *args):
+  if len(args) == 1:
+    if args[0] == "help":
+      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 60 to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan""")
+  print("to do")
 
 #debug command
 @bot.command()
@@ -1075,7 +1118,7 @@ async def reset_bet_winners_to_match_winners(ctx):
     if not int(get_from_list("match", bet.match_id).winner) == 0:
       bet.winner = int(get_from_list("match", bet.match_id).winner)
       replace_in_list("bet", bet.code, bet)
-      await ctx.send(embed=await create_bet_embedded(bet.code))
+      await ctx.send(embed=await create_bet_embedded(bet))
 
 
 #debug command
