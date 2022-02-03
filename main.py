@@ -56,10 +56,12 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
     replace_in_list("user", user.code, user)
     
 def delete_balance_id(user_ambig, balance_id):
+  #to do, update everything ahead
+
   user = ambig_to_obj(user_ambig, "user")
   if user == None: return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
-  if len(indices) > 1:
+  if len(indices) > 10:
     return "More than one balance_id found"
   elif len(indices) == 0:
     return "No balance_id found"
@@ -952,14 +954,14 @@ $debug balance rename [user @] "old balance id" "new balance id": replaces balan
     uid = uid.replace("@","")
     uid = uid.replace("!","")
     if args[0] == "balance" and args[1] == "delete" and is_digit(uid):
-      delete_balance_id(uid, args[3])
+      print(delete_balance_id(uid, args[3]))
   elif len(args) == 5:  
     uid = args[2].replace("<","")
     uid = uid.replace(">","")
     uid = uid.replace("@","")
     uid = uid.replace("!","")
     if args[0] == "balance" and args[1] == "rename" and is_digit(uid):
-      rename_balance_id(uid, args[3], args[4])
+      print(rename_balance_id(uid, args[3], args[4]))
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
 
@@ -1050,7 +1052,7 @@ async def award(ctx, *args):
       await ctx.send("Not a valid command do $award help for list of commands")
       return
 
-    user = add_balance_user(uid, int(args[1]), args[2])
+    user = add_balance_user(uid, int(args[1]), "award_" + args[2])
     if user == None:
       await ctx.send("User not found")
     else:
