@@ -35,6 +35,6 @@ class Bet:
     
   async def short_to_string(self, bot):
     
-    team_payout = self.get_team_and_payout()
+    (team, payout) = self.get_team_and_payout()
 
-    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team_payout[0]}, Amount: {self.bet_amount}, Payout: {int(round(team_payout[1], 5))}"
+    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(round(payout, 5))}"
