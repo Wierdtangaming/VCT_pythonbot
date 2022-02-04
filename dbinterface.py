@@ -1,6 +1,7 @@
 import jsonpickle 
 from replit import db
 import math
+import discord
 
 def get_from_list(prefix, identifier):
   objects = get_all_objects(prefix)
@@ -97,3 +98,10 @@ def get_all_objects(prefix):
   list_objects = sum(list(lists), [])
   objs = [jsonpickle.decode(obj) for obj in list_objects]
   return objs
+
+async def smart_get_user(user_id, bot):
+  user = bot.get_user(user_id)
+  print(user)
+  if user == None:
+    user = await bot.fetch_user(user_id)
+  return user
