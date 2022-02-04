@@ -13,7 +13,7 @@ from replit import db
 from Match import Match
 from Bet import Bet
 from User import User
-from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects
+from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user
 import math
 from datetime import datetime
 from discord.ext import commands
@@ -147,7 +147,7 @@ async def create_match_embedded(match_ambig):
                     inline=True)
     embed.add_field(name="Odds Source:", value=match.odds_source, inline=True)
     embed.add_field(name="Creator:",
-                    value=(await bot.fetch_user(match.creator)).mention,
+                    value=(await smart_get_user(match.creator, bot)).mention,
                     inline=True)
     bet_str = str(', '.join(match.bet_ids))
     if bet_str == "":
@@ -221,7 +221,7 @@ async def create_bet_embedded(bet_ambig):
                               for i in (0, 2, 4))))
     embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
     embed.add_field(name="User:",
-                    value=(await bot.fetch_user(bet.user_id)).mention,
+                    value=(await smart_get_user(bet.user_id, bot)).mention,
                     inline=True)
     embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
     match = get_from_list("match", bet.match_id)
@@ -256,7 +256,7 @@ async def create_user_embedded(user_ambig):
                               int((user.color_code[0:8])[i:i + 2], 16)
                               for i in (0, 2, 4))))
     embed.add_field(name="Name:",
-                    value=(await bot.fetch_user(user.code)).mention,
+                    value=(await smart_get_user(user.code, bot)).mention,
                     inline=True)
     embed.add_field(name="Balance:",
                     value=math.floor(user.balance[-1][1]),
@@ -282,14 +282,14 @@ async def create_leaderboard_embedded():
             rank = "#" + str(rank_num)
             embed.add_field(
                 name=rank +
-                f": {(await bot.fetch_user(user_rank[0])).display_name}",
+                f": {(await smart_get_user(user_rank[0], bot)).display_name}",
                 value=str(math.floor(user_rank[1])),
                 inline=False)
         else:
             rank = emoji.emojize(medals[rank_num - 1])
             embed.add_field(
                 name=rank +
-                f":  {(await bot.fetch_user(user_rank[0])).display_name}",
+                f":  {(await smart_get_user(user_rank[0], bot)).display_name}",
                 value=str(math.floor(user_rank[1])),
                 inline=False)
         rank_num += 1
@@ -535,8 +535,8 @@ async def on_message(message):
                         cmatch.t2o) + "\nTournament Name: " + str(
                             cmatch.tournament_name) + "\nOdds Source: " + str(
                                 cmatch.odds_source) + "\nCreator: " + str(
-                                    (await bot.fetch_user(cmatch.creator
-                                                          )).mention
+                                    (await smart_get_user(cmatch.creator,
+                                                          bot)).mention
                                 ) + "\nCreated On: " + str(date_formatted)
 
                     await message.channel.send(
@@ -670,7 +670,7 @@ $match list full: sends embed of all matches without a winner""")
                 return
 
             embedd = await create_match_list_embedded(
-                f"{(await bot.fetch_user(user.code)).display_name}'s Match:",
+                f"{(await smart_get_user(user.code, bot)).display_name}'s Match:",
                 match_list)
             await ctx.send(embed=embedd)
 
@@ -1200,7 +1200,7 @@ async def loan(ctx, *args):
     if len(args) == 1:
         if args[0] == "help":
             await ctx.send(
-                """$loan: gives you 50 and adds a loan that you have to pay 60 to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan"""
+                """$loan: gives you 50 and adds a loan that you have to pay (50 + the amount of loans you haven't paid) to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan"""
             )
     print("to do")
 

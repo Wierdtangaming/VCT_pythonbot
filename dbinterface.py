@@ -1,7 +1,6 @@
 import jsonpickle 
 from replit import db
 import math
-import discord
 
 def get_from_list(prefix, identifier):
   objects = get_all_objects(prefix)
