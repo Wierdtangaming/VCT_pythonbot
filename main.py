@@ -32,10 +32,7 @@ bot = commands.Bot(intents=intents, command_prefix="$")
 
 def ambig_to_obj(ambig, prefix):
   if isinstance(ambig, int) or isinstance(ambig, str):
-    print(ambig)
-    print(prefix)
     obj = get_from_list(prefix, ambig)
-    print(obj)
   else:
     obj = ambig
   if obj == None:
@@ -90,7 +87,7 @@ async def edit_all_messages(ids, embedd):
       msg = await channel.fetch_message(id[0])
       await msg.edit(embed=embedd)
     except Exception as e:
-      print("no msg found" + str(e))
+      print("no msg found")
 
 
 def is_key(key):
@@ -599,7 +596,7 @@ $match list full: sends embed of all matches without a winner"""
             msg = await channel.fetch_message(msg_id[0])
             await msg.delete()
           except Exception as e:
-            print("no msg found" + str(e))
+            print("no msg found")
         remove_from_active_ids(bet.user_id, bet.code)
         remove_from_list("bet", bet_id)
 
@@ -609,7 +606,7 @@ $match list full: sends embed of all matches without a winner"""
           msg = await channel.fetch_message(msg_id[0])
           await msg.delete()
         except Exception as e:
-          print("no msg found" + str(e))
+          print("no msg found")
       await ctx.send(remove_from_list("match", args[1]))
 
     elif args[0] == "list" and args[1] == "new":
