@@ -232,8 +232,8 @@ async def create_user_embedded(user_ambig):
 
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
   embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=True)
-  embed.add_field(name="Balance:", value=math.floor(user.balance[-1][1]), inline=False)
-  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - get_user_unavailable_balance(user)), inline=False)
+  embed.add_field(name="Balance:", value=math.floor(user.balance[-1][1]), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - get_user_unavailable_balance(user)), inline=True)
   return embed
 
 
@@ -300,6 +300,27 @@ def get_user_unavailable_balance(user_ambig):
 
   return used
 
+#returns user with new balance
+def change_prev_balance(user, balance_id, new_amount):
+  index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
+  if not len(index) == 1:
+    print(str(len(index)) + " copy of id")
+    return None
+    
+  index = index[0]
+
+  difference = user.balance[index][1] - new_amount
+
+  for i in range(index, len(user.balance)):
+    if i+1 < len(user.balance):
+      difference = user.balance[i+1][1] - user.balance[i][1]
+    user.balance[i] = (user.balance[i][0], new_amount, user.balance[i][2])
+    new_amount = user.balance[i][1] + difference
+  return user
+  
+  
+  
+
 
 async def cancel_match():
   keys = db.keys()
@@ -346,6 +367,7 @@ async def on_message(message):
 
   # hard reset but logs and channel ids
   if message.content == "$clear the database of bad keys please and thank you":
+    return
     all_keys = db.keys()
     keys = []
     for k in all_keys:
@@ -525,6 +547,7 @@ $match [Identifier]: replaces message with match info
 $match close betting [Identifier]: closes betting
 $match open betting [Identifier]: open betting
 $match winner [Identifier] [team]: sets the team's winner and pays out all bets, (to do): if winner is already set it takes back on all bets (a team of 0 sets the team to none)
+$match winner override [Identifier] [team]: switches the team's winner and updates payout on \ all bets, (to do): if winner is already set it takes back on all bets (a team of 0 sets the team to none)
 $match delete [Identifier]: deletes match along with all bets connected, can only be done before payout
 $match list: sends a shorter embed of all matches without a winner
 $match list new: sends a shorter embed of all matches that you havent bet on without a winner
@@ -647,7 +670,7 @@ $match list full: sends embed of all matches without a winner"""
       await edit_all_messages(match.message_ids, embedd)
       await ctx.send("Betting Opened")
 
-    elif args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
+    elif args[0].startswith("winner") and len(args[1]) == 8 and (args[2] == str(1) or args[2] == str(2)):
       match = get_from_list("match", args[1])
       if match == None:
         await ctx.send("Identifier Not Found")
@@ -701,6 +724,59 @@ $match list full: sends embed of all matches without a winner"""
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
 
+  elif len(args) == 4:
+    
+    if args[0].startswith("winner") and args[1].startswith("override") and len(args[2]) == 8 and (args[3] == str(1) or args[3] == str(2)):
+      match = get_from_list("match", args[2])
+      if match == None:
+        await ctx.send("Identifier Not Found")
+        return
+        
+      if False and match.winner == int(args[3]):
+        await ctx.send("Winner is already set to that.")
+        return
+
+      if not (match.winner == 1 or match.winner == 2):
+        await ctx.send("Winner has not been set yet")
+        return
+
+      
+      match.winner = int(args[3])
+      replace_in_list("match", match.code, match)
+      embedd = await create_match_embedded(match)
+      await edit_all_messages(match.message_ids, embedd)
+      msg_ids = []
+      for bet_id in match.bet_ids:
+        bet = get_from_list("bet", bet_id)
+        user = get_from_list("user", bet.user_id)
+        
+
+        balance_id = "id_" + bet.code
+        index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
+        
+        if not len(index) == 1:
+          print(str(len(index)) + " copy of id")
+          return None
+        if int(args[3]) == bet.team_num:
+          payout = bet.get_team_and_payout()[1]
+        else:
+          payout = -bet.bet_amount
+          
+        index = index[0]
+        new_amount = user.balance[index-1][1] + payout
+
+        replace_in_list("user", user.code, change_prev_balance(user, balance_id, new_amount))
+
+        bet.winner = int(match.winner)
+        replace_in_list("bet", bet.code, bet)
+        embedd = await create_bet_embedded(bet)
+        msg_ids.append((bet.message_ids, embedd))
+      
+      [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+      await ctx.send("Updated winner") 
+        
+    else:
+      await ctx.send("Not valid command. Use $match help to get list of commands")    
   else:
     await ctx.send("Not valid command. Use $match help to get list of commands")
 
@@ -828,7 +904,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       return
 
     # $bet [match id] [team_num] [amount]
-    if not is_digit(amount):
+    if not is_digit(amount) and (team_num == 1 or team_num == 2):
       await ctx.send("Not valid command. Use $bet help to get list of commands")
       return
 
@@ -993,10 +1069,10 @@ $assign bets: where the end bets show up"""
 @bot.command()
 async def balance(ctx, *args):
   if len(args) == 0:
-    if get_from_list("user", ctx.author.id) == None:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
       create_user(ctx.author.id)
-    print(ctx.author.id)
-    embedd = await create_user_embedded(int(ctx.author.id))
+    embedd = await create_user_embedded(user)
     if embedd == None:
       await ctx.send("Identifier Not Found")
       return
@@ -1064,8 +1140,7 @@ $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
 $leaderboard: gives leaderboard of balances
-$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION"""
-  )
+$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION""")
 
 
 @bot.command()
@@ -1098,10 +1173,27 @@ async def reset_season(ctx):
 # gives 50 if under 100
 @bot.command()
 async def loan(ctx, *args):
-  if len(args) == 1:
+  return
+  if len(args) == 0:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
+      await ctx.send("You do not have an account yet do $balance or make an account to create an account")
+    if user.balance[-1][1] < 100:
+      loan_amount = len(user.loans)
+      loan_price = 50 + loan_amount * 10
+      user.loan.append((loan_price, loan_price, datetime.now))
+      replace_in_list("user", user.code, user)
+    else:
+      await ctx.send("You must have less than 100 to make a loan")
+
+  elif len(args) == 1:
     if args[0] == "help":
       await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay (50 + the amount of loans you haven't paid) to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan""")
-  print("to do")
+    else:
+      await ctx.send("Not a valid command do $loan help for list of commands")
+  else:
+    await ctx.send("Not a valid command do $loan help for list of commands")
+      
 
 
 # debug command
@@ -1148,7 +1240,7 @@ async def add_var(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    user.active_bet_ids = []
+    user.loans = []
     replace_in_list("user", user.code, user)
 
 

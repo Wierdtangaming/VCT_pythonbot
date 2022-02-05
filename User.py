@@ -14,6 +14,9 @@ class User:
     
     self.active_bet_ids = []
 
+    #a tuple (balance due, start balance, date)
+    self.loans = []
+
 
   def to_string(self):
     return "Balance: " + str(self.balance)
