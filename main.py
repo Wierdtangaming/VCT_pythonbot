@@ -946,6 +946,8 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     replace_in_list("bet", bet.code, bet)
     if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
+    else:
+      await ctx.send("bet created")
 
   else:
     await ctx.send("Not valid command. Use $bet help to get list of commands")
