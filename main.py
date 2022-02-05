@@ -732,7 +732,7 @@ $match list full: sends embed of all matches without a winner"""
         await ctx.send("Identifier Not Found")
         return
         
-      if False and match.winner == int(args[3]):
+      if match.winner == int(args[3]):
         await ctx.send("Winner is already set to that.")
         return
 
