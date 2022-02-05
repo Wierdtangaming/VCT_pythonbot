@@ -935,7 +935,6 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     match.bet_ids.append(bet.code)
     replace_in_list("match", match.code, match)
     embedd = await create_match_embedded(match)
-    await edit_all_messages(match.message_ids, embedd)
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
     embedd = await create_bet_embedded(bet)
@@ -948,6 +947,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       await ctx.message.delete()
     else:
       await ctx.send("bet created")
+    await edit_all_messages(match.message_ids, embedd)
 
   else:
     await ctx.send("Not valid command. Use $bet help to get list of commands")
