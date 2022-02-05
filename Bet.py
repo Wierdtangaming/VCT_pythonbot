@@ -1,5 +1,5 @@
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user
-
+import math
 
 class Bet:
   def __init__(self, code, match_id, user_id, bet_amount, team_num, date_created):
@@ -37,4 +37,4 @@ class Bet:
     
     (team, payout) = self.get_team_and_payout()
 
-    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(round(payout, 5))}"
+    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout, 5))}"
