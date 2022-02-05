@@ -206,7 +206,7 @@ async def create_bet_embedded(bet_ambig):
   (team, payout) = bet.get_team_and_payout()
 
   embed.add_field(name="Bet on:", value=team, inline=True)
-  embed.add_field(name="Payout On Win:", value=payout, inline=True)
+  embed.add_field(name="Payout On Win:", value=math.floor(payout), inline=True)
 
   if int(bet.winner) == 0:
     embed.add_field(name="Winner:", value="None", inline=True)
