@@ -32,10 +32,7 @@ bot = commands.Bot(intents=intents, command_prefix="$")
 
 def ambig_to_obj(ambig, prefix):
   if isinstance(ambig, int) or isinstance(ambig, str):
-    print(ambig)
-    print(prefix)
     obj = get_from_list(prefix, ambig)
-    print(obj)
   else:
     obj = ambig
   if obj == None:
@@ -90,7 +87,7 @@ async def edit_all_messages(ids, embedd):
       msg = await channel.fetch_message(id[0])
       await msg.edit(embed=embedd)
     except Exception as e:
-      print("no msg found" + str(e))
+      print("no msg found")
 
 
 def is_key(key):
@@ -206,7 +203,7 @@ async def create_bet_embedded(bet_ambig):
   (team, payout) = bet.get_team_and_payout()
 
   embed.add_field(name="Bet on:", value=team, inline=True)
-  embed.add_field(name="Payout On Win:", value=payout, inline=True)
+  embed.add_field(name="Payout On Win:", value=math.floor(payout), inline=True)
 
   if int(bet.winner) == 0:
     embed.add_field(name="Winner:", value="None", inline=True)
@@ -599,7 +596,7 @@ $match list full: sends embed of all matches without a winner"""
             msg = await channel.fetch_message(msg_id[0])
             await msg.delete()
           except Exception as e:
-            print("no msg found" + str(e))
+            print("no msg found")
         remove_from_active_ids(bet.user_id, bet.code)
         remove_from_list("bet", bet_id)
 
@@ -609,7 +606,7 @@ $match list full: sends embed of all matches without a winner"""
           msg = await channel.fetch_message(msg_id[0])
           await msg.delete()
         except Exception as e:
-          print("no msg found" + str(e))
+          print("no msg found")
       await ctx.send(remove_from_list("match", args[1]))
 
     elif args[0] == "list" and args[1] == "new":
@@ -732,7 +729,7 @@ $match list full: sends embed of all matches without a winner"""
         await ctx.send("Identifier Not Found")
         return
         
-      if False and match.winner == int(args[3]):
+      if match.winner == int(args[3]):
         await ctx.send("Winner is already set to that.")
         return
 
@@ -935,7 +932,6 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     match.bet_ids.append(bet.code)
     replace_in_list("match", match.code, match)
     embedd = await create_match_embedded(match)
-    await edit_all_messages(match.message_ids, embedd)
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
     embedd = await create_bet_embedded(bet)
@@ -946,6 +942,9 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     replace_in_list("bet", bet.code, bet)
     if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
+    else:
+      await ctx.send("bet created")
+    await edit_all_messages(match.message_ids, embedd)
 
   else:
     await ctx.send("Not valid command. Use $bet help to get list of commands")

@@ -37,4 +37,4 @@ class Bet:
     
     (team, payout) = self.get_team_and_payout()
 
-    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout, 5))}"
+    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
