@@ -1168,9 +1168,7 @@ async def loan(ctx, *args):
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
     if user.balance[-1][1] < 100:
-      loan_amount = len(user.loans)
-      loan_price = 50 + loan_amount * 10
-      user.loan.append((loan_price, datetime.now, None))
+      user.loan.append((50, datetime.now, None))
       replace_in_list("user", user.code, user)
     else:
       await ctx.send("You must have less than 100 to make a loan")
