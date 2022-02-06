@@ -230,7 +230,7 @@ async def create_user_embedded(user_ambig):
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
   embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=True)
   embed.add_field(name="Balance:", value=math.floor(user.balance[-1][1]), inline=True)
-  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - get_user_unavailable_balance(user)), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - user.available()), inline=True)
   return embed
 
 
@@ -285,17 +285,7 @@ def add_balance_user(user_ambig, change, description):
   return user
 
 
-def get_user_unavailable_balance(user_ambig):
-  user = ambig_to_obj(user_ambig, "user")
-  if user == None:
-    return None
 
-  used = 0
-  for bet_id in user.active_bet_ids:
-    temp_bet = get_from_list("bet", bet_id)
-    used += temp_bet.bet_amount
-
-  return used
 
 #returns user with new balance
 def change_prev_balance(user, balance_id, new_amount):
@@ -922,7 +912,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     if user == None:
       user = create_user(ctx.author.id)
 
-    balance_left = user.balance[-1][1] - int(amount) - get_user_unavailable_balance(user)
+    balance_left = user.balance[-1][1] - int(amount) - user.available()
     if balance_left < 0:
       await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
       return
@@ -1180,7 +1170,7 @@ async def loan(ctx, *args):
     if user.balance[-1][1] < 100:
       loan_amount = len(user.loans)
       loan_price = 50 + loan_amount * 10
-      user.loan.append((loan_price, loan_price, datetime.now))
+      user.loan.append((loan_price, datetime.now, None))
       replace_in_list("user", user.code, user)
     else:
       await ctx.send("You must have less than 100 to make a loan")

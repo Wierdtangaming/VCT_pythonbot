@@ -1,3 +1,5 @@
+from dbinterface import get_from_list
+
 class User:
   def __init__(self, code, color_code, date_created):
     self.code = code
@@ -14,9 +16,18 @@ class User:
     
     self.active_bet_ids = []
 
-    #a tuple (balance due, start balance, date)
+    #a tuple (balance, date created, date paid)
+    
     self.loans = []
 
+
+  def available(self):
+    used = 0
+    for bet_id in self.active_bet_ids:
+      temp_bet = get_from_list("bet", bet_id)
+      used += temp_bet.bet_amount
+
+    return used
 
   def to_string(self):
     return "Balance: " + str(self.balance)
