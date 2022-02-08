@@ -20,12 +20,19 @@ class User:
     
     self.loans = []
 
+
+  def get_open_loans(self):
+    open_loans = []
+    for loan in self.loans:
+      if loan[2] == None:
+        open_loans.append(loan)
+    return open_loans
+
   def loan_bal(self):
 
     loan_amount = 0
-    for loan in self.loans:
-      if loan[2] == None:
-        loan_amount += loan[0]
+    for loan in self.get_open_loans:
+      loan_amount += loan[0]
     
     return loan_amount
 
@@ -43,6 +50,9 @@ class User:
     bal += self.loan_bal()
     return bal
 
+
+  def avaliable_nonloan_bal(self):
+    return self.balance[-1][1] - self.unavailable()
 
 
 

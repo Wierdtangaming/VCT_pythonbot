@@ -1171,11 +1171,12 @@ async def loan(ctx, *args):
     user = get_from_list("user", ctx.author.id)
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.get_balance() < 100:
-      user.loan.append((50, datetime.now, None))
-      replace_in_list("user", user.code, user)
-    else:
+    if user.get_balance() >= 100:
       await ctx.send("You must have less than 100 to make a loan")
+      return
+    user.loan.append((50, datetime.now, None))
+    replace_in_list("user", user.code, user)
+    await ctx.send("You have been loaned 50")
 
   elif len(args) == 1:
     if args[0] == "help":
@@ -1183,6 +1184,32 @@ async def loan(ctx, *args):
 $loan count: gives how many loans you have active
 $loan pay: pays off all loans
 $loan pay [amount of loans]: pays off amount of loans equal""")
+
+    elif args[0] == "count":
+      user = get_from_list("user", ctx.author.id)
+      await ctx.send(f"You currently have {len(user.get_open_loans())} active loans")
+
+    elif args[0] == "pay":
+      user = get_from_list("user", ctx.author.id)
+      loan_amount = user.loan_bal()
+      anb = user.avaliable_nonloan_bal()
+      if(anb < loan_amount):
+        await ctx.send(f"You need {loan_amount - anb} more to pay off all loans")
+        return
+
+      loans = user.get_open_loans()
+      for loan in loans:
+        new_loan = list(loan)
+        new_loan[2] = datetime.now()
+        new_loan = tuple(new_loan)
+
+
+        index = user.loans.index(loan)
+        user.loans[index] = new_loan
+      await ctx.send(f"You have paid off {len(loans)} loan(s)")
+
+      
+    
     else:
       await ctx.send("Not a valid command do $loan help for list of commands")
   else:
