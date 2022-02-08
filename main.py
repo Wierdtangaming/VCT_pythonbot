@@ -87,6 +87,7 @@ async def edit_all_messages(ids, embedd):
       msg = await channel.fetch_message(id[0])
       await msg.edit(embed=embedd)
     except Exception as e:
+      print(e.message)
       print("no msg found")
 
 
@@ -229,8 +230,9 @@ async def create_user_embedded(user_ambig):
 
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
   embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=True)
-  embed.add_field(name="Balance:", value=math.floor(user.balance[-1][1]), inline=True)
-  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - user.available()), inline=True)
+  embed.add_field(name="Clean:", value=math.floor(user.balance[-1][1]), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
+  embed.add_field(name="Loan Balance:", value=math.floor(user.loan_bal()), inline=True)
   return embed
 
 
@@ -586,6 +588,7 @@ $match list full: sends embed of all matches without a winner"""
             msg = await channel.fetch_message(msg_id[0])
             await msg.delete()
           except Exception as e:
+            print(e.message)
             print("no msg found")
         remove_from_active_ids(bet.user_id, bet.code)
         remove_from_list("bet", bet_id)
@@ -596,6 +599,7 @@ $match list full: sends embed of all matches without a winner"""
           msg = await channel.fetch_message(msg_id[0])
           await msg.delete()
         except Exception as e:
+          print(e.message)
           print("no msg found")
       await ctx.send(remove_from_list("match", args[1]))
 
@@ -912,7 +916,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     if user == None:
       user = create_user(ctx.author.id)
 
-    balance_left = user.balance[-1][1] - int(amount) - user.available()
+    balance_left = user.get_balance() - int(amount)
     if balance_left < 0:
       await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
       return
@@ -1167,17 +1171,18 @@ async def loan(ctx, *args):
     user = get_from_list("user", ctx.author.id)
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.balance[-1][1] < 100:
-      loan_amount = len(user.loans)
-      loan_price = 50 + loan_amount * 10
-      user.loan.append((loan_price, datetime.now, None))
+    if user.get_balance() < 100:
+      user.loan.append((50, datetime.now, None))
       replace_in_list("user", user.code, user)
     else:
       await ctx.send("You must have less than 100 to make a loan")
 
   elif len(args) == 1:
     if args[0] == "help":
-      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay (50 + the amount of loans you haven't paid) to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan""")
+      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
+$loan count: gives how many loans you have active
+$loan pay: pays off all loans
+$loan pay [amount of loans]: pays off amount of loans equal""")
     else:
       await ctx.send("Not a valid command do $loan help for list of commands")
   else:
