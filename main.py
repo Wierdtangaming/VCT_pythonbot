@@ -1132,7 +1132,8 @@ $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
 $leaderboard: gives leaderboard of balances
-$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION""")
+$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION
+$loan: create and pay off loans, you have to be under 100 to get a loan""")
 
 
 @bot.command()
