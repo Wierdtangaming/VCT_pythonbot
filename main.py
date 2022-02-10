@@ -936,7 +936,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
     else:
-      await ctx.send("bet created")
+      await ctx.send("Bet created")
     await edit_all_messages(match.message_ids, embedd)
 
   else:
