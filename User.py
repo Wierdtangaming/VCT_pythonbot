@@ -20,22 +20,43 @@ class User:
     
     self.loans = []
 
+  def get_open_loans(self):
+    open_loans = []
+    for loan in self.loans:
+      if loan[2] == None:
+        open_loans.append(loan)
+    return open_loans
+
   def loan_bal(self):
 
     loan_amount = 0
-    for loan in self.loans:
-      if loan[2] == None:
-        loan_amount += loan[0]
+    loans = self.get_open_loans()
+    if loans == 0:
+      return 0
+    for loan in loans:
+      loan_amount += loan[0]
     
     return loan_amount
-    
-  def available(self):
+
+  def unavailable(self):
     used = 0
     for bet_id in self.active_bet_ids:
       temp_bet = get_from_list("bet", bet_id)
       used += temp_bet.bet_amount
 
     return used
+
+  def get_balance(self):
+    bal = self.balance[-1][1]
+    bal -= self.unavailable()
+    bal += self.loan_bal()
+    return bal
+
+
+  def avaliable_nonloan_bal(self):
+    return self.balance[-1][1] - self.unavailable()
+
+
 
   def to_string(self):
     return "Balance: " + str(self.balance)

@@ -2,6 +2,10 @@
 # rename, remove, get all balance_id
 # double check balance rounding
 # test bet list with and without await
+# have it replace by code not by value
+# test prefix unique with 1 long in test code
+
+
 
 from keepalive import keep_alive
 
@@ -86,7 +90,7 @@ async def edit_all_messages(ids, embedd):
       channel = await bot.fetch_channel(id[1])
       msg = await channel.fetch_message(id[0])
       await msg.edit(embed=embedd)
-    except Exception as e:
+    except Exception:
       print("no msg found")
 
 
@@ -228,9 +232,10 @@ async def create_user_embedded(user_ambig):
     return None
 
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
-  embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=True)
-  embed.add_field(name="Balance:", value=math.floor(user.balance[-1][1]), inline=True)
-  embed.add_field(name="Balance Available:", value=math.floor(user.balance[-1][1] - user.available()), inline=True)
+  embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=False)
+  embed.add_field(name="Account Balance:", value=math.floor(user.balance[-1][1]), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
+  embed.add_field(name="Loan Balance:", value=math.floor(user.loan_bal()), inline=True)
   return embed
 
 
@@ -279,7 +284,6 @@ def add_balance_user(user_ambig, change, description):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
-
   user.balance.append((description, round(user.balance[-1][1] + change, 5), datetime.now()))
   replace_in_list("user", user.code, user)
   return user
@@ -585,7 +589,7 @@ $match list full: sends embed of all matches without a winner"""
             channel = await bot.fetch_channel(msg_id[1])
             msg = await channel.fetch_message(msg_id[0])
             await msg.delete()
-          except Exception as e:
+          except Exception:
             print("no msg found")
         remove_from_active_ids(bet.user_id, bet.code)
         remove_from_list("bet", bet_id)
@@ -595,7 +599,7 @@ $match list full: sends embed of all matches without a winner"""
           channel = await bot.fetch_channel(msg_id[1])
           msg = await channel.fetch_message(msg_id[0])
           await msg.delete()
-        except Exception as e:
+        except Exception:
           print("no msg found")
       await ctx.send(remove_from_list("match", args[1]))
 
@@ -736,7 +740,6 @@ $match list full: sends embed of all matches without a winner"""
       for bet_id in match.bet_ids:
         bet = get_from_list("bet", bet_id)
         user = get_from_list("user", bet.user_id)
-        
 
         balance_id = "id_" + bet.code
         index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
@@ -912,7 +915,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     if user == None:
       user = create_user(ctx.author.id)
 
-    balance_left = user.balance[-1][1] - int(amount) - user.available()
+    balance_left = user.get_balance() - int(amount)
     if balance_left < 0:
       await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
       return
@@ -1074,7 +1077,7 @@ async def balance(ctx, *args):
     uid = uid.replace("!", "")
     if args[0] == "help":
       await ctx.send(
-        """$balance gives your own balance
+        """$balance: gives your own balance (doesn't include loans or money currently in bets. for leaderboard purposes), avalable balance (money you can bet), loan balance (how much you have/owe with loans)
 $balance [user's @]: gives balance of that user"""
       )
     elif is_digit(uid):
@@ -1162,20 +1165,50 @@ async def reset_season(ctx):
 # gives 50 if under 100
 @bot.command()
 async def loan(ctx, *args):
-  return
   if len(args) == 0:
     user = get_from_list("user", ctx.author.id)
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.balance[-1][1] < 100:
-      user.loan.append((50, datetime.now, None))
-      replace_in_list("user", user.code, user)
-    else:
+    if user.get_balance() >= 100:
       await ctx.send("You must have less than 100 to make a loan")
+      return
+    user.loans.append((50, datetime.now, None))
+    replace_in_list("user", user.code, user)
+    await ctx.send("You have been loaned 50")
 
   elif len(args) == 1:
     if args[0] == "help":
-      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay (50 + the amount of loans you haven't paid) to close, all loans get auto paid at 1000+ balance, you need less that 100 to get a loan""")
+      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
+$loan count: gives how many loans you have active
+$loan pay: pays off all loans""")
+
+    elif args[0] == "count":
+      user = get_from_list("user", ctx.author.id)
+      await ctx.send(f"You currently have {len(user.get_open_loans())} active loans")
+
+    elif args[0] == "pay":
+      user = get_from_list("user", ctx.author.id)
+      loan_amount = user.loan_bal()
+      if loan_amount == 0:
+        await ctx.send("You currently have no loans")
+        return
+      anb = user.avaliable_nonloan_bal()
+      if(anb < loan_amount):
+        await ctx.send(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
+        return
+
+      loans = user.get_open_loans()
+      for loan in loans:
+        new_loan = list(loan)
+        new_loan[2] = datetime.now()
+        new_loan = tuple(new_loan)
+
+
+        index = user.loans.index(loan)
+        user.loans[index] = new_loan
+      replace_in_list("user", user.code, user)
+      await ctx.send(f"You have paid off {len(loans)} loan(s)")
+  
     else:
       await ctx.send("Not a valid command do $loan help for list of commands")
   else:
@@ -1230,7 +1263,13 @@ async def add_var(ctx):
     user.loans = []
     replace_in_list("user", user.code, user)
 
-
+# debug command
+@bot.command()
+async def test_get_object(ctx):
+  user = get_from_list("user", ctx.author.id)
+  replace_in_list("user", user.code, user)
+  print("done")
+  
 # debug command
 @bot.command()
 async def update_bet_ids(ctx):
