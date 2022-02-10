@@ -28,15 +28,17 @@ def add_to_list(prefix, obj):
   db[prefix + "_list_" + str(list_num + 1)] = list_to_add
 
 
-def replace_in_list(prefix, identifier, obj):
+def replace_in_list(prefix, obj_ambig, obj):
+  if isinstance(obj_ambig, int) or isinstance(obj_ambig, str):
+    obj_found = get_from_list(prefix, obj_ambig)
+  else:
+    obj_found = obj_ambig
+  
   objects = get_all_objects(prefix)
   objects_e = [jsonpickle.encode(obj) for obj in objects]
-
-  if get_from_list(prefix, identifier) == None:
-    print(prefix + identifier)
-    return "No Identifier Found"
-    
-  object_to_replace = jsonpickle.encode(get_from_list(prefix, identifier))
+  
+  object_to_replace = jsonpickle.encode(obj_found)
+  print(objects_e)
   index = objects_e.index(object_to_replace)
   list_num = math.floor(index / 50)
 

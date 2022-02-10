@@ -31,7 +31,10 @@ class User:
   def loan_bal(self):
 
     loan_amount = 0
-    for loan in self.get_open_loans:
+    loans = self.get_open_loans()
+    if loans == 0:
+      return 0
+    for loan in loans:
       loan_amount += loan[0]
     
     return loan_amount
