@@ -1192,7 +1192,7 @@ $loan pay: pays off all loans""")
       if loan_amount == 0:
         await ctx.send("You currently have no loans")
         return
-      anb = user.avaliable_nonloan_bal()
+      anb = user.get_balance()
       if(anb < loan_amount):
         await ctx.send(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
         return
