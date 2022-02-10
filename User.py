@@ -20,7 +20,6 @@ class User:
     
     self.loans = []
 
-
   def get_open_loans(self):
     open_loans = []
     for loan in self.loans:
