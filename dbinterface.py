@@ -28,23 +28,26 @@ def add_to_list(prefix, obj):
   db[prefix + "_list_" + str(list_num + 1)] = list_to_add
 
 
-def replace_in_list(prefix, obj_ambig, obj):
-  if isinstance(obj_ambig, int) or isinstance(obj_ambig, str):
-    obj_found = get_from_list(prefix, obj_ambig)
-  else:
-    obj_found = obj_ambig
+def replace_in_list(prefix, obj_code, obj):
   
   objects = get_all_objects(prefix)
-  objects_e = [jsonpickle.encode(obj) for obj in objects]
-  
-  object_to_replace = jsonpickle.encode(obj_found)
-  print(objects_e)
-  index = objects_e.index(object_to_replace)
-  list_num = math.floor(index / 50)
+  for dbobj in objects:
+    if dbobj.code == obj_code:
+      index = objects.index(dbobj)
+      list_num = math.floor(index / 50)
+      list_to_replace = list(db[prefix + "_list_" + str(list_num + 1)])
+      list_index = 0
+      for listdbobj in list_to_replace:
+        if jsonpickle.decode(listdbobj).code == obj_code:
+          list_to_replace[list_index] = jsonpickle.encode(obj)
+          db[prefix + "_list_" + str(list_num + 1)] = list_to_replace
+          return
+        list_index += 1
 
-  list_to_replace = list(db[prefix + "_list_" + str(list_num + 1)])
-  list_to_replace[list_to_replace.index(object_to_replace)] = jsonpickle.encode(obj)
-  db[prefix + "_list_" + str(list_num + 1)] = list_to_replace
+      print("none found")
+      return
+
+  
 
 
 

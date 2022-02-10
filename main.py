@@ -22,7 +22,6 @@ import math
 from datetime import datetime
 from discord.ext import commands
 import emoji
-import copy
 
 intents = discord.Intents.default()
 intents.members = True
@@ -47,7 +46,6 @@ def ambig_to_obj(ambig, prefix):
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "user")
-  old_user = user
   if user == None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
@@ -58,14 +56,13 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
   else:
     balat = user.balance[indices[0]]
     user.balance[indices[0]] = (new_balance_id, balat[1], balat[2])
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 
 def delete_balance_id(user_ambig, balance_id):
   # to do, update everything ahead
 
   user = ambig_to_obj(user_ambig, "user")
-  old_user = user
   if user == None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
@@ -76,7 +73,7 @@ def delete_balance_id(user_ambig, balance_id):
   else:
     balat = user.balance[indices[0]]
     user.balance.remove(balat)
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 
 def print_all_balance(user_ambig):
@@ -264,17 +261,15 @@ async def create_leaderboard_embedded():
 
 def add_to_active_ids(user_ambig, bet_id):
   user = ambig_to_obj(user_ambig, "user")
-  old_user = user
   if user == None:
     return None
 
   user.active_bet_ids.append(bet_id)
-  replace_in_list("user", old_user, user)
+  replace_in_list("user", user.code, user)
 
 
 def remove_from_active_ids(user_ambig, bet_id):
   user = ambig_to_obj(user_ambig, "user")
-  old_user = user
   if user == None:
     return None
 
@@ -282,18 +277,15 @@ def remove_from_active_ids(user_ambig, bet_id):
     print("Bet_id Not Found")
     return
   user.active_bet_ids.remove(bet_id)
-  print(replace_in_list("user", old_user, user))
+  print(replace_in_list("user", user.code, user))
 
 
 def add_balance_user(user_ambig, change, description):
   user = ambig_to_obj(user_ambig, "user")
-  old_user = copy.deepcopy(user)
   if user == None:
     return None
   user.balance.append((description, round(user.balance[-1][1] + change, 5), datetime.now()))
-  print(user.balance[-1])
-  print(old_user.balance[-1])
-  replace_in_list("user", ambig_to_obj(user_ambig, "user"), user)
+  replace_in_list("user", user.code, user)
   return user
 
 
@@ -572,14 +564,13 @@ $match list full: sends embed of all matches without a winner"""
 
     elif len(args[0]) == 8:
       match = get_from_list("match", args[0])
-      old_match = copy.deepcopy(match)
       if match == None:
         await ctx.send("Identifier Not Found")
         return
       embedd = await create_match_embedded(match)
       msg = await ctx.send(embed=embedd)
       match.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("match", old_match, match)
+      replace_in_list("match", match.code, match)
       await ctx.message.delete()
 
     else:
@@ -635,14 +626,13 @@ $match list full: sends embed of all matches without a winner"""
       if len(match_list) == 0:
         await ctx.send("No undecided match.")
       for match in match_list:
-        old_match = match
         embedd = await create_match_embedded(match)
         if embedd == None:
           await ctx.send("Identifier Not Found")
           return
         msg = await ctx.send(embed=embedd)
         match.message_ids.append((msg.id, msg.channel.id))
-        replace_in_list("match", old_match, match)
+        replace_in_list("match", match.code, match)
 
     else:
       await ctx.send("Not valid command. Use $match help to get list of commands")
@@ -650,12 +640,11 @@ $match list full: sends embed of all matches without a winner"""
   elif len(args) == 3:
     if args[0] == "close" and args[1] == "betting" and len(args[2]) == 8:
       match = get_from_list("match", args[2])
-      old_match = match
       if match == None:
         await ctx.send("Identifier Not Found")
         return
       match.date_closed = datetime.now()
-      replace_in_list("match", old_match, match)
+      replace_in_list("match", match.code, match)
       embedd = await create_match_embedded(match)
       await edit_all_messages(match.message_ids, embedd)
 
@@ -663,26 +652,24 @@ $match list full: sends embed of all matches without a winner"""
 
     elif args[0] == "open" and args[1] == "betting" and len(args[2]) == 8:
       match = get_from_list("match", args[2])
-      old_match = match
       if match == None:
         await ctx.send("Identifier Not Found")
         return
       match.date_closed = None
-      replace_in_list("match", old_match, match)
+      replace_in_list("match", match.code, match)
       embedd = await create_match_embedded(match)
       await edit_all_messages(match.message_ids, embedd)
       await ctx.send("Betting Opened")
 
     elif args[0].startswith("winner") and len(args[1]) == 8 and (args[2] == str(1) or args[2] == str(2)):
       match = get_from_list("match", args[1])
-      old_match = match
       if match == None:
         await ctx.send("Identifier Not Found")
         return
       if int(match.winner) == 0 or args[0] == "winnerforce":
         match.winner = int(args[2])
         match.date_closed = datetime.now()
-        replace_in_list("match", old_match, match)
+        replace_in_list("match", match.code, match)
         embedd = await create_match_embedded(match)
         await edit_all_messages(match.message_ids, embedd)
         odds = 0.0
@@ -697,7 +684,6 @@ $match list full: sends embed of all matches without a winner"""
         users = []
         for bet_id in match.bet_ids:
           bet = get_from_list("bet", bet_id)
-          old_bet = bet
           if not bet == None:
             bet.winner = int(match.winner)
             payout = -bet.bet_amount
@@ -707,7 +693,7 @@ $match list full: sends embed of all matches without a winner"""
             remove_from_active_ids(user, bet.code)
             add_balance_user(user, payout, "id_" + str(bet.code))
 
-            replace_in_list("bet", old_bet, bet)
+            replace_in_list("bet", bet.code, bet)
             embedd = await create_bet_embedded(bet)
             msg_ids.append((bet.message_ids, embedd))
             users.append(user.code)
@@ -733,7 +719,6 @@ $match list full: sends embed of all matches without a winner"""
     
     if args[0].startswith("winner") and args[1].startswith("override") and len(args[2]) == 8 and (args[3] == str(1) or args[3] == str(2)):
       match = get_from_list("match", args[2])
-      old_match = match
       if match == None:
         await ctx.send("Identifier Not Found")
         return
@@ -748,15 +733,13 @@ $match list full: sends embed of all matches without a winner"""
 
       
       match.winner = int(args[3])
-      replace_in_list("match", old_match, match)
+      replace_in_list("match", match.code, match)
       embedd = await create_match_embedded(match)
       await edit_all_messages(match.message_ids, embedd)
       msg_ids = []
       for bet_id in match.bet_ids:
         bet = get_from_list("bet", bet_id)
         user = get_from_list("user", bet.user_id)
-        old_bet = bet
-        old_user = user
 
         balance_id = "id_" + bet.code
         index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
@@ -772,10 +755,10 @@ $match list full: sends embed of all matches without a winner"""
         index = index[0]
         new_amount = user.balance[index-1][1] + payout
 
-        replace_in_list("user", old_user, change_prev_balance(user, balance_id, new_amount))
+        replace_in_list("user", user.code, change_prev_balance(user, balance_id, new_amount))
 
         bet.winner = int(match.winner)
-        replace_in_list("bet", old_bet, bet)
+        replace_in_list("bet", bet.code, bet)
         embedd = await create_bet_embedded(bet)
         msg_ids.append((bet.message_ids, embedd))
       
@@ -820,14 +803,13 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 
     elif len(arg) == 8:
       bet = get_from_list("bet", arg)
-      old_bet = bet
       if bet == None:
         await ctx.send("Identifier Not Found")
         return
       embedd = await create_bet_embedded(bet)
       msg = await ctx.send(embed=embedd)
       bet.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("bet", old_bet, bet)
+      replace_in_list("bet", bet.code, bet)
       await ctx.message.delete()
     else:
       await ctx.send("Not valid command. Use $bet help to get list of commands")
@@ -843,24 +825,22 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       if len(bet_list) == 0:
         await ctx.send("No undecided bets.")
       for bet in bet_list:
-        old_bet = bet
         embedd = await create_bet_embedded(bet)
         if embedd == None:
           await ctx.send("Identifier Not Found")
           return
         msg = await ctx.send(embed=embedd)
         bet.message_ids.append((msg.id, msg.channel.id))
-        replace_in_list("bet", old_bet, bet)
+        replace_in_list("bet", bet.code, bet)
     elif args[0].startswith("cancel") and len(args[1]) == 8:
       bet = get_from_list("bet", args[1])
       if bet == None:
         await ctx.send("Identifier Not Found")
         return
       match = get_from_list("match", bet.match_id)
-      old_match = match
       if match.date_closed == None or args[0] == "cancelforce":
         match.bet_ids.remove(bet.code)
-        replace_in_list("match", old_match, match)
+        replace_in_list("match", match.code, match)
         embedd = await create_match_embedded(match)
         await edit_all_messages(match.message_ids, embedd)
 
@@ -884,7 +864,6 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     match_id, team_num, amount = args
     if args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
       bet = get_from_list("bet", args[1])
-      old_bet = bet
       if bet == None:
         await ctx.send("Identifier Not Found")
         return
@@ -906,7 +885,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
         remove_from_active_ids(user, bet.code)
         add_balance_user(user, payout, "id_" + str(bet.code))
 
-        replace_in_list("bet", old_bet, bet)
+        replace_in_list("bet", bet.code, bet)
         embedd = await create_bet_embedded(bet)
         await edit_all_messages(bet.message_ids, embedd)
 
@@ -923,7 +902,6 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       await ctx.send("Cant bet negatives")
       return
     match = get_from_list("match", match_id)
-    old_match = match
     if match == None:
       await ctx.send("Identifier Not Found")
       return
@@ -943,10 +921,9 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       return
 
     bet = Bet(code, match_id, ctx.author.id, int(amount), int(team_num), datetime.now())
-    old_bet = bet
 
     match.bet_ids.append(bet.code)
-    replace_in_list("match", old_match, match)
+    replace_in_list("match", match.code, match)
     embedd = await create_match_embedded(match)
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
@@ -955,7 +932,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 
     await edit_all_messages(bet.message_ids, embedd)
     bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("bet", old_bet, bet)
+    replace_in_list("bet", bet.code, bet)
     if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
     else:
@@ -1180,10 +1157,9 @@ async def reset_season(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    old_user = user
     user.balance.pop()
     user.balance.append(("reset 2", 500, datetime.now()))
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 
 # gives 50 if under 100
@@ -1191,22 +1167,20 @@ async def reset_season(ctx):
 async def loan(ctx, *args):
   if len(args) == 0:
     user = get_from_list("user", ctx.author.id)
-    old_user = user
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
     if user.get_balance() >= 100:
       await ctx.send("You must have less than 100 to make a loan")
       return
     user.loans.append((50, datetime.now, None))
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
     await ctx.send("You have been loaned 50")
 
   elif len(args) == 1:
     if args[0] == "help":
       await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
 $loan count: gives how many loans you have active
-$loan pay: pays off all loans
-$loan pay [amount of loans]: pays off amount of loans equal""")
+$loan pay: pays off all loans""")
 
     elif args[0] == "count":
       user = get_from_list("user", ctx.author.id)
@@ -1232,10 +1206,9 @@ $loan pay [amount of loans]: pays off amount of loans equal""")
 
         index = user.loans.index(loan)
         user.loans[index] = new_loan
+      replace_in_list("user", user.code, user)
       await ctx.send(f"You have paid off {len(loans)} loan(s)")
-
-      
-    
+  
     else:
       await ctx.send("Not a valid command do $loan help for list of commands")
   else:
@@ -1250,9 +1223,8 @@ async def reset_bet_winners_to_match_winners(ctx):
   bets = get_all_objects("bet")
   for bet in bets:
     if not int(get_from_list("match", bet.match_id).winner) == 0:
-      old_bet = bet
       bet.winner = int(get_from_list("match", bet.match_id).winner)
-      replace_in_list("bet", old_bet, bet)
+      replace_in_list("bet", bet.code, bet)
       await ctx.send(embed=await create_bet_embedded(bet))
 
 
@@ -1262,12 +1234,11 @@ async def round_all_user_balances(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    old_user = user
     for bal in user.balance:
 
       user.balance[user.balance.index(bal)] = (user.balance[user.balance.index(bal)][0], round(user.balance[user.balance.index(bal)][1], 5), user.balance[user.balance.index(bal)][2])
 
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 
 # debug command
@@ -1276,12 +1247,11 @@ async def delete_last_bal(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    old_user = user
     print(user.balance)
     if type(user.balance[-1][1]) == tuple:
       user.balance.pop()
       print(user.balance)
-      replace_in_list("user", old_user, user)
+      replace_in_list("user", user.code, user)
 
 
 # debug command
@@ -1290,15 +1260,14 @@ async def add_var(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    old_user = user
     user.loans = []
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 # debug command
 @bot.command()
 async def test_get_object(ctx):
   user = get_from_list("user", ctx.author.id)
-  replace_in_list("user", user, user)
+  replace_in_list("user", user.code, user)
   print("done")
   
 # debug command
@@ -1308,12 +1277,11 @@ async def update_bet_ids(ctx):
   users = get_all_objects("user")
   for user in users:
     print(user.active_bet_ids)
-    old_user = user
     for bal in user.balance:
       if len(user.balance[user.balance.index(bal)][0]) == 8:
         user.balance[user.balance.index(bal)] = (("id_" + str(user.balance[user.balance.index(bal)][0])), user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
 
-    replace_in_list("user", old_user, user)
+    replace_in_list("user", user.code, user)
 
 
 keep_alive()
