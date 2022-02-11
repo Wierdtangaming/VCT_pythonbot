@@ -24,6 +24,7 @@ class Bet:
 
     team = ""
     payout = 0.0
+    print()
     if self.team_num == 1:
       team = match.t1
       payout = self.bet_amount * match.t1o - self.bet_amount

@@ -52,6 +52,8 @@ class User:
     bal += self.loan_bal()
     return bal
 
+  def get_clean_bal_loan(self):
+    return self.balance[-1][1] + self.loan_bal()
 
   def avaliable_nonloan_bal(self):
     return self.balance[-1][1] - self.unavailable()
