@@ -901,7 +901,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       await ctx.send("Not valid command. Use $bet help to get list of commands")
       return
     
-    if not (int(team_num) == 1 or int(team_num == 2)):
+    if not (int(team_num) == 1 or int(team_num) == 2):
       await ctx.send("Team num has to either be 1 or 2")
       return
 
