@@ -34,8 +34,7 @@ class Bet:
 
     return(team, payout)
 
-  def get_team_and_winner(self):
-    match = get_from_list("match", self.match_id)
+  def get_team_and_winner(self, match):
 
     team = ""
     winner = ""
@@ -47,9 +46,9 @@ class Bet:
 
     if self.winner == 1:
       winner = match.t1
-    elif self.team_num == 2:
+    elif self.winner == 2:
       winner = match.t2
-    elif self.team_num == 0:
+    elif self.winner == 0:
       winner = "None"
 
     return(team, winner)
@@ -62,7 +61,8 @@ class Bet:
 
   async def balance_to_string(self, balance):
     
-    (team, winner) = self.get_team_and_winner()
+    match = get_from_list("match", self.match_id)
+    (team, winner) = self.get_team_and_winner(match)
 
-    return f"Team: {team}, Winner: {winner}, Amount Bet: {self.bet_amount}"
+    return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.bet_amount)}, Balance change: {math.floor(balance)}"
 

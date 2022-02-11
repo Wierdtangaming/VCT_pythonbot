@@ -1100,7 +1100,7 @@ $balance [user's @]: gives balance of that user"""
     if args[0] == "log" and args[1].isdigit():
       user = get_from_list("user", ctx.author.id)
 
-      await ctx.send(embed=user.get_new_balance_changes(int(args[1])))
+      await ctx.send(embed= await user.get_new_balance_changes(int(args[1])) )
   else:
     await ctx.send("Not a valid command do $balance help for list of commands")
 
