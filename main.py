@@ -902,7 +902,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       return
     
     if not (int(team_num) == 1 or int(team_num == 2)):
-      await ctx.send("newam num has to either be 1 or 2")
+      await ctx.send("Team num has to either be 1 or 2")
       return
 
     if int(amount) <= 0:
@@ -982,7 +982,7 @@ $debug balance rename [user @] "old balance id" "new balance id": replaces balan
       for obj in objects:
         output += obj.to_string() + "\n"
       if not output == "":
-        await ctx.send(output)
+        print(output)
       else:
         await ctx.send("No keys of type " + args[1])
 
@@ -1101,7 +1101,7 @@ $balance log [amount you want to show]: shows the last x amount of balance chang
     if args[0] == "log" and args[1].isdigit():
       user = get_from_list("user", ctx.author.id)
 
-      await ctx.send(embed= await user.get_new_balance_changes(int(args[1])) )
+      await ctx.send(embed= user.get_new_balance_changes(int(args[1])) )
   else:
     await ctx.send("Not a valid command do $balance help for list of commands")
 
