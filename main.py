@@ -832,17 +832,20 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
         msg = await ctx.send(embed=embedd)
         bet.message_ids.append((msg.id, msg.channel.id))
         replace_in_list("bet", bet.code, bet)
+
     elif args[0].startswith("cancel") and len(args[1]) == 8:
       bet = get_from_list("bet", args[1])
       if bet == None:
         await ctx.send("Identifier Not Found")
         return
       match = get_from_list("match", bet.match_id)
-      if match.date_closed == None or args[0] == "cancelforce":
-        match.bet_ids.remove(bet.code)
-        replace_in_list("match", match.code, match)
-        embedd = await create_match_embedded(match)
-        await edit_all_messages(match.message_ids, embedd)
+
+      if args[0] == "cancelforce" or match == None or match.date_closed == None:
+        if not match == None:
+          match.bet_ids.remove(bet.code)
+          replace_in_list("match", match.code, match)
+          embedd = await create_match_embedded(match)
+          await edit_all_messages(match.message_ids, embedd)
 
         for msg_id in bet.message_ids:
           try:
@@ -894,8 +897,12 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
       return
 
     # $bet [match id] [team_num] [amount]
-    if not is_digit(amount) and (team_num == 1 or team_num == 2):
+    if not is_digit(amount):
       await ctx.send("Not valid command. Use $bet help to get list of commands")
+      return
+    
+    if not (int(team_num) == 1 or int(team_num == 2)):
+      await ctx.send("newam num has to either be 1 or 2")
       return
 
     if int(amount) <= 0:
@@ -923,20 +930,21 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     bet = Bet(code, match_id, ctx.author.id, int(amount), int(team_num), datetime.now())
 
     match.bet_ids.append(bet.code)
-    replace_in_list("match", match.code, match)
-    embedd = await create_match_embedded(match)
     add_to_list("bet", bet)
     add_to_active_ids(ctx.author.id, bet.code)
-    embedd = await create_bet_embedded(bet)
-    msg = await (await bot.fetch_channel(db["bet_channel_id"])).send(embed=embedd)
 
-    await edit_all_messages(bet.message_ids, embedd)
+    embedd = await create_bet_embedded(bet)
+    channel = await bot.fetch_channel(db["bet_channel_id"])
+    msg = await channel.send(embed=embedd)
+
     bet.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("match", match.code, match)
     replace_in_list("bet", bet.code, bet)
     if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
       await ctx.message.delete()
     else:
-      await ctx.send("bet created")
+      await ctx.send("Bet created")
+    embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
 
   else:
@@ -1088,6 +1096,11 @@ $balance [user's @]: gives balance of that user"""
       await ctx.send(embed=embedd)
     else:
       await ctx.send("Not a valid command do $balance help for list of commands")
+  elif len(args) == 2:
+    if args[0] == "log" and args[1].isdigit():
+      user = get_from_list("user", ctx.author.id)
+
+      await ctx.send(embed= await user.get_new_balance_changes(int(args[1])) )
   else:
     await ctx.send("Not a valid command do $balance help for list of commands")
 
@@ -1170,7 +1183,7 @@ async def loan(ctx, *args):
     user = get_from_list("user", ctx.author.id)
     if user == None:
       await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.get_balance() >= 100:
+    if user.get_clean_bal_loan() >= 100:
       await ctx.send("You must have less than 100 to make a loan")
       return
     user.loans.append((50, datetime.now, None))

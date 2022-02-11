@@ -24,6 +24,7 @@ class Bet:
 
     team = ""
     payout = 0.0
+    print()
     if self.team_num == 1:
       team = match.t1
       payout = self.bet_amount * match.t1o - self.bet_amount
@@ -32,9 +33,36 @@ class Bet:
       payout = self.bet_amount * match.t2o - self.bet_amount
 
     return(team, payout)
-    
+
+  def get_team_and_winner(self, match):
+
+    team = ""
+    winner = ""
+
+    if self.team_num == 1:
+      team = match.t1
+    elif self.team_num == 2:
+      team = match.t2
+
+    if self.winner == 1:
+      winner = match.t1
+    elif self.winner == 2:
+      winner = match.t2
+    elif self.winner == 0:
+      winner = "None"
+
+    return(team, winner)
+
   async def short_to_string(self, bot):
     
     (team, payout) = self.get_team_and_payout()
 
     return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
+
+  async def balance_to_string(self, balance):
+    
+    match = get_from_list("match", self.match_id)
+    (team, winner) = self.get_team_and_winner(match)
+
+    return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.bet_amount)}, Balance change: {math.floor(balance)}"
+
