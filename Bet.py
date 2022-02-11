@@ -59,7 +59,7 @@ class Bet:
 
     return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
 
-  async def balance_to_string(self, balance):
+  def balance_to_string(self, balance):
     
     match = get_from_list("match", self.match_id)
     (team, winner) = self.get_team_and_winner(match)

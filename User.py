@@ -63,16 +63,16 @@ class User:
   def to_string(self):
     return "Balance: " + str(self.balance)
       
-  async def get_new_balance_changes(self, amount):
+  def get_new_balance_changes(self, amount):
     if amount >= len(self.balance):
       amount = len(self.balance)
       before = 0
     new_balances = self.balance[-amount:]
     new_balances.reverse()
-    before = self.balance[len(self.balance)-amount-1][1]
+    before = self.balance[-2][1]
 
     embed = discord.Embed(title="Balance Log:", color=discord.Color.from_rgb(*tuple(int((self.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
-
+    bal_index = 3
     for balance in new_balances:
       #a tuple (bet_id, balance after change, date)
       #bet_id = id_[bet_id]: bet id
@@ -84,7 +84,7 @@ class User:
         #bet id
         bet = get_from_list("bet", balance[0][3:])
 
-        embed.add_field(name="Bet: " + bet.code, value=await bet.balance_to_string(balance_change), inline=False)
+        embed.add_field(name=f"Bet: {bet.code}", value=bet.balance_to_string(balance_change), inline=False)
         
       elif balance[0].startswith("award_"):
         text = f""
@@ -105,7 +105,12 @@ class User:
         #reset
         embed.add_field(name="Reset To:", value=f"Balance set to {balance[1]} because of a reset", inline=False)
       else:
-        print("error condition not found", str(balance))
         embed.add_field(name=f"Invalid Balance Update {balance[0]}:", value=f"Balance set to {balance[1]} and changed by {balance_change}", inline=False)
-      before = balance[1]
+        print("error condition not found", str(balance))
+      if bal_index < len(self.balance):
+        before = self.balance[-bal_index][1]
+        bal_index += 1
+      else:
+        before = 0
+        
     return embed
