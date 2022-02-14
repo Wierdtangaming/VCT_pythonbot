@@ -109,7 +109,7 @@ class User:
         embeds[endex].add_field(name="Set To:", value=f"Manually set to {balance[1]}", inline=False)
       elif balance[0].startswith("reset_"):
         #reset
-        embeds[endex].add_field(name="Reset To:", value=f"Balance set to {balance[1]} because of a reset", inline=False)
+        embeds[endex].add_field(name="Reset To:", value=f"Balance set to {balance[1]} because of {balance[0][6:]}", inline=False)
       else:
         embeds[endex].add_field(name=f"Invalid Balance Update {balance[0]}:", value=f"Balance set to {balance[1]} and changed by {balance_change}", inline=False)
         print("error condition not found", str(balance))

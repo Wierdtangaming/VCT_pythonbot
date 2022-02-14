@@ -1311,8 +1311,8 @@ async def update_bet_ids(ctx):
   for user in users:
     print(user.active_bet_ids)
     for bal in user.balance:
-      if len(user.balance[user.balance.index(bal)][0]) == 8:
-        user.balance[user.balance.index(bal)] = (("id_" + str(user.balance[user.balance.index(bal)][0])), user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
+      if user.balance[user.balance.index(bal)][0] == "reset 1":
+        user.balance[user.balance.index(bal)] = ("reset_2022 Stage 1" , user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
 
     replace_in_list("user", user.code, user)
 
