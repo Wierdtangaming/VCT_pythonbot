@@ -1100,8 +1100,25 @@ $balance log [amount you want to show]: shows the last x amount of balance chang
   elif len(args) == 2:
     if args[0] == "log" and args[1].isdigit():
       user = get_from_list("user", ctx.author.id)
-
-      await ctx.send(embed= user.get_new_balance_changes(int(args[1])) )
+      gen_msg = await ctx.send("Generating log...")
+      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[1]))]
+      await gen_msg.delete()
+    else:
+      await ctx.send("Not a valid command do $balance help for list of commands")
+  elif len(args) == 3:
+    uid = args[1].replace("<", "")
+    uid = uid.replace(">", "")
+    uid = uid.replace("@", "")
+    uid = uid.replace("!", "")
+    if args[0] == "log" and uid.isdigit() and args[2].isdigit():
+      user = get_from_list("user", uid)
+      if user == None:
+        await ctx.send("User ID not found")
+      gen_msg = await ctx.send("Generating log...")
+      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[1]))]
+      await gen_msg.delete()
+    else:
+      await ctx.send("Not a valid command do $balance help for list of commands")
   else:
     await ctx.send("Not a valid command do $balance help for list of commands")
 
