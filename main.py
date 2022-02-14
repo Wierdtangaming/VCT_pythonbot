@@ -1087,7 +1087,8 @@ async def balance(ctx, *args):
       await ctx.send(
         """$balance: gives your own balance (doesn't include loans or money currently in bets. for leaderboard purposes), avalable balance (money you can bet), loan balance (how much you have/owe with loans)
 $balance [user's @]: gives balance of that user
-$balance log [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc)"""
+$balance log [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc)
+$balance log [user's @] [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc) of user @'d'"""
       )
     elif is_digit(uid):
       embedd = await create_user_embedded(int(uid))
