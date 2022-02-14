@@ -1115,7 +1115,7 @@ $balance log [amount you want to show]: shows the last x amount of balance chang
       if user == None:
         await ctx.send("User ID not found")
       gen_msg = await ctx.send("Generating log...")
-      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[1]))]
+      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[2]))]
       await gen_msg.delete()
     else:
       await ctx.send("Not a valid command do $balance help for list of commands")
