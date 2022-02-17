@@ -1192,11 +1192,11 @@ $balance print last [amount] [user @]: gives image of all of bet history of the 
         await ctx.send("Amount has to be bigger.")
         return
       elif amount >= len(user.balance):
-        amount = len(user.balance)-1
+        amount = len(user.balance)
       
       with BytesIO() as image_binary:
         gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image(user.balance[-(amount+1):]).save(image_binary, 'PNG')
+        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
         image_binary.seek(0)
         await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
         await gen_msg.delete()
@@ -1212,11 +1212,11 @@ $balance print last [amount] [user @]: gives image of all of bet history of the 
         await ctx.send("Amount has to be bigger.")
         return
       elif amount >= len(user.balance):
-        amount = len(user.balance)-1
+        amount = len(user.balance)
       
       with BytesIO() as image_binary:
         gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image(user.balance[-(amount+1):]).save(image_binary, 'PNG')
+        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
         image_binary.seek(0)
         await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
         await gen_msg.delete()
