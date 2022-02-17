@@ -9,6 +9,8 @@
 
 from keepalive import keep_alive
 
+from io import BytesIO
+import collections
 import discord
 import os
 import random
@@ -43,6 +45,23 @@ def ambig_to_obj(ambig, prefix):
     return None
   return obj
 
+def get_user_from_at(id):
+  uid = id.replace("<", "")
+  uid = uid.replace(">", "")
+  uid = uid.replace("@", "")
+  uid = uid.replace("!", "")
+  if uid.isdigit():
+    return get_user_from_id(int(uid))
+  else:
+    return None
+
+def get_user_from_id(id):
+  users = get_all_objects("user")
+  for user in users:
+    if user.code == id:
+      return user
+  else:
+    return None
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "user")
@@ -66,12 +85,16 @@ def delete_balance_id(user_ambig, balance_id):
   if user == None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
-  if len(indices) > 10:
+  if len(indices) > 1:
     return "More than one balance_id found"
   elif len(indices) == 0:
     return "No balance_id found"
   else:
+    #to do
+    #reset_range = self.get_reset_range(indices[0])
+    #index = indices[0] + 1
     balat = user.balance[indices[0]]
+    
     user.balance.remove(balat)
     replace_in_list("user", user.code, user)
 
@@ -109,7 +132,7 @@ def is_digit(str):
 
 def get_uniqe_code(prefix):
   all_objs = get_all_objects(prefix)
-  codes = [k.code for k in all_objs]
+  codes = [str(k.code) for k in all_objs]
   code = ""
   copy = True
   while copy:
@@ -280,11 +303,11 @@ def remove_from_active_ids(user_ambig, bet_id):
   print(replace_in_list("user", user.code, user))
 
 
-def add_balance_user(user_ambig, change, description):
+def add_balance_user(user_ambig, change, description, date):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
-  user.balance.append((description, round(user.balance[-1][1] + change, 5), datetime.now()))
+  user.balance.append((description, round(user.balance[-1][1] + change, 5), date))
   replace_in_list("user", user.code, user)
   return user
 
@@ -682,6 +705,7 @@ $match list full: sends embed of all matches without a winner"""
 
         msg_ids = []
         users = []
+        date = datetime.now()
         for bet_id in match.bet_ids:
           bet = get_from_list("bet", bet_id)
           if not bet == None:
@@ -691,7 +715,7 @@ $match list full: sends embed of all matches without a winner"""
               payout += bet.bet_amount * odds
             user = get_from_list("user", bet.user_id)
             remove_from_active_ids(user, bet.code)
-            add_balance_user(user, payout, "id_" + str(bet.code))
+            add_balance_user(user, payout, "id_" + str(bet.code), date)
 
             replace_in_list("bet", bet.code, bet)
             embedd = await create_bet_embedded(bet)
@@ -924,6 +948,9 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 
     balance_left = user.get_balance() - int(amount)
     if balance_left < 0:
+      if int(amount <= 100):
+        await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have, try taking out a loan")
+        return
       await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
       return
 
@@ -948,7 +975,8 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
     await edit_all_messages(match.message_ids, embedd)
 
   else:
-    await ctx.send("Not valid command. Use $bet help to get list of commands")
+    await ctx.send("""Not valid command. Use $bet help to get list of commands.
+if you want to make a bet do $bet [match id] [team] [amount]""")
 
 
 # debug
@@ -965,11 +993,16 @@ $debug reassign "[original key]" "[new key]": replaces the original key with the
 $debug delete key "[key]": deletes key for database (quotes only needed if there is a space)
 $debug balance print [user @]: prints balance to console
 $debug balance delete [user @] "balance id: delete balance with that ID
-$debug balance rename [user @] "old balance id" "new balance id": replaces balance ID with new ID"""
+$debug balance rename [user @] "old balance id" "new balance id": replaces balance ID with new ID
+$debug user_dump: prints json dump"""
       )
 
     elif args[0] == "keys":
       await ctx.send(str(db.keys())[1:-1])
+
+    elif args[0] == "user_dump":
+      user = get_from_list("user", ctx.author.id)
+      print(jsonpickle.encode(user))
 
     else:
       await ctx.send("Not valid command. Use $debug help to get list of commands")
@@ -993,10 +1026,7 @@ $debug balance rename [user @] "old balance id" "new balance id": replaces balan
       await ctx.send("Not valid command. Use $debug help to get list of commands")
 
   elif len(args) == 3:
-    uid = args[2].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
+    uid = get_user_from_at(args[2])
     if args[0] == "reassign":
       db[args[2]] = db[args[1]]
       del db[args[1]]
@@ -1006,23 +1036,17 @@ $debug balance rename [user @] "old balance id" "new balance id": replaces balan
       del db[args[2]]
       await ctx.send("deleted " + str(args[2]))
 
-    elif args[0] == "balance" and args[1] == "print" and is_digit(uid):
+    elif args[0] == "balance" and args[1] == "print" and not uid == None:
       print_all_balance(uid)
     else:
       await ctx.send("Not valid command. Use $debug help to get list of commands")
   elif len(args) == 4:
-    uid = args[2].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
-    if args[0] == "balance" and args[1] == "delete" and is_digit(uid):
+    uid = get_user_from_at(args[2])
+    if args[0] == "balance" and args[1] == "delete" and not uid == None:
       print(delete_balance_id(uid, args[3]))
   elif len(args) == 5:
-    uid = args[2].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
-    if args[0] == "balance" and args[1] == "rename" and is_digit(uid):
+    uid = get_user_from_at(args[2])
+    if args[0] == "balance" and args[1] == "rename" and not uid == None:
       print(rename_balance_id(uid, args[3], args[4]))
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
@@ -1068,6 +1092,7 @@ $assign bets: where the end bets show up"""
 # returns your own or someone else's balance
 @bot.command()
 async def balance(ctx, *args):
+  
   if len(args) == 0:
     user = get_from_list("user", ctx.author.id)
     if user == None:
@@ -1079,45 +1104,122 @@ async def balance(ctx, *args):
     await ctx.send(embed=embedd)
 
   elif len(args) == 1:
-    uid = args[0].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
+    uid = get_user_from_at(args[0])
     if args[0] == "help":
       await ctx.send(
         """$balance: gives your own balance (doesn't include loans or money currently in bets. for leaderboard purposes), avalable balance (money you can bet), loan balance (how much you have/owe with loans)
 $balance [user's @]: gives balance of that user
 $balance log [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc)
-$balance log [user's @] [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc) of user @'d'"""
+$balance log [user's @] [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc) of user @'d
+$balance print: gives graph seince last reset
+$balance print [user @]: gives graph seince last reset of the user
+$balance print all: gives image of all of bet history
+$balance print all [user @]: gives image of all of bet history of the user
+$balance print last [amount]: gives image of all of bet history
+$balance print last [amount] [user @]: gives image of all of bet history of the user
+"""
       )
-    elif is_digit(uid):
-      embedd = await create_user_embedded(int(uid))
+    elif not uid == None:
+      embedd = await create_user_embedded(uid)
       if embedd == None:
         await ctx.send("Identifier Not Found")
         return
       await ctx.send(embed=embedd)
+    elif args[0] == "print":
+      user = get_from_list("user", ctx.author.id)
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image("current").save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
     else:
       await ctx.send("Not a valid command do $balance help for list of commands")
+      
   elif len(args) == 2:
+    uid = get_user_from_at(args[1])
     if args[0] == "log" and args[1].isdigit():
       user = get_from_list("user", ctx.author.id)
       gen_msg = await ctx.send("Generating log...")
       [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[1]))]
       await gen_msg.delete()
+      
+    elif args[0] == "print" and args[1] == "all":
+      user = get_from_list("user", ctx.author.id)
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image("full").save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
+        
+    elif args[0] == "print" and (not uid == None):
+      user = uid
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image("current").save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
+        
     else:
       await ctx.send("Not a valid command do $balance help for list of commands")
+      
   elif len(args) == 3:
-    uid = args[1].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
-    if args[0] == "log" and uid.isdigit() and args[2].isdigit():
-      user = get_from_list("user", uid)
+    uid = get_user_from_at(args[1])
+    uid2 = get_user_from_at(args[2])
+    if args[0] == "log" and (not uid == None) and args[2].isdigit():
+      user = uid
       if user == None:
         await ctx.send("User ID not found")
       gen_msg = await ctx.send("Generating log...")
       [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[2]))]
       await gen_msg.delete()
+
+    elif args[0] == "print" and args[1] == "all" and (not uid2 == None):
+      user = uid2
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image("full").save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
+
+    elif args[0] == "print" and args[1] == "last" and args[2].isdigit():
+      user = get_from_list("user", ctx.author.id)
+      amount = int(args[2])
+      if amount <= 1:
+        await ctx.send("Amount has to be bigger.")
+        return
+      elif amount >= len(user.balance):
+        amount = len(user.balance)
+      
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
+        
+    else:
+      await ctx.send("Not a valid command do $balance help for list of commands")
+  elif len(args) == 4:
+    uid = get_user_from_at(args[3])
+    if args[0] == "print" and args[1] == "last" and args[2].isdigit() and (not uid == None):
+      user = uid
+      amount = int(args[2])
+      if amount <= 1:
+        await ctx.send("Amount has to be bigger.")
+        return
+      elif amount >= len(user.balance):
+        amount = len(user.balance)
+      
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.send("Generating graph...")
+        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.delete()
     else:
       await ctx.send("Not a valid command do $balance help for list of commands")
   else:
@@ -1131,15 +1233,12 @@ async def award(ctx, *args):
     if args[0] == "help":
       await ctx.send("""$award [user @] [amount] "[description]": adds the amount to the user from the bank, description needs to be in quotes. DON'T USE WITHOUT PERMISSION""")
   elif len(args) == 3:
-    uid = args[0].replace("<", "")
-    uid = uid.replace(">", "")
-    uid = uid.replace("@", "")
-    uid = uid.replace("!", "")
-    if not (is_digit(uid) and is_digit(args[1])):
+    uid = get_user_from_at(args[0])
+    if not ((not uid == None) and is_digit(args[1])):
       await ctx.send("Not a valid command do $award help for list of commands")
       return
 
-    user = add_balance_user(uid, int(args[1]), "award_" + args[2])
+    user = add_balance_user(uid, int(args[1]), "award_" + args[2], datetime.now())
     if user == None:
       await ctx.send("User not found")
     else:
@@ -1189,9 +1288,10 @@ async def reset_season(ctx):
   # to do make the command also include season name
   return
   users = get_all_objects("user")
+  date = datetime.now()
   for user in users:
     user.balance.pop()
-    user.balance.append(("reset 2", 500, datetime.now()))
+    user.balance.append(("reset 2", 500, date))
     replace_in_list("user", user.code, user)
 
 
@@ -1302,6 +1402,16 @@ async def test_get_object(ctx):
   user = get_from_list("user", ctx.author.id)
   replace_in_list("user", user.code, user)
   print("done")
+
+@bot.command()
+async def find_common_ids(ctx):
+  matches = get_all_objects("match")
+  bets = get_all_objects("bet")
+  
+  
+  match_copies = [item for item, count in collections.Counter(matches).items() if count > 1]
+  bet_copies = [item for item, count in collections.Counter(bets).items() if count > 1]
+  await ctx.send(f"match copies {match_copies}, bet copies {bet_copies}")
   
 # debug command
 @bot.command()

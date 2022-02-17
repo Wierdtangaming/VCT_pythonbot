@@ -1,5 +1,8 @@
 from dbinterface import get_from_list
 import discord
+import io
+import matplotlib.pyplot as plt
+from PIL import Image
 
 class User:
   def __init__(self, code, color_code, date_created):
@@ -58,16 +61,38 @@ class User:
   def avaliable_nonloan_bal(self):
     return self.balance[-1][1] - self.unavailable()
 
-
+  def get_resets(self):
+    return [i for i, x in enumerate(self.balance) if x[0].startswith("reset_")]
+    
+  def get_sets(self):
+    set_list = [i for i, x in enumerate(self.balance) if (x[0].startswith("reset_") or x[0] == "start")]
+    set_list.append(len(self.balance))
+    return set_list
+    
+  def get_reset_range(self, index):
+    resets = self.get_sets()
+    if index == -1:
+      return range(resets[len(resets)-2], resets[len(resets)-1])
+      
+    for reset in resets:
+      rrange = range(reset, resets[1 + resets.index(reset)])
+      if reset == len(self.balance)-1:
+        return None
+      if rrange.contains(index):
+        return rrange
+    return None
 
   def to_string(self):
     return "Balance: " + str(self.balance)
       
   def get_new_balance_changes_embeds(self, amount):
+    
     if amount >= len(self.balance):
       amount = len(self.balance)
       before = 0
+    sorted_balances = sorted(self.balance, key=lambda x: x[2])
     new_balances = self.balance[-amount:]
+    new_balances = sorted(new_balances, key=lambda x: x[2])
     new_balances.reverse()
     before = self.balance[-2][1]
     embed_amount = int((amount - 1) / 25) + 1
@@ -113,10 +138,77 @@ class User:
       else:
         embeds[endex].add_field(name=f"Invalid Balance Update {balance[0]}:", value=f"Balance set to {balance[1]} and changed by {balance_change}", inline=False)
         print("error condition not found", str(balance))
-      if bal_index < len(self.balance):
-        before = self.balance[-bal_index][1]
+      if bal_index < len(sorted_balances):
+        before = sorted_balances[-bal_index][1]
         bal_index += 1
       else:
         before = 0
       embed_index += 1
     return embeds
+
+  def get_graph_image(self, balances_ambig):
+    if type(balances_ambig) == list:
+      balances = balances_ambig
+    elif type(balances_ambig) == str:
+      if balances_ambig == "full":
+        balances = self.balance
+      elif balances_ambig == "current":
+        balances = [self.balance[x] for x in self.get_reset_range(-1)]
+      else:
+        return None
+    else:
+      balances = [self.balance[x] for x in balances_ambig]
+
+    print(len(balances))
+      
+    label = []
+    balance = []
+    colors = []
+    line_colors = []
+    before = None
+    for bet_id, amount, date in balances:
+      if not before == None:
+        if amount > before:
+          line_colors.append('g')
+        elif amount < before:
+          line_colors.append('r')
+        else:
+          line_colors.append('k')
+      before = amount
+      if bet_id.startswith('id_'):
+        label.append(bet_id[3:])
+        balance.append(amount)
+        colors.append('b')
+      elif bet_id.startswith('award_'):
+        label.append(bet_id[6:])
+        balance.append(amount)
+        colors.append('xkcd:gold')
+      elif bet_id == 'start':
+        label.append('start')
+        balance.append(amount)
+        colors.append('k')
+      elif bet_id.startswith('reset_'):
+        label.append('reset')
+        balance.append(amount)
+        colors.append('k')
+      else:
+        label.append(bet_id)
+        balance.append(amount)
+        colors.append('k')
+    
+    #make a 800 x 800 figure
+    fig, ax = plt.subplots(figsize=(8,8))
+    #plot the balance
+    for i in range(len(line_colors)-1):
+      ax.plot([i, i+1], [balance[i], balance[i+1]], label=[label[i], ""], color=line_colors[i])
+    
+    llc = len(line_colors)
+    ax.plot([llc-1, llc], [balance[llc-1], balance[llc]], label=[label[llc-1], label[llc]], color=line_colors[llc-1], zorder=1)
+    ax.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    im = Image.open(buf)
+    return im
+    
