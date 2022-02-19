@@ -6,7 +6,6 @@
 # have it replace by code not by value
 # test prefix unique with 1 long in test code
 
-print("hi 1")
 
 from keepalive import keep_alive
 
@@ -25,8 +24,8 @@ import math
 from datetime import datetime
 from discord.ext import commands
 import emoji
-print("hi 2")
 
+print(discord.__version__)
 intents = discord.Intents.default()
 intents.members = True
 
