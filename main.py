@@ -1,3 +1,4 @@
+
 # add moddifacation when no on incorrect match creation
 # rename, remove, get all balance_id
 # double check balance rounding
@@ -5,7 +6,7 @@
 # have it replace by code not by value
 # test prefix unique with 1 long in test code
 
-
+print("hi 1")
 
 from keepalive import keep_alive
 
@@ -24,6 +25,7 @@ import math
 from datetime import datetime
 from discord.ext import commands
 import emoji
+print("hi 2")
 
 intents = discord.Intents.default()
 intents.members = True
@@ -1248,6 +1250,14 @@ async def award(ctx, *args):
   else:
     await ctx.send("Not a valid command do $award help for list of commands")
 
+
+
+@bot.slash_command()
+async def awardtwo(ctx, name: str = None):
+  name = name or ctx.author.name
+  await ctx.respond(f"Hello {name}!")
+  
+    
 
 # help
 bot.remove_command("help")
