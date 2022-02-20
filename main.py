@@ -12,6 +12,7 @@ from keepalive import keep_alive
 from io import BytesIO
 import collections
 import discord
+from discord.commands import Option, SlashCommandGroup
 import os
 import random
 import jsonpickle
@@ -31,6 +32,9 @@ intents.members = True
 
 bot = commands.Bot(intents=intents, command_prefix="$")
 
+gid = [int(os.environ["GUILD_ID"])]
+print(gid)
+
 # matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
 # user is in user_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
 # bet is in bet_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
@@ -40,8 +44,8 @@ bot = commands.Bot(intents=intents, command_prefix="$")
 def ambig_to_obj(ambig, prefix):
   if isinstance(ambig, int) or isinstance(ambig, str):
     obj = get_from_list(prefix, ambig)
-  else:
-    obj = ambig
+  elif isinstance(ambig, discord.Member) :
+    obj = get_from_list(prefix, ambig.id)
   if obj == None:
     return None
   return obj
@@ -367,6 +371,7 @@ def roundup(x):
 @bot.event
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
+  print(bot.guilds)
 
 
 @bot.event
@@ -949,7 +954,7 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 
     balance_left = user.get_balance() - int(amount)
     if balance_left < 0:
-      if int(amount <= 100):
+      if int(amount) <= 100:
         await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have, try taking out a loan")
         return
       await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
@@ -1227,40 +1232,32 @@ $balance print last [amount] [user @]: gives image of all of bet history of the 
     await ctx.send("Not a valid command do $balance help for list of commands")
 
 
-# gives points
-@bot.command()
-async def award(ctx, *args):
-  if len(args) == 1:
-    if args[0] == "help":
-      await ctx.send("""$award [user @] [amount] "[description]": adds the amount to the user from the bank, description needs to be in quotes. DON'T USE WITHOUT PERMISSION""")
-  elif len(args) == 3:
-    uid = get_user_from_at(args[0])
-    if not ((not uid == None) and is_digit(args[1])):
-      await ctx.send("Not a valid command do $award help for list of commands")
-      return
 
-    user = add_balance_user(uid, int(args[1]), "award_" + args[2], datetime.now())
-    if user == None:
-      await ctx.send("User not found")
-    else:
-      embedd = await create_user_embedded(user)
-      await ctx.send(embed=embedd)
+#award start
+@bot.slash_command( 
+  name = "award", 
+  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
+  guild_ids = gid,
+)
+async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take"), description: Option(str, "Uniqe description of why the award is given")):
 
+  abu = add_balance_user(user, amount, "award_" + description, datetime.now())
+  if abu == None:
+    await ctx.send("User not found")
   else:
-    await ctx.send("Not a valid command do $award help for list of commands")
-
-
-
-@bot.slash_command()
-async def awardtwo(ctx, name: str = None):
-  name = name or ctx.author.name
-  await ctx.respond(f"Hello {name}!")
-  
+    embedd = await create_user_embedded(user)
+    await ctx.send(embed=embedd)
     
+#graph = bot.create_group("graph", "awards the money to someone's account.")  # create a slash command group
 
-# help
+#@graph.command(guild_ids = gid, name = "print", description = "Awards the amount to the user from the bank. DON'T USE WITHOUT PERMISSION")
+#async def graphprint(ctx):
+#  name = ctx.author.name
+#  await ctx.respond(f"Hello {name}!")
+  
+
+#help
 bot.remove_command("help")
-
 
 @bot.command()
 async def help(ctx):
@@ -1272,7 +1269,7 @@ $bet: creates and lists bet
 $assign: assigns what channels do what functions
 $balance: returns your own or someone else's balance
 $leaderboard: gives leaderboard of balances
-$award: addes the money to someone's account DON'T USE WITHOUT PERMISSION
+$award: awards the money to someone's account DON'T USE WITHOUT PERMISSION
 $loan: create and pay off loans, you have to be under 100 to get a loan""")
 
 

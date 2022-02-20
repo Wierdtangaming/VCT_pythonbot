@@ -7,7 +7,7 @@ def get_from_list(prefix, identifier):
   if objects == None or objects.count == 0:
     return None
   for obj in objects:
-    if str(obj.code) == str(identifier):
+    if obj.code == identifier:
       return obj
   return None
 
