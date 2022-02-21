@@ -90,14 +90,25 @@ def get_all_avalable_matches():
       match_list.append(match)
   return match_list
 
-def avalable_matches_option_choice():
-  #graph balance start
+def avalable_matches_name_code():
   matches = get_all_objects("match")
-  match_list = []
+  match_t_list = []
   for match in matches:
-    if int(match.winner) == 0:
-      match_list.append(OptionChoice(name=f"{match.t1} vs {match.t2}", value=match.code))
-  return match_list
+    if match.date_closed is None:
+      match_t_list.append((f"{match.t1} vs {match.t2}".lower(), match.code))
+  return match_t_list
+
+async def avalable_bets_name_code(bot):
+  matches = get_all_objects("match")
+  bet_list = []
+  for match in matches:
+    if match.date_closed is None:
+      for bet_id in match.bet_ids:
+        bet = get_from_list("bet", bet_id)
+        name = (await smart_get_user(bet.user_id, bot)).display_name
+        bet_list.append(OptionChoice(name=f"{name} {bet.amount} on {bet.get_team(match)}", value=bet.code))
+  return bet_list
+
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "user")
@@ -402,7 +413,6 @@ def roundup(x):
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
-  print(avalable_matches_option_choice())
 
 
 @bot.event
@@ -1028,6 +1038,7 @@ bet = SlashCommandGroup(
   guild_ids = gid,
 )
 
+#bet modal start
 class BetModal(Modal):
   
   def __init__(self, match: Match, user: User, *args, **kwargs) -> None:
@@ -1035,7 +1046,7 @@ class BetModal(Modal):
     self.match = match
     self.user = user
     
-    self.add_item(InputText(label=f"{match.t1} vs {match.t2}. Odds: {match.t1o} to {match.t2o}", placeholder=f"1 for {match.t1} and 2 for {match.t2}.", min_length=1, max_length=1))
+    self.add_item(InputText(label=f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}", placeholder=f"1 for {match.t1} and 2 for {match.t2}.", min_length=1, max_length=1))
 
     self.add_item(InputText(label="Amount you want to bet.", placeholder=f"Your avalable balance is {round(user.get_balance())}.", min_length=1, max_length=20))
 
@@ -1088,16 +1099,34 @@ class BetModal(Modal):
     replace_in_list("bet", bet.code, bet)
     embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
+#bet modal end
 
+  
+#bet autocomplete start
+async def bet_list_ac(ctx: discord.AutocompleteContext):
+  
+  match_t_list = avalable_matches_name_code()
+  return [match_t[0] for match_t in match_t_list if ctx.value.lower() in match_t[0]]
+#bet autocomplete end
+      
 
 #bet create start
 @bet.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "ID of match you want to bet on.", choices = avalable_matches_option_choice())):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=bet_list_ac)):
+  
   user = get_from_list("user", ctx.author.id)
   if user == None:
     create_user(ctx.author.id)
+    
+  match_t_list = avalable_matches_name_code()
   
-  if (match := get_from_list("match", match)) is None:
+  match_t = next((match_t for match_t in match_t_list if match == match_t[0]), None)
+  if match_t is None:
+    match_id = match
+  else:
+    match_id = match_t[1]
+
+  if (match := get_from_list("match", match_id)) is None:
     await ctx.respond("Match ID not found.")
     return
     
@@ -1111,9 +1140,40 @@ async def bet_create(ctx, match: Option(str, "ID of match you want to bet on.", 
 
 
 #bet cancel start
+
 @bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
-async def bet_cancel(ctx):
-  print("cancel")
+async def bet_cancel(ctx, bet = Option(str, "Bet you want to cancel.")):
+  
+  bet = get_from_list("bet", bet)
+  if bet == None:
+    await ctx.respond("Identifier not found.")
+    return
+    
+  match = get_from_list("match", bet.match_id)
+  if (match is None) or (match.date_closed is not None):
+    await ctx.respond("Match betting has closed, you cannot cancel the bet.")
+    return
+    
+  gen_msg = await ctx.respond("Deleting bet...")
+    
+  try:
+    match.bet_ids.remove(bet.code)
+    replace_in_list("match", match.code, match)
+    embedd = await create_match_embedded(match)
+    await edit_all_messages(match.message_ids, embedd)
+  except:
+    print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
+    
+  for msg_id in bet.message_ids:
+    try:
+      channel = await bot.fetch_channel(msg_id[1])
+      msg = await channel.fetch_message(msg_id[0])
+
+      await msg.delete()
+    except Exception:
+      print("no msg found")
+  remove_from_active_ids(bet.user_id, bet.code)
+  await gen_msg.edit_original_message(remove_from_list("bet", bet.code))
 #bet cancel end
 
 
