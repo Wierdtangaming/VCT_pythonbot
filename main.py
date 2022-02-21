@@ -1223,59 +1223,6 @@ bot.add_application_command(loan)
 
 
 
-
-# gives 50 if under 100
-@bot.command()
-async def loan(ctx, *args):
-  if len(args) == 0:
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.get_clean_bal_loan() >= 100:
-      await ctx.send("You must have less than 100 to make a loan")
-      return
-    user.loans.append((50, datetime.now, None))
-    replace_in_list("user", user.code, user)
-    await ctx.send("You have been loaned 50")
-
-  elif len(args) == 1:
-    if args[0] == "help":
-      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
-$loan count: gives how many loans you have active
-$loan pay: pays off all loans""")
-
-    elif args[0] == "count":
-      user = get_from_list("user", ctx.author.id)
-      await ctx.send(f"You currently have {len(user.get_open_loans())} active loans")
-
-    elif args[0] == "pay":
-      user = get_from_list("user", ctx.author.id)
-      loan_amount = user.loan_bal()
-      if loan_amount == 0:
-        await ctx.send("You currently have no loans")
-        return
-      anb = user.get_balance()
-      if(anb < loan_amount):
-        await ctx.send(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
-        return
-
-      loans = user.get_open_loans()
-      for loan in loans:
-        new_loan = list(loan)
-        new_loan[2] = datetime.now()
-        new_loan = tuple(new_loan)
-
-
-        index = user.loans.index(loan)
-        user.loans[index] = new_loan
-      replace_in_list("user", user.code, user)
-      await ctx.send(f"You have paid off {len(loans)} loan(s)")
-  
-    else:
-      await ctx.send("Not a valid command do $loan help for list of commands")
-  else:
-    await ctx.send("Not a valid command do $loan help for list of commands")
-
 #season reset command
 @bot.command()
 async def reset_season(ctx):
