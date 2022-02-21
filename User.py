@@ -86,10 +86,13 @@ class User:
     return "Balance: " + str(self.balance)
       
   def get_new_balance_changes_embeds(self, amount):
-    
+
+    if amount <= 0:
+      return None
     if amount >= len(self.balance):
       amount = len(self.balance)
       before = 0
+      
     sorted_balances = sorted(self.balance, key=lambda x: x[2])
     new_balances = self.balance[-amount:]
     new_balances = sorted(new_balances, key=lambda x: x[2])
@@ -144,6 +147,9 @@ class User:
       else:
         before = 0
       embed_index += 1
+      
+    if len(embeds) == 0:
+      return None
     return embeds
 
   def get_graph_image(self, balances_ambig):

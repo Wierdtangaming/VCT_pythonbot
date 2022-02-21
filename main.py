@@ -12,7 +12,7 @@ from keepalive import keep_alive
 from io import BytesIO
 import collections
 import discord
-from discord.commands import Option, SlashCommandGroup
+from discord.commands import Option,OptionChoice , SlashCommandGroup
 import os
 import random
 import jsonpickle
@@ -44,8 +44,13 @@ print(gid)
 def ambig_to_obj(ambig, prefix):
   if isinstance(ambig, int) or isinstance(ambig, str):
     obj = get_from_list(prefix, ambig)
-  elif isinstance(ambig, discord.Member) :
+  elif isinstance(ambig, discord.Member):
     obj = get_from_list(prefix, ambig.id)
+  elif isinstance(ambig, User):
+    obj = ambig
+  else:
+    obj = None
+    print(ambig, type(ambig))
   if obj == None:
     return None
   return obj
@@ -67,6 +72,14 @@ def get_user_from_id(id):
       return user
   else:
     return None
+
+async def get_user_from_member(ctx, user):
+  if user == None:
+    user = ctx.author
+  user = get_from_list("user", user.id)
+  if user == None:
+    await ctx.respond("User not found. To create an account do $balance")
+  return user
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "user")
@@ -91,7 +104,7 @@ def delete_balance_id(user_ambig, balance_id):
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
   if len(indices) > 1:
-    return "More than one balance_id found"
+    print("More than one balance_id found")
   elif len(indices) == 0:
     return "No balance_id found"
   else:
@@ -1057,179 +1070,31 @@ $debug user_dump: prints json dump"""
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
 
+    
 
-@bot.command()
-async def back(ctx):
-  if not db["stage"] == 0:
-    db["stage"] = db["stage"] - 1
-    print(db["stage"])
-    # to do give the text
-    await ctx.send("Backed up for you :)")
-  else:
-    await ctx.send("Backed all the way up")
+#assign start
+assign = SlashCommandGroup(
+  name = "assign", 
+  description = "Assigns the discord channel it is put in to that channel type.",
+  guild_ids = gid,
+)
 
+#assign matches start
+@assign.command(name = "matches", description = "Where the end matches show up.")
+async def assign_matches(ctx):
+  db["match_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the match list channel")
+#assign matches end
 
-# assign bot spicific action to channel
-@bot.command()
-async def assign(ctx, *args):
-  if not len(args) == 1:
-    await ctx.send("Not a valid command do $assign help for list of commands")
-    return
-  arg = args[0]
-  if arg == "help":
-    await ctx.send(
-      """$assign creation: where match creation takes place
-$assign matches: where the end matches and bets show up
-$assign bets: where the end bets show up"""
-    )
-  elif arg == "creation":
-    db["creation_channel_id"] = ctx.channel.id
-    await ctx.send("This channel is now the match creation channel")
-  elif arg == "matches":
-    db["match_channel_id"] = ctx.channel.id
-    await ctx.send("This channel is now the match list channel")
-  elif arg == "bets":
-    db["bet_channel_id"] = ctx.channel.id
-    await ctx.send("This channel is now the bet list channel")
-  else:
-    await ctx.send("Not a valid command do $assign help for list of commands")
+#assign bets start
+@assign.command(name = "bets", description = "Where the end bets show up.")
+async def assign_bets(ctx):
+  db["bet_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the bet list channel")
+#assign bets end
 
-
-# returns your own or someone else's balance
-@bot.command()
-async def balance(ctx, *args):
-  
-  if len(args) == 0:
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      create_user(ctx.author.id)
-    embedd = await create_user_embedded(user)
-    if embedd == None:
-      await ctx.send("Identifier Not Found")
-      return
-    await ctx.send(embed=embedd)
-
-  elif len(args) == 1:
-    uid = get_user_from_at(args[0])
-    if args[0] == "help":
-      await ctx.send(
-        """$balance: gives your own balance (doesn't include loans or money currently in bets. for leaderboard purposes), avalable balance (money you can bet), loan balance (how much you have/owe with loans)
-$balance [user's @]: gives balance of that user
-$balance log [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc)
-$balance log [user's @] [amount you want to show]: shows the last x amount of balance changes (awards, bets, etc) of user @'d
-$balance print: gives graph seince last reset
-$balance print [user @]: gives graph seince last reset of the user
-$balance print all: gives image of all of bet history
-$balance print all [user @]: gives image of all of bet history of the user
-$balance print last [amount]: gives image of all of bet history
-$balance print last [amount] [user @]: gives image of all of bet history of the user
-"""
-      )
-    elif not uid == None:
-      embedd = await create_user_embedded(uid)
-      if embedd == None:
-        await ctx.send("Identifier Not Found")
-        return
-      await ctx.send(embed=embedd)
-    elif args[0] == "print":
-      user = get_from_list("user", ctx.author.id)
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image("current").save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-    else:
-      await ctx.send("Not a valid command do $balance help for list of commands")
-      
-  elif len(args) == 2:
-    uid = get_user_from_at(args[1])
-    if args[0] == "log" and args[1].isdigit():
-      user = get_from_list("user", ctx.author.id)
-      gen_msg = await ctx.send("Generating log...")
-      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[1]))]
-      await gen_msg.delete()
-      
-    elif args[0] == "print" and args[1] == "all":
-      user = get_from_list("user", ctx.author.id)
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image("full").save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-        
-    elif args[0] == "print" and (not uid == None):
-      user = uid
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image("current").save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-        
-    else:
-      await ctx.send("Not a valid command do $balance help for list of commands")
-      
-  elif len(args) == 3:
-    uid = get_user_from_at(args[1])
-    uid2 = get_user_from_at(args[2])
-    if args[0] == "log" and (not uid == None) and args[2].isdigit():
-      user = uid
-      if user == None:
-        await ctx.send("User ID not found")
-      gen_msg = await ctx.send("Generating log...")
-      [await ctx.send(embed=embed) for embed in user.get_new_balance_changes_embeds(int(args[2]))]
-      await gen_msg.delete()
-
-    elif args[0] == "print" and args[1] == "all" and (not uid2 == None):
-      user = uid2
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image("full").save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-
-    elif args[0] == "print" and args[1] == "last" and args[2].isdigit():
-      user = get_from_list("user", ctx.author.id)
-      amount = int(args[2])
-      if amount <= 1:
-        await ctx.send("Amount has to be bigger.")
-        return
-      elif amount >= len(user.balance):
-        amount = len(user.balance)
-      
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-        
-    else:
-      await ctx.send("Not a valid command do $balance help for list of commands")
-  elif len(args) == 4:
-    uid = get_user_from_at(args[3])
-    if args[0] == "print" and args[1] == "last" and args[2].isdigit() and (not uid == None):
-      user = uid
-      amount = int(args[2])
-      if amount <= 1:
-        await ctx.send("Amount has to be bigger.")
-        return
-      elif amount >= len(user.balance):
-        amount = len(user.balance)
-      
-      with BytesIO() as image_binary:
-        gen_msg = await ctx.send("Generating graph...")
-        user.get_graph_image(user.balance[-(amount):]).save(image_binary, 'PNG')
-        image_binary.seek(0)
-        await ctx.send(file=discord.File(fp=image_binary, filename='image.png'))
-        await gen_msg.delete()
-    else:
-      await ctx.send("Not a valid command do $balance help for list of commands")
-  else:
-    await ctx.send("Not a valid command do $balance help for list of commands")
+bot.add_application_command(assign)
+#assign end
 
 
 
@@ -1241,19 +1106,107 @@ $balance print last [amount] [user @]: gives image of all of bet history of the 
 )
 async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take"), description: Option(str, "Uniqe description of why the award is given")):
 
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
   abu = add_balance_user(user, amount, "award_" + description, datetime.now())
   if abu == None:
-    await ctx.send("User not found")
+    await ctx.respond("User not found")
   else:
     embedd = await create_user_embedded(user)
-    await ctx.send(embed=embedd)
-    
-#graph = bot.create_group("graph", "awards the money to someone's account.")  # create a slash command group
+    await ctx.respond(embed=embedd)
+#award end
 
-#@graph.command(guild_ids = gid, name = "print", description = "Awards the amount to the user from the bank. DON'T USE WITHOUT PERMISSION")
-#async def graphprint(ctx):
-#  name = ctx.author.name
-#  await ctx.respond(f"Hello {name}!")
+  
+
+#balance start
+@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc)", aliases=["bal"])
+async def balance(ctx, user: Option(discord.Member, "User you want to get balance of", default = None, required = False)):
+  if user == None:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
+      create_user(ctx.author.id)
+  else:
+    user = get_from_list("user", user.id)
+    if user == None:
+      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
+      return
+    
+  embedd = await create_user_embedded(user)
+  if embedd == None:
+    await ctx.respond("User not found.")
+    return
+  await ctx.respond(embed=embedd)
+#balance end
+
+
+
+#graph start
+graph = SlashCommandGroup(
+  name = "graph", 
+  description = "Shows an image of a graph to user.",
+  guild_ids = gid,
+)
+
+#graph balance start
+balance_choices = [
+  OptionChoice(name="season", value=0),
+  OptionChoice(name="all", value=1),
+  OptionChoice(name="last", value=2),
+]
+@graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season")
+async def graph_balance(ctx,
+  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
+  user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
+  amount: Option(int, "User you want to get balance of.", default = 20, required = False)):
+    
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if type == 0:
+    graph_type = "current"
+  elif type == 1:
+    graph_type = "all"
+  elif type == 2:
+    graph_type = amount
+  else:
+    ctx.respond("Not a valid type.")
+    return
+    
+  with BytesIO() as image_binary:
+    gen_msg = await ctx.respond("Generating graph...")
+    user.get_graph_image(graph_type).save(image_binary, 'PNG')
+    image_binary.seek(0)
+    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+#graph balance end
+
+bot.add_application_command(graph)
+#graph end
+
+
+
+#log start
+@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
+async def log(ctx, amount: Option(int, "How many balance changed you want to see"), user: Option(discord.Member, "User you want to check log of (defaulted to you)", default = None, required = False)):
+
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if amount <= 0:
+    await ctx.respond("Amount has to be greater than 0.")
+    return
+    
+  gen_msg = await ctx.respond("Generating log...")
+  
+  embeds = user.get_new_balance_changes_embeds(amount)
+  if embeds == None:
+    await gen_msg.edit_original_message(content = "No log generated.")
+    return
+  
+  await gen_msg.edit_original_message(content="", embeds=embeds)
+#log end
+
+
+
+    
+
   
 
 #help
