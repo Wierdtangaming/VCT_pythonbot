@@ -13,6 +13,7 @@ from io import BytesIO
 import collections
 import discord
 from discord.commands import Option,OptionChoice , SlashCommandGroup
+from discord.ui import InputText, Modal
 import os
 import random
 import jsonpickle
@@ -46,13 +47,11 @@ def ambig_to_obj(ambig, prefix):
     obj = get_from_list(prefix, ambig)
   elif isinstance(ambig, discord.Member):
     obj = get_from_list(prefix, ambig.id)
-  elif isinstance(ambig, User):
+  elif isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
     obj = ambig
   else:
     obj = None
     print(ambig, type(ambig))
-  if obj == None:
-    return None
   return obj
 
 def get_user_from_at(id):
@@ -82,6 +81,23 @@ async def get_user_from_member(ctx, user):
   if user == None:
     await ctx.respond("User not found. To create an account do $balance")
   return user
+
+def get_all_avalable_matches():
+  matches = get_all_objects("match")
+  match_list = []
+  for match in matches:
+    if int(match.winner) == 0:
+      match_list.append(match)
+  return match_list
+
+def avalable_matches_option_choice():
+  #graph balance start
+  matches = get_all_objects("match")
+  match_list = []
+  for match in matches:
+    if int(match.winner) == 0:
+      match_list.append(OptionChoice(name=f"{match.t1} vs {match.t2}", value=match.code))
+  return match_list
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "user")
@@ -386,6 +402,7 @@ def roundup(x):
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
+  print(avalable_matches_option_choice())
 
 
 @bot.event
@@ -886,10 +903,14 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 
       if args[0] == "cancelforce" or match == None or match.date_closed == None:
         if not match == None:
-          match.bet_ids.remove(bet.code)
-          replace_in_list("match", match.code, match)
-          embedd = await create_match_embedded(match)
-          await edit_all_messages(match.message_ids, embedd)
+          try:
+            match.bet_ids.remove(bet.code)
+            replace_in_list("match", match.code, match)
+            embedd = await create_match_embedded(match)
+            await edit_all_messages(match.message_ids, embedd)
+          except:
+            print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
+          
 
         for msg_id in bet.message_ids:
           try:
@@ -999,16 +1020,122 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 if you want to make a bet do $bet [match id] [team] [amount]""")
 
 
+  
+#bet start
+bet = SlashCommandGroup(
+  name = "bet", 
+  description = "Assigns the discord channel it is put in to that channel type.",
+  guild_ids = gid,
+)
 
-#All commands have their own help. To go to help type $[command] help
-#$match: startes match setup and lists match
-#$back: goes backwards in match stage
-#$bet: creates and lists bet
-#$assign: assigns what channels do what functions
-#$balance: returns your own or someone else's balance
-#$leaderboard: gives leaderboard of balances
-#$award: awards the money to someone's account DON'T USE WITHOUT PERMISSION
-#$loan: create and pay off loans, you have to be under 100 to get a loan
+class BetModal(Modal):
+  
+  def __init__(self, match: Match, user: User, *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    self.match = match
+    self.user = user
+    
+    self.add_item(InputText(label=f"{match.t1} vs {match.t2}. Odds: {match.t1o} to {match.t2o}", placeholder=f"1 for {match.t1} and 2 for {match.t2}.", min_length=1, max_length=1))
+
+    self.add_item(InputText(label="Amount you want to bet.", placeholder=f"Your avalable balance is {round(user.get_balance())}.", min_length=1, max_length=20))
+
+  async def callback(self, interaction: discord.Interaction):
+    
+    match = self.match
+    user = self.user
+    team_num = self.children[0].value
+    amount = self.children[1].value
+    
+    if not is_digit(amount):
+      await interaction.response.send_message("Not valid command. Use $bet help to get list of commands.")
+      return
+    
+    if not (int(team_num) == 1 or int(team_num) == 2):
+      await interaction.response.send_message("Team num has to either be 1 or 2.")
+      return
+
+    if int(amount) <= 0:
+      await interaction.response.send_message("Cant bet negatives.")
+      return
+
+    if not match.date_closed == None:
+      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+      return
+
+    code = get_uniqe_code("bet")
+
+    balance_left = user.get_balance() - int(amount)
+    if balance_left < 0:
+      if int(amount) <= 100:
+        await interaction.response.send_message("You have bet " + str(math.floor(-balance_left)) + " more than you have, try taking out a loan.")
+        return
+      await interaction.response.send_message("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+      return
+
+    bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now())
+
+    match.bet_ids.append(bet.code)
+    add_to_list("bet", bet)
+    add_to_active_ids(user.code, bet.code)
+
+    embedd = await create_bet_embedded(bet)
+    print(embedd)
+    channel = await bot.fetch_channel(db["bet_channel_id"])
+    msg = await interaction.response.send_message(embed=embedd)
+
+    bet.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("match", match.code, match)
+    replace_in_list("bet", bet.code, bet)
+    embedd = await create_match_embedded(match)
+    await edit_all_messages(match.message_ids, embedd)
+
+
+#bet create start
+@bet.command(name = "create", description = "Create a bet.")
+async def bet_create(ctx, match: Option(str, "ID of match you want to bet on.", choices = avalable_matches_option_choice())):
+  user = get_from_list("user", ctx.author.id)
+  if user == None:
+    create_user(ctx.author.id)
+  
+  if (match := get_from_list("match", match)) is None:
+    await ctx.respond("Match ID not found.")
+    return
+    
+  if match.date_closed is not None:
+    await ctx.respond("Betting has closed.")
+    
+  modal = BetModal(match=match, user=user, title="Create Bet")
+  await ctx.interaction.response.send_modal(modal)
+
+#bet create end
+
+
+#bet cancel start
+@bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
+async def bet_cancel(ctx):
+  print("cancel")
+#bet cancel end
+
+
+#bet find start
+@bet.command(name = "find", description = "Sends the embed of the bet.")
+async def bet_find(ctx):
+  print("find")
+#bet find end
+
+
+#bet list start
+@bet.command(name = "list", description = "sends embed with all bets. If type is full it sends the whole embed.")
+async def bet_list(ctx):
+  print("list")
+#bet list end
+  
+bot.add_application_command(bet)
+#bet end
+
+
+
+
 
 #assign start
 assign = SlashCommandGroup(
@@ -1165,9 +1292,7 @@ loan = SlashCommandGroup(
 @loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
     
-  if (user := get_user_from_id(ctx.author.id)) is None: 
-    await ctx.respond("User not found. To create an account do $balance")
-    return
+  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
 
   if user.get_clean_bal_loan() >= 100:
     await ctx.respond("You must have less than 100 to make a loan")
@@ -1191,9 +1316,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 #loan pay start
 @loan.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
-  if (user := get_user_from_id(ctx.author.id)) is None: 
-    await ctx.respond("User not found. To create an account do $balance")
-    return
+  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
     
   loan_amount = user.loan_bal()
   if loan_amount == 0:
