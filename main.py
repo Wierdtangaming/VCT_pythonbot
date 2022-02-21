@@ -70,8 +70,10 @@ def get_user_from_id(id):
   for user in users:
     if user.code == id:
       return user
-  else:
+  
+  if user == None:
     return None
+    
 
 async def get_user_from_member(ctx, user):
   if user == None:
@@ -107,14 +109,13 @@ def delete_balance_id(user_ambig, balance_id):
     print("More than one balance_id found")
   elif len(indices) == 0:
     return "No balance_id found"
-  else:
-    #to do
-    #reset_range = self.get_reset_range(indices[0])
-    #index = indices[0] + 1
-    balat = user.balance[indices[0]]
-    
-    user.balance.remove(balat)
-    replace_in_list("user", user.code, user)
+  #to do
+  #reset_range = self.get_reset_range(indices[0])
+  #index = indices[0] + 1
+  balat = user.balance[indices[0]]
+  
+  user.balance.remove(balat)
+  replace_in_list("user", user.code, user)
 
 
 def print_all_balance(user_ambig):
@@ -998,7 +999,296 @@ $bet winner [bet id]: sets the bets winner (should mostly only be used after an 
 if you want to make a bet do $bet [match id] [team] [amount]""")
 
 
-# debug
+
+#All commands have their own help. To go to help type $[command] help
+#$match: startes match setup and lists match
+#$back: goes backwards in match stage
+#$bet: creates and lists bet
+#$assign: assigns what channels do what functions
+#$balance: returns your own or someone else's balance
+#$leaderboard: gives leaderboard of balances
+#$award: awards the money to someone's account DON'T USE WITHOUT PERMISSION
+#$loan: create and pay off loans, you have to be under 100 to get a loan
+
+#assign start
+assign = SlashCommandGroup(
+  name = "assign", 
+  description = "Assigns the discord channel it is put in to that channel type.",
+  guild_ids = gid,
+)
+
+#assign matches start
+@assign.command(name = "matches", description = "Where the end matches show up.")
+async def assign_matches(ctx):
+  db["match_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the match list channel.")
+#assign matches end
+
+#assign bets start
+@assign.command(name = "bets", description = "Where the end bets show up.")
+async def assign_bets(ctx):
+  db["bet_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the bet list channel.")
+#assign bets end
+
+bot.add_application_command(assign)
+#assign end
+
+
+
+#award start
+@bot.slash_command( 
+  name = "award", 
+  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
+  guild_ids = gid,
+)
+async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
+
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  abu = add_balance_user(user, amount, "award_" + description, datetime.now())
+  if abu == None:
+    await ctx.respond("User not found.")
+  else:
+    embedd = await create_user_embedded(user)
+    await ctx.respond(embed=embedd)
+#award end
+
+  
+
+#balance start
+@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"])
+async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
+  if user == None:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
+      create_user(ctx.author.id)
+  else:
+    user = get_from_list("user", user.id)
+    if user == None:
+      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
+      return
+    
+  embedd = await create_user_embedded(user)
+  if embedd == None:
+    await ctx.respond("User not found.")
+    return
+  await ctx.respond(embed=embedd)
+#balance end
+
+
+
+#graph start
+graph = SlashCommandGroup(
+  name = "graph", 
+  description = "Shows an image of a graph to user.",
+  guild_ids = gid,
+)
+
+
+#graph balance start
+balance_choices = [
+  OptionChoice(name="season", value=0),
+  OptionChoice(name="all", value=1),
+  OptionChoice(name="last", value=2),
+]
+@graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
+async def graph_balance(ctx,
+  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
+  user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
+  amount: Option(int, "User you want to get balance of.", default = 20, required = False)):
+    
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if type == 0:
+    graph_type = "current"
+  elif type == 1:
+    graph_type = "all"
+  elif type == 2:
+    graph_type = amount
+  else:
+    ctx.respond("Not a valid type.")
+    return
+    
+  with BytesIO() as image_binary:
+    gen_msg = await ctx.respond("Generating graph...")
+    user.get_graph_image(graph_type).save(image_binary, 'PNG')
+    image_binary.seek(0)
+    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+#graph balance end
+
+bot.add_application_command(graph)
+#graph end
+
+
+
+#leaderboard start
+@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.")
+async def leaderboard(ctx):
+  embedd = await create_leaderboard_embedded()
+  await ctx.respond(embed=embedd)
+#leaderboard end
+
+
+  
+#log start
+@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
+async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
+
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if amount <= 0:
+    await ctx.respond("Amount has to be greater than 0.")
+    return
+    
+  gen_msg = await ctx.respond("Generating log...")
+  
+  embedds = user.get_new_balance_changes_embeds(amount)
+  if embedds == None:
+    await gen_msg.edit_original_message(content = "No log generated.")
+    return
+  
+  await gen_msg.edit_original_message(content="", embeds=embedds)
+#log end
+
+
+
+#loan start
+loan = SlashCommandGroup(
+  name = "loan", 
+  description = "Create and pay off loans.",
+  guild_ids = gid,
+)
+
+
+#loan create start
+@loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
+async def loan_create(ctx):
+    
+  if (user := get_user_from_id(ctx.author.id)) is None: 
+    await ctx.respond("User not found. To create an account do $balance")
+    return
+
+  if user.get_clean_bal_loan() >= 100:
+    await ctx.respond("You must have less than 100 to make a loan")
+    return
+  user.loans.append((50, datetime.now, None))
+  replace_in_list("user", user.code, user)
+  await ctx.respond("You have been loaned 50")
+#loan create end
+
+  
+#loan count start
+@loan.command(name = "count", description = "See how many loans you have active.")
+async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  user = get_from_list("user", ctx.author.id)
+  await ctx.respond(f"You currently have {len(user.get_open_loans())} active loans")
+#loan count end
+
+  
+#loan pay start
+@loan.command(name = "pay", description = "See how many loans you have active.")
+async def loan_pay(ctx):
+  if (user := get_user_from_id(ctx.author.id)) is None: 
+    await ctx.respond("User not found. To create an account do $balance")
+    return
+    
+  loan_amount = user.loan_bal()
+  if loan_amount == 0:
+    await ctx.respond("You currently have no loans")
+    return
+  anb = user.get_balance()
+  if(anb < loan_amount):
+    await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
+    return
+
+  loans = user.get_open_loans()
+  for loan in loans:
+    new_loan = list(loan)
+    new_loan[2] = datetime.now()
+    new_loan = tuple(new_loan)
+
+
+    index = user.loans.index(loan)
+    user.loans[index] = new_loan
+  replace_in_list("user", user.code, user)
+  await ctx.respond(f"You have paid off {len(loans)} loan(s)")
+#loan pay end
+
+bot.add_application_command(loan)
+#loan end
+
+
+
+
+
+# gives 50 if under 100
+@bot.command()
+async def loan(ctx, *args):
+  if len(args) == 0:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
+      await ctx.send("You do not have an account yet do $balance or make an account to create an account")
+    if user.get_clean_bal_loan() >= 100:
+      await ctx.send("You must have less than 100 to make a loan")
+      return
+    user.loans.append((50, datetime.now, None))
+    replace_in_list("user", user.code, user)
+    await ctx.send("You have been loaned 50")
+
+  elif len(args) == 1:
+    if args[0] == "help":
+      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
+$loan count: gives how many loans you have active
+$loan pay: pays off all loans""")
+
+    elif args[0] == "count":
+      user = get_from_list("user", ctx.author.id)
+      await ctx.send(f"You currently have {len(user.get_open_loans())} active loans")
+
+    elif args[0] == "pay":
+      user = get_from_list("user", ctx.author.id)
+      loan_amount = user.loan_bal()
+      if loan_amount == 0:
+        await ctx.send("You currently have no loans")
+        return
+      anb = user.get_balance()
+      if(anb < loan_amount):
+        await ctx.send(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
+        return
+
+      loans = user.get_open_loans()
+      for loan in loans:
+        new_loan = list(loan)
+        new_loan[2] = datetime.now()
+        new_loan = tuple(new_loan)
+
+
+        index = user.loans.index(loan)
+        user.loans[index] = new_loan
+      replace_in_list("user", user.code, user)
+      await ctx.send(f"You have paid off {len(loans)} loan(s)")
+  
+    else:
+      await ctx.send("Not a valid command do $loan help for list of commands")
+  else:
+    await ctx.send("Not a valid command do $loan help for list of commands")
+
+#season reset command
+@bot.command()
+async def reset_season(ctx):
+  # to do make the command also include season name
+  return
+  users = get_all_objects("user")
+  date = datetime.now()
+  for user in users:
+    user.balance.pop()
+    user.balance.append(("reset 2", 500, date))
+    replace_in_list("user", user.code, user)
+
+#debug
 @bot.command()
 async def debug(ctx, *args):
   if len(args) == 1:
@@ -1069,244 +1359,6 @@ $debug user_dump: prints json dump"""
       print(rename_balance_id(uid, args[3], args[4]))
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
-
-    
-
-#assign start
-assign = SlashCommandGroup(
-  name = "assign", 
-  description = "Assigns the discord channel it is put in to that channel type.",
-  guild_ids = gid,
-)
-
-#assign matches start
-@assign.command(name = "matches", description = "Where the end matches show up.")
-async def assign_matches(ctx):
-  db["match_channel_id"] = ctx.channel.id
-  await ctx.respond("This channel is now the match list channel")
-#assign matches end
-
-#assign bets start
-@assign.command(name = "bets", description = "Where the end bets show up.")
-async def assign_bets(ctx):
-  db["bet_channel_id"] = ctx.channel.id
-  await ctx.respond("This channel is now the bet list channel")
-#assign bets end
-
-bot.add_application_command(assign)
-#assign end
-
-
-
-#award start
-@bot.slash_command( 
-  name = "award", 
-  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
-  guild_ids = gid,
-)
-async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take"), description: Option(str, "Uniqe description of why the award is given")):
-
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  abu = add_balance_user(user, amount, "award_" + description, datetime.now())
-  if abu == None:
-    await ctx.respond("User not found")
-  else:
-    embedd = await create_user_embedded(user)
-    await ctx.respond(embed=embedd)
-#award end
-
-  
-
-#balance start
-@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc)", aliases=["bal"])
-async def balance(ctx, user: Option(discord.Member, "User you want to get balance of", default = None, required = False)):
-  if user == None:
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      create_user(ctx.author.id)
-  else:
-    user = get_from_list("user", user.id)
-    if user == None:
-      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
-      return
-    
-  embedd = await create_user_embedded(user)
-  if embedd == None:
-    await ctx.respond("User not found.")
-    return
-  await ctx.respond(embed=embedd)
-#balance end
-
-
-
-#graph start
-graph = SlashCommandGroup(
-  name = "graph", 
-  description = "Shows an image of a graph to user.",
-  guild_ids = gid,
-)
-
-#graph balance start
-balance_choices = [
-  OptionChoice(name="season", value=0),
-  OptionChoice(name="all", value=1),
-  OptionChoice(name="last", value=2),
-]
-@graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season")
-async def graph_balance(ctx,
-  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
-  user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
-  amount: Option(int, "User you want to get balance of.", default = 20, required = False)):
-    
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  if type == 0:
-    graph_type = "current"
-  elif type == 1:
-    graph_type = "all"
-  elif type == 2:
-    graph_type = amount
-  else:
-    ctx.respond("Not a valid type.")
-    return
-    
-  with BytesIO() as image_binary:
-    gen_msg = await ctx.respond("Generating graph...")
-    user.get_graph_image(graph_type).save(image_binary, 'PNG')
-    image_binary.seek(0)
-    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
-#graph balance end
-
-bot.add_application_command(graph)
-#graph end
-
-
-
-#log start
-@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
-async def log(ctx, amount: Option(int, "How many balance changed you want to see"), user: Option(discord.Member, "User you want to check log of (defaulted to you)", default = None, required = False)):
-
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  if amount <= 0:
-    await ctx.respond("Amount has to be greater than 0.")
-    return
-    
-  gen_msg = await ctx.respond("Generating log...")
-  
-  embeds = user.get_new_balance_changes_embeds(amount)
-  if embeds == None:
-    await gen_msg.edit_original_message(content = "No log generated.")
-    return
-  
-  await gen_msg.edit_original_message(content="", embeds=embeds)
-#log end
-
-
-
-    
-
-  
-
-#help
-bot.remove_command("help")
-
-@bot.command()
-async def help(ctx):
-  await ctx.send(
-    """All commands have their own help. To go to help type $[command] help
-$match: startes match setup and lists match
-$back: goes backwards in match stage
-$bet: creates and lists bet
-$assign: assigns what channels do what functions
-$balance: returns your own or someone else's balance
-$leaderboard: gives leaderboard of balances
-$award: awards the money to someone's account DON'T USE WITHOUT PERMISSION
-$loan: create and pay off loans, you have to be under 100 to get a loan""")
-
-
-@bot.command()
-async def leaderboard(ctx, *arg):
-
-  if len(arg) == 0:
-    embedd = await create_leaderboard_embedded()
-    await ctx.send(embed=embedd)
-  elif len(arg) == 1:
-    if len(arg) == "help":
-      await ctx.send("""$leaderboard: shows a learderboard""")
-    else:
-      await ctx.send("Not a valid command do $leaderboard help for list of commands")
-  else:
-    await ctx.send("Not a valid command do $leaderboard help for list of commands")
-
-
-# season reset command
-@bot.command()
-async def reset_season(ctx):
-  # to do make the command also include season name
-  return
-  users = get_all_objects("user")
-  date = datetime.now()
-  for user in users:
-    user.balance.pop()
-    user.balance.append(("reset 2", 500, date))
-    replace_in_list("user", user.code, user)
-
-
-# gives 50 if under 100
-@bot.command()
-async def loan(ctx, *args):
-  if len(args) == 0:
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      await ctx.send("You do not have an account yet do $balance or make an account to create an account")
-    if user.get_clean_bal_loan() >= 100:
-      await ctx.send("You must have less than 100 to make a loan")
-      return
-    user.loans.append((50, datetime.now, None))
-    replace_in_list("user", user.code, user)
-    await ctx.send("You have been loaned 50")
-
-  elif len(args) == 1:
-    if args[0] == "help":
-      await ctx.send("""$loan: gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan
-$loan count: gives how many loans you have active
-$loan pay: pays off all loans""")
-
-    elif args[0] == "count":
-      user = get_from_list("user", ctx.author.id)
-      await ctx.send(f"You currently have {len(user.get_open_loans())} active loans")
-
-    elif args[0] == "pay":
-      user = get_from_list("user", ctx.author.id)
-      loan_amount = user.loan_bal()
-      if loan_amount == 0:
-        await ctx.send("You currently have no loans")
-        return
-      anb = user.get_balance()
-      if(anb < loan_amount):
-        await ctx.send(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
-        return
-
-      loans = user.get_open_loans()
-      for loan in loans:
-        new_loan = list(loan)
-        new_loan[2] = datetime.now()
-        new_loan = tuple(new_loan)
-
-
-        index = user.loans.index(loan)
-        user.loans[index] = new_loan
-      replace_in_list("user", user.code, user)
-      await ctx.send(f"You have paid off {len(loans)} loan(s)")
-  
-    else:
-      await ctx.send("Not a valid command do $loan help for list of commands")
-  else:
-    await ctx.send("Not a valid command do $loan help for list of commands")
-      
-
 
 # debug command
 @bot.command()
