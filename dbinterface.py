@@ -61,22 +61,24 @@ def remove_from_list(prefix, obj_ambig):
   objects_e = [jsonpickle.encode(obj) for obj in objects]
 
   if obj_found == None:
-    return "No Identifier Found"
+    print("No Identifier Found")
+    return None
 
   object_to_remove = jsonpickle.encode(obj_found)
   if len(objects_e) == 0 or (not object_to_remove in objects_e):
-    return "No Identifier Found"
+    print("No Identifier Found")
+    return None
   index = objects_e.index(object_to_remove)
   list_num = math.floor(index / 50)
   list_to_add = list(db[prefix + "_list_" + str(list_num + 1)])
   list_to_add.remove(object_to_remove)
   if len(list_to_add) == 0:
     del db[prefix + "_list_" + str(list_num + 1)]
-    return "Removed " + prefix
+    return obj_found
   
   db[prefix + "_list_" + str(list_num + 1)] = list_to_add
   if list_num + 1 == len(db.prefix(prefix + "_list_")):
-    return "Removed " + prefix
+    return obj_found
   for x in range(list_num + 1, len(list(db.prefix(prefix + "_list_")))):
     list1 = list(db[prefix + "_list_" + str(x)])
     list2 = list(db[prefix + "_list_" + str(x + 1)])
@@ -89,7 +91,7 @@ def remove_from_list(prefix, obj_ambig):
     else:
       db[prefix + "_list_" + str(x + 1)] = list2
 
-  return "Removed " + prefix
+  return obj_found
 
 
 def get_all_objects(prefix):
@@ -105,7 +107,7 @@ def get_all_objects(prefix):
 
 async def smart_get_user(user_id, bot):
   user = bot.get_user(user_id)
-  print(user)
   if user == None:
+    print("fetched")
     user = await bot.fetch_user(user_id)
   return user

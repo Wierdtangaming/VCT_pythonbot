@@ -17,16 +17,14 @@ class Bet:
     date_formatted = self.date_created.strftime("%d/%m/%Y at %H:%M:%S")
     return "Match ID: " + str(self.match_id) + ", User ID: " + str(self.user_id) + ", Amount Bet: " + str(self.bet_amount) + ", Team Bet On: " + str(self.team_num) + ", Date Created: " + str(date_formatted) + ", Date Closed: " + str(self.date_closed) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
 
-  def get_team(self, match):
+  def get_team(self, match=None):
     if match is None:
       match = get_from_list("match", self.match_id)
-    team = ""
     if self.team_num == 1:
-      team = match.t1
-      payout = self.bet_amount * match.t1o - self.bet_amount
+      return match.t1
     elif self.team_num == 2:
-      team = match.t2
-      payout = self.bet_amount * match.t2o - self.bet_amount
+      return match.t2
+    
 
   def get_team_and_payout(self):
     match = get_from_list("match", self.match_id)
@@ -68,6 +66,12 @@ class Bet:
 
     return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
 
+  async def basic_to_string(self, bot, match=None):
+    if match is None:
+      match = get_from_list("match", self.match_id)
+
+    return f"Bet: {self.code}, User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {self.get_team()}, Amount: {self.bet_amount}, Match ID: {match.code}"
+  
   def balance_to_string(self, balance):
     
     match = get_from_list("match", self.match_id)

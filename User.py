@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 class User:
-  def __init__(self, code, color_code, date_created):
+  def __init__(self, code, username, color_code, date_created):
     self.code = code
+    self.username = username
     self.color_code = color_code
 
     #a tuple (bet_id, balance after change, date)

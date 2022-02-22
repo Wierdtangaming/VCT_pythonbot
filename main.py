@@ -73,7 +73,6 @@ def get_user_from_id(id):
   if user == None:
     return None
     
-
 async def get_user_from_member(ctx, user):
   if user == None:
     user = ctx.author
@@ -81,6 +80,19 @@ async def get_user_from_member(ctx, user):
   if user == None:
     await ctx.respond("User not found. To create an account do $balance")
   return user
+
+
+async def autocorrect_tuple_to_id(ctx, t_list, text, prefix):
+  t = next((t for t in t_list if text == t[0]), None)
+  if t is None:
+    obj = get_from_list(prefix, t[1])
+  else:
+    obj = t[1]
+    
+  if obj is None:
+    await ctx.respond(f"{prefix.capitalize()} ID not found.")
+  return obj
+
 
 def get_all_avalable_matches():
   matches = get_all_objects("match")
@@ -95,10 +107,10 @@ def avalable_matches_name_code():
   match_t_list = []
   for match in matches:
     if match.date_closed is None:
-      match_t_list.append((f"{match.t1} vs {match.t2}".lower(), match.code))
+      match_t_list.append((f"{match.t1} vs {match.t2}", match))
   return match_t_list
 
-async def avalable_bets_name_code(bot):
+async def current_bets_name_code(bot):
   matches = get_all_objects("match")
   bet_list = []
   for match in matches:
@@ -106,7 +118,7 @@ async def avalable_bets_name_code(bot):
       for bet_id in match.bet_ids:
         bet = get_from_list("bet", bet_id)
         name = (await smart_get_user(bet.user_id, bot)).display_name
-        bet_list.append(OptionChoice(name=f"{name} {bet.amount} on {bet.get_team(match)}", value=bet.code))
+        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team(match)}", bet))
   return bet_list
 
 
@@ -841,195 +853,7 @@ $match list full: sends embed of all matches without a winner"""
   else:
     await ctx.send("Not valid command. Use $match help to get list of commands")
 
-
-# create bet command
-@bot.command()
-async def bet(ctx, *args):
-
-  if len(args) == 1:
-    arg = args[0]
-    if arg == "help":
-      await ctx.send(
-        """$bet [match id] [team] [amount]: you make a bet on the match with match id on the team ("1" for first team listed "2" for second team listed) amount is whole numbers only
-$bet cancel [bet id]: removes bet if bets are still open
-$bet [bet id]: replaces your command with bet info
-$bet list: sends embed with all bets without a winner
-$bet list full: sends embeds of all bets without a winner
-$bet winner [bet id]: sets the bets winner (should mostly only be used after an error)"""
-      )
-
-    elif args[0] == "list":
-      bets = get_all_objects("bet")
-      bet_list = []
-      for bet in bets:
-        if int(bet.winner) == 0:
-          bet_list.append(bet)
-      if len(bet_list) == 0:
-        await ctx.send("No undecided bets.")
-        return
-      gen_msg = await ctx.send("Generating list...")
-      embedd = await create_bet_list_embedded("Bets:", bet_list)
-      await ctx.send(embed=embedd)
-      await gen_msg.delete()
-
-    elif len(arg) == 8:
-      bet = get_from_list("bet", arg)
-      if bet == None:
-        await ctx.send("Identifier Not Found")
-        return
-      embedd = await create_bet_embedded(bet)
-      msg = await ctx.send(embed=embedd)
-      bet.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("bet", bet.code, bet)
-      await ctx.message.delete()
-    else:
-      await ctx.send("Not valid command. Use $bet help to get list of commands")
-
-  elif len(args) == 2:
-
-    if args[0] == "list" and args[1] == "full":
-      bets = get_all_objects("bet")
-      bet_list = []
-      for bet in bets:
-        if int(bet.winner) == 0:
-          bet_list.append(bet)
-      if len(bet_list) == 0:
-        await ctx.send("No undecided bets.")
-      for bet in bet_list:
-        embedd = await create_bet_embedded(bet)
-        if embedd == None:
-          await ctx.send("Identifier Not Found")
-          return
-        msg = await ctx.send(embed=embedd)
-        bet.message_ids.append((msg.id, msg.channel.id))
-        replace_in_list("bet", bet.code, bet)
-
-    elif args[0].startswith("cancel") and len(args[1]) == 8:
-      bet = get_from_list("bet", args[1])
-      if bet == None:
-        await ctx.send("Identifier Not Found")
-        return
-      match = get_from_list("match", bet.match_id)
-
-      if args[0] == "cancelforce" or match == None or match.date_closed == None:
-        if not match == None:
-          try:
-            match.bet_ids.remove(bet.code)
-            replace_in_list("match", match.code, match)
-            embedd = await create_match_embedded(match)
-            await edit_all_messages(match.message_ids, embedd)
-          except:
-            print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
-          
-
-        for msg_id in bet.message_ids:
-          try:
-            channel = await bot.fetch_channel(msg_id[1])
-            msg = await channel.fetch_message(msg_id[0])
-
-            await msg.delete()
-          except Exception:
-            print("no msg found")
-        remove_from_active_ids(bet.user_id, bet.code)
-        await ctx.send(remove_from_list("bet", args[1]))
-
-      else:
-        await ctx.send("Match betting has closed cannot bet")
-    else:
-      await ctx.send("Not valid command. Use $bet help to get list of commands")
-
-  elif len(args) == 3:
-    match_id, team_num, amount = args
-    if args[0].startswith("winner") and len(args[1]) == 8 and len(args[2]) == 1 and is_digit(args[2]):
-      bet = get_from_list("bet", args[1])
-      if bet == None:
-        await ctx.send("Identifier Not Found")
-        return
-
-      match = get_from_list("match", bet.match_id)
-      if int(bet.winner) == 0 or args[0] == "winnerforce":
-        bet.winner = int(args[2])
-        if int(args[2]) == 1:
-          odds = match.t1o
-          await ctx.send("Winner has been set to " + match.t1)
-        else:
-          odds = match.t2o
-          await ctx.send("Winner has been set to " + match.t2)
-
-        payout = -bet.bet_amount
-        if bet.team_num == int(args[2]):
-          payout += bet.bet_amount * odds
-        user = get_from_list("user", bet.user_id)
-        remove_from_active_ids(user, bet.code)
-        add_balance_user(user, payout, "id_" + str(bet.code))
-
-        replace_in_list("bet", bet.code, bet)
-        embedd = await create_bet_embedded(bet)
-        await edit_all_messages(bet.message_ids, embedd)
-
-        embedd = await create_user_embedded(user)
-        await ctx.send(embed=embedd)
-      return
-
-    # $bet [match id] [team_num] [amount]
-    if not is_digit(amount):
-      await ctx.send("Not valid command. Use $bet help to get list of commands")
-      return
     
-    if not (int(team_num) == 1 or int(team_num) == 2):
-      await ctx.send("Team num has to either be 1 or 2")
-      return
-
-    if int(amount) <= 0:
-      await ctx.send("Cant bet negatives")
-      return
-    match = get_from_list("match", match_id)
-    if match == None:
-      await ctx.send("Identifier Not Found")
-      return
-
-    if not match.date_closed == None:
-      await ctx.send("Betting has closed you cannot make a bet.")
-      return
-
-    code = get_uniqe_code("bet")
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      user = create_user(ctx.author.id)
-
-    balance_left = user.get_balance() - int(amount)
-    if balance_left < 0:
-      if int(amount) <= 100:
-        await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have, try taking out a loan")
-        return
-      await ctx.send("You have bet " + str(math.floor(-balance_left)) + " more than you have")
-      return
-
-    bet = Bet(code, match_id, ctx.author.id, int(amount), int(team_num), datetime.now())
-
-    match.bet_ids.append(bet.code)
-    add_to_list("bet", bet)
-    add_to_active_ids(ctx.author.id, bet.code)
-
-    embedd = await create_bet_embedded(bet)
-    channel = await bot.fetch_channel(db["bet_channel_id"])
-    msg = await channel.send(embed=embedd)
-
-    bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("match", match.code, match)
-    replace_in_list("bet", bet.code, bet)
-    if ctx.channel.id == db["bet_channel_id"] or ctx.channel.id == db["match_channel_id"]:
-      await ctx.message.delete()
-    else:
-      await ctx.send("Bet created")
-    embedd = await create_match_embedded(match)
-    await edit_all_messages(match.message_ids, embedd)
-
-  else:
-    await ctx.send("""Not valid command. Use $bet help to get list of commands.
-if you want to make a bet do $bet [match id] [team] [amount]""")
-
-
   
 #bet start
 bet = SlashCommandGroup(
@@ -1091,8 +915,11 @@ class BetModal(Modal):
 
     embedd = await create_bet_embedded(bet)
     print(embedd)
-    channel = await bot.fetch_channel(db["bet_channel_id"])
-    msg = await interaction.response.send_message(embed=embedd)
+    if (channel := await bot.fetch_channel(db["bet_channel_id"])) == interaction.channel:
+      msg = await interaction.response.send_message(embed=embedd)
+    else:
+      msg = await channel.send(embed=embedd)
+      await interaction.response.send_message(f"Bet created in {channel.mention}.")
 
     bet.message_ids.append((msg.id, msg.channel.id))
     replace_in_list("match", match.code, match)
@@ -1102,53 +929,45 @@ class BetModal(Modal):
 #bet modal end
 
   
-#bet autocomplete start
-async def bet_list_ac(ctx: discord.AutocompleteContext):
+#match list autocomplete start
+async def match_list_autocomplete(ctx: discord.AutocompleteContext):
   
   match_t_list = avalable_matches_name_code()
-  return [match_t[0] for match_t in match_t_list if ctx.value.lower() in match_t[0]]
-#bet autocomplete end
+  return [match_t[0] for match_t in match_t_list if ctx.value.lower() in match_t[0].lower()]
+#match list autocomplete end
+
+#bet list autocomplete start
+async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  
+  bet_t_list = await current_bets_name_code(bot)
+  return [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+#bet list autocomplete end
       
 
 #bet create start
 @bet.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=bet_list_ac)):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=match_list_autocomplete)):
   
   user = get_from_list("user", ctx.author.id)
   if user == None:
     create_user(ctx.author.id)
     
-  match_t_list = avalable_matches_name_code()
-  
-  match_t = next((match_t for match_t in match_t_list if match == match_t[0]), None)
-  if match_t is None:
-    match_id = match
-  else:
-    match_id = match_t[1]
-
-  if (match := get_from_list("match", match_id)) is None:
-    await ctx.respond("Match ID not found.")
-    return
+  match = await autocorrect_tuple_to_id(ctx, avalable_matches_name_code(), match, "match")
     
   if match.date_closed is not None:
     await ctx.respond("Betting has closed.")
     
   modal = BetModal(match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(modal)
-
 #bet create end
 
 
 #bet cancel start
-
 @bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
-async def bet_cancel(ctx, bet = Option(str, "Bet you want to cancel.")):
+async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
   
-  bet = get_from_list("bet", bet)
-  if bet == None:
-    await ctx.respond("Identifier not found.")
-    return
-    
+  bet = await autocorrect_tuple_to_id(ctx, await current_bets_name_code(bot), bet, "bet")
+  
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
     await ctx.respond("Match betting has closed, you cannot cancel the bet.")
@@ -1173,27 +992,60 @@ async def bet_cancel(ctx, bet = Option(str, "Bet you want to cancel.")):
     except Exception:
       print("no msg found")
   remove_from_active_ids(bet.user_id, bet.code)
-  await gen_msg.edit_original_message(remove_from_list("bet", bet.code))
+  bet = remove_from_list("bet", bet.code)
+  await gen_msg.edit_original_message(content=f"Canceled {await bet.basic_to_string(bot, match)}.")
 #bet cancel end
 
 
 #bet find start
 @bet.command(name = "find", description = "Sends the embed of the bet.")
-async def bet_find(ctx):
-  print("find")
+async def bet_find(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
+  
+  bet = await autocorrect_tuple_to_id(ctx, await current_bets_name_code(bot), bet, "bet")
+  
+  embedd = await create_bet_embedded(bet)
+  msg = await ctx.respond(embed=embedd)
+  bet.message_ids.append((msg.id, msg.channel.id))
+  replace_in_list("bet", bet.code, bet)
 #bet find end
 
-
+list_choices = [
+  OptionChoice(name="shortened", value=0),
+  OptionChoice(name="full", value=1),
+]
 #bet list start
-@bet.command(name = "list", description = "sends embed with all bets. If type is full it sends the whole embed.")
-async def bet_list(ctx):
-  print("list")
+@bet.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed.")
+async def bet_list(ctx, type: Option(int, "User you want to get balance of.", choices = list_choices, default = 0, required = False)):
+  
+  bets = get_all_objects("bet")
+  bet_list = []
+  for bet in bets:
+    if int(bet.winner) == 0:
+      bet_list.append(bet)
+  if len(bet_list) == 0:
+    await ctx.send("No undecided bets.")
+
+  if type == 0:
+    #short
+    gen_msg = await ctx.send("Generating list...")
+    embedd = await create_bet_list_embedded("Bets:", bet_list)
+    await ctx.send(embed=embedd)
+    await gen_msg.delete()
+    
+  elif type == 1:
+    #full
+    for i, bet in enumerate(bet_list):
+      embedd = await create_bet_embedded(bet)
+      if i == 0:
+        msg = await ctx.respond(embed=embedd)
+      else:
+        msg = await ctx.send(embed=embedd)
+      bet.message_ids.append((msg.id, msg.channel.id))
+      replace_in_list("bet", bet.code, bet)
 #bet list end
   
 bot.add_application_command(bet)
 #bet end
-
-
 
 
 
@@ -1534,8 +1386,8 @@ async def add_var(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    user.loans = []
-    replace_in_list("user", user.code, user)
+    print(user.username)
+    #replace_in_list("user", user.code, user)
 
 # debug command
 @bot.command()
