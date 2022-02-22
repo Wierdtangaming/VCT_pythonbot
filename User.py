@@ -24,6 +24,12 @@ class User:
     
     self.loans = []
 
+  def active_bet_ids_bets(self):
+    return [active_id[0] for active_id in self.active_bet_ids]
+
+  def active_bet_ids_matches(self):
+    return [active_id[1] for active_id in self.active_bet_ids]
+  
   def get_open_loans(self):
     open_loans = []
     for loan in self.loans:
@@ -44,7 +50,8 @@ class User:
 
   def unavailable(self):
     used = 0
-    for bet_id in self.active_bet_ids:
+    active_bet_ids_bets = self.active_bet_ids_bets()
+    for bet_id in active_bet_ids_bets:
       temp_bet = get_from_list("bet", bet_id)
       used += temp_bet.bet_amount
 

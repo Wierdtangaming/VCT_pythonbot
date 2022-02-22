@@ -82,7 +82,7 @@ async def get_user_from_member(ctx, user):
   return user
 
 
-async def autocorrect_tuple_to_id(ctx, t_list, text, prefix):
+async def user_from_autocorrect_tuple(ctx, t_list, text, prefix):
   t = next((t for t in t_list if text == t[0]), None)
   if t is None:
     obj = get_from_list(prefix, t[1])
@@ -340,25 +340,22 @@ async def create_leaderboard_embedded():
   return embed
 
 
-def add_to_active_ids(user_ambig, bet_id):
-  user = ambig_to_obj(user_ambig, "user")
-  if user == None:
-    return None
+def add_to_active_ids(user_ambig, bet_ambig):
+  if (user := ambig_to_obj(user_ambig, "user")) is None: return None
+  if (bet := ambig_to_obj(bet_ambig, "bet")) is None: return None
 
-  user.active_bet_ids.append(bet_id)
+  user.active_bet_ids.append((bet.code, bet.match_id))
   replace_in_list("user", user.code, user)
 
 
 def remove_from_active_ids(user_ambig, bet_id):
-  user = ambig_to_obj(user_ambig, "user")
-  if user == None:
-    return None
-
-  if not bet_id in user.active_bet_ids:
+  if (user := ambig_to_obj(user_ambig, "user")) is None: return None
+  
+  if (t := next((t for t in user.active_bet_ids if bet_id == t[0]), None)) is None:
     print("Bet_id Not Found")
     return
-  user.active_bet_ids.remove(bet_id)
-  print(replace_in_list("user", user.code, user))
+  user.active_bet_ids.remove(t)
+  replace_in_list("user", user.code, user)
 
 
 def add_balance_user(user_ambig, change, description, date):
@@ -689,8 +686,10 @@ $match list full: sends embed of all matches without a winner"""
       matches = get_all_objects("match")
       match_list = []
       user = get_from_list("user", ctx.author.id)
+      
       for match in matches:
-        if int(match.winner) == 0 and (set(user.active_bet_ids).isdisjoint(match.bet_ids)):
+        
+        if int(match.winner) == 0 and (set(user.active_bet_ids_bets()).isdisjoint(match.bet_ids)):
           match_list.append(match)
       if len(match_list) == 0:
         await ctx.send("No undecided matches.")
@@ -865,14 +864,24 @@ bet = SlashCommandGroup(
 #bet modal start
 class BetModal(Modal):
   
-  def __init__(self, match: Match, user: User, *args, **kwargs) -> None:
+  def __init__(self, org_ctx, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
+    self.org_ctx = org_ctx
     
-    self.add_item(InputText(label=f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}", placeholder=f"1 for {match.t1} and 2 for {match.t2}.", min_length=1, max_length=1))
+    if error[0] is None: 
+      team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
+    else:
+      team_label = error[0]
+      
+    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}.', min_length=1, max_length=100))
 
-    self.add_item(InputText(label="Amount you want to bet.", placeholder=f"Your avalable balance is {round(user.get_balance())}.", min_length=1, max_length=20))
+    if error[1] is None: 
+      amount_label = "Amount you want to bet."
+    else:
+      amount_label = error[1]
+    self.add_item(InputText(label=amount_label, placeholder=f"Your avalable balance is {round(user.get_balance())}.", min_length=1, max_length=20))
 
   async def callback(self, interaction: discord.Interaction):
     
@@ -880,41 +889,44 @@ class BetModal(Modal):
     user = self.user
     team_num = self.children[0].value
     amount = self.children[1].value
+    error = [None, None]
     
     if not is_digit(amount):
-      await interaction.response.send_message("Not valid command. Use $bet help to get list of commands.")
-      return
+      print("Amount has to be a positive whole integer.")
+      error[1] = "Amount must be a positive whole number."
     
-    if not (int(team_num) == 1 or int(team_num) == 2):
-      await interaction.response.send_message("Team num has to either be 1 or 2.")
-      return
+    if not (int(team_num) == 1 or int(team_num) == 2 or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+      print("Team num has to either be 1 or 2.")
+      error[0] = f'Please enter "1", "2", "{match.t1}", or "{match.t2}". Odds: {match.t1o} / {match.t2o}.'
 
     if int(amount) <= 0:
-      await interaction.response.send_message("Cant bet negatives.")
-      return
+      print("Cant bet negatives.")
+      error[1] = "Amount must be a positive whole number."
 
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
-      return
 
     code = get_uniqe_code("bet")
 
     balance_left = user.get_balance() - int(amount)
     if balance_left < 0:
-      if int(amount) <= 100:
-        await interaction.response.send_message("You have bet " + str(math.floor(-balance_left)) + " more than you have, try taking out a loan.")
-        return
-      await interaction.response.send_message("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+      print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+      error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+      "⛔"
+    if not error == [None, None]:
+      modal = BetModal(org_ctx = self.org_ctx, match=match, user=user, title="Error In Create Bet")
+      #await interaction.response.send_message(f"Bet created in .")
+      #await self.interaction.response.send_modal(modal)
       return
 
     bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now())
 
     match.bet_ids.append(bet.code)
     add_to_list("bet", bet)
-    add_to_active_ids(user.code, bet.code)
+    add_to_active_ids(user.code, bet)
 
     embedd = await create_bet_embedded(bet)
-    print(embedd)
+    
     if (channel := await bot.fetch_channel(db["bet_channel_id"])) == interaction.channel:
       msg = await interaction.response.send_message(embed=embedd)
     else:
@@ -926,6 +938,7 @@ class BetModal(Modal):
     replace_in_list("bet", bet.code, bet)
     embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
+    self.stop()
 #bet modal end
 
   
@@ -933,7 +946,10 @@ class BetModal(Modal):
 async def match_list_autocomplete(ctx: discord.AutocompleteContext):
   
   match_t_list = avalable_matches_name_code()
-  return [match_t[0] for match_t in match_t_list if ctx.value.lower() in match_t[0].lower()]
+  user = get_from_list("user", ctx.interaction.user.id)
+  if user is None: return []
+  active_bet_ids_matches = user.active_bet_ids_matches()
+  return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
 #match list autocomplete end
 
 #bet list autocomplete start
@@ -952,13 +968,14 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
   if user == None:
     create_user(ctx.author.id)
     
-  match = await autocorrect_tuple_to_id(ctx, avalable_matches_name_code(), match, "match")
+  match = await user_from_autocorrect_tuple(ctx, avalable_matches_name_code(), match, "match")
     
   if match.date_closed is not None:
     await ctx.respond("Betting has closed.")
     
-  modal = BetModal(match=match, user=user, title="Create Bet")
-  await ctx.interaction.response.send_modal(modal)
+  bet_modal = BetModal(org_ctx=ctx, match=match, user=user, title="Create Bet")
+  await ctx.interaction.response.send_modal(bet_modal)
+  await bet_modal.wait()
 #bet create end
 
 
@@ -966,7 +983,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 @bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
   
-  bet = await autocorrect_tuple_to_id(ctx, await current_bets_name_code(bot), bet, "bet")
+  bet = await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")
   
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
@@ -1001,7 +1018,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 @bet.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
   
-  bet = await autocorrect_tuple_to_id(ctx, await current_bets_name_code(bot), bet, "bet")
+  bet = await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")
   
   embedd = await create_bet_embedded(bet)
   msg = await ctx.respond(embed=embedd)
@@ -1023,13 +1040,14 @@ async def bet_list(ctx, type: Option(int, "User you want to get balance of.", ch
     if int(bet.winner) == 0:
       bet_list.append(bet)
   if len(bet_list) == 0:
-    await ctx.send("No undecided bets.")
+    await ctx.respond("No undecided bets.")
+    return
 
   if type == 0:
     #short
-    gen_msg = await ctx.send("Generating list...")
+    gen_msg = await ctx.respond("Generating list...")
     embedd = await create_bet_list_embedded("Bets:", bet_list)
-    await ctx.send(embed=embedd)
+    await ctx.respond(embed=embedd)
     await gen_msg.delete()
     
   elif type == 1:
@@ -1412,7 +1430,6 @@ async def update_bet_ids(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    print(user.active_bet_ids)
     for bal in user.balance:
       if user.balance[user.balance.index(bal)][0] == "reset 1":
         user.balance[user.balance.index(bal)] = ("reset_2022 Stage 1" , user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
