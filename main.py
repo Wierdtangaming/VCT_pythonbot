@@ -28,8 +28,7 @@ from discord.ext import commands
 import emoji
 
 print(discord.__version__)
-intents = discord.Intents.default()
-intents.members = True
+intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
 
@@ -83,11 +82,9 @@ async def get_user_from_member(ctx, user):
 
 
 async def user_from_autocorrect_tuple(ctx, t_list, text, prefix):
-  t = next((t for t in t_list if text == t[0]), None)
-  if t is None:
-    obj = get_from_list(prefix, t[1])
-  else:
-    obj = t[1]
+  obj = next((t[1] for t in t_list if text == t[0]), None)
+  if obj is None:
+    obj = get_from_list(prefix, text)
     
   if obj is None:
     await ctx.respond(f"{prefix.capitalize()} ID not found.")
@@ -430,9 +427,8 @@ async def on_message(message):
   if message.author == bot.user:
     return
 
-  print(" ")
-  print(message.author)
-  print(message.content)
+  print(message.author, message.content)
+  print(message.content == "")
   await bot.process_commands(message)
 
   # hard reset but logs and channel ids
@@ -852,12 +848,80 @@ $match list full: sends embed of all matches without a winner"""
   else:
     await ctx.send("Not valid command. Use $match help to get list of commands")
 
+#$match: starts match creation
+#$match cancel: cancels match creation
+#$match [Identifier]: replaces message with match info
+#$match close betting [Identifier]: closes betting
+#$match open betting [Identifier]: open betting
+#$match winner [Identifier] [team]: sets the team's winner and pays out all bets, (to do): if winner is already set it takes back on all bets (a team of 0 sets the team to none)
+#$match winner override [Identifier] [team]: switches the team's winner and updates payout on \ all bets, (to do): if winner is already set it takes back on all bets (a team of 0 sets the team to none)
+#$match delete [Identifier]: deletes match along with all bets connected, can only be done before payout
+#$match list: sends a shorter embed of all matches without a winner
+#$match list new: sends a shorter embed of all matches that you havent bet on without a winner
+#$match list full: sends embed of all matches without a winner
+    
+#match start
+match = SlashCommandGroup(
+  name = "match", 
+  description = "Create, edit, and view matches.",
+  guild_ids = gid,
+)
+
+
+#match create start
+@match.command(name = "create", description = "Create a match.")
+async def match_create(ctx):
+  print("4")
+#match create end
+
+
+#match find start
+@match.command(name = "find", description = "Sends the embed of the match.")
+async def match_find(ctx):
+  print("4")
+#match find end
+
+
+#match betting start
+@match.command(name = "betting", description = "Open and close betting.")
+async def match_betting(ctx):
+  print("4")
+#match betting end
+
+
+#match winner start
+@match.command(name = "winner", description = "Set winner of match.")
+async def match_winner(ctx):
+  print("4")
+#match winner end
+
+
+#match delete start
+@match.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
+async def match_delete(ctx):
+  print("4")
+#match end
+
+
+#match list start
+match_list_choices = [
+  OptionChoice(name="shortened", value=0),
+  OptionChoice(name="full", value=1),
+]
+@match.command(name = "list", description = "Sends embed with all matches. If type is full it sends the whole embed of each match.")
+async def match_list(ctx, type: Option(int, "If type is full it sends the whole embed of each match.", choices = match_list_choices, default = 0, required = False)):
+  print("4")
+#match list end
+
+  
+bot.add_application_command(match)
+#match end
     
   
 #bet start
 bet = SlashCommandGroup(
   name = "bet", 
-  description = "Assigns the discord channel it is put in to that channel type.",
+  description = "Create, edit, and view bets.",
   guild_ids = gid,
 )
 
@@ -914,9 +978,15 @@ class BetModal(Modal):
       error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
       "⛔"
     if not error == [None, None]:
-      modal = BetModal(org_ctx = self.org_ctx, match=match, user=user, title="Error In Create Bet")
-      #await interaction.response.send_message(f"Bet created in .")
-      #await self.interaction.response.send_modal(modal)
+      errortxt = ""
+      if error[0] is not None:
+        errortext += error[0]
+        if error[1] is not None:
+          errortext += " "
+        #TODO
+        interaction.response.sent_msg(interaction)
+      if error[1] is not None:
+        errortext += error[1]
       return
 
     bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now())
@@ -949,29 +1019,34 @@ async def match_list_autocomplete(ctx: discord.AutocompleteContext):
   user = get_from_list("user", ctx.interaction.user.id)
   if user is None: return []
   active_bet_ids_matches = user.active_bet_ids_matches()
-  return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
+  auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
+  print(auto_completes)
+  return auto_completes
 #match list autocomplete end
 
 #bet list autocomplete start
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  
   bet_t_list = await current_bets_name_code(bot)
-  return [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+  print(auto_completes)
+  return auto_completes
 #bet list autocomplete end
-      
+
 
 #bet create start
 @bet.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=match_list_autocomplete)):
-  
+  print(type(ctx))
   user = get_from_list("user", ctx.author.id)
   if user == None:
     create_user(ctx.author.id)
     
-  match = await user_from_autocorrect_tuple(ctx, avalable_matches_name_code(), match, "match")
+  if (match := await user_from_autocorrect_tuple(ctx, avalable_matches_name_code(), match, "match")) is None: return
+  print(match)
     
   if match.date_closed is not None:
     await ctx.respond("Betting has closed.")
+    return
     
   bet_modal = BetModal(org_ctx=ctx, match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(bet_modal)
@@ -982,8 +1057,9 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 #bet cancel start
 @bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
-  
-  bet = await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")
+  print("4")
+  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+  print("5")
   
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
@@ -1018,7 +1094,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 @bet.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
   
-  bet = await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")
+  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
   
   embedd = await create_bet_embedded(bet)
   msg = await ctx.respond(embed=embedd)
@@ -1026,13 +1102,14 @@ async def bet_find(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete
   replace_in_list("bet", bet.code, bet)
 #bet find end
 
-list_choices = [
+
+#bet list start
+bet_list_choices = [
   OptionChoice(name="shortened", value=0),
   OptionChoice(name="full", value=1),
 ]
-#bet list start
-@bet.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed.")
-async def bet_list(ctx, type: Option(int, "User you want to get balance of.", choices = list_choices, default = 0, required = False)):
+@bet.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
+async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = bet_list_choices, default = 0, required = False)):
   
   bets = get_all_objects("bet")
   bet_list = []
@@ -1048,7 +1125,6 @@ async def bet_list(ctx, type: Option(int, "User you want to get balance of.", ch
     gen_msg = await ctx.respond("Generating list...")
     embedd = await create_bet_list_embedded("Bets:", bet_list)
     await ctx.respond(embed=embedd)
-    await gen_msg.delete()
     
   elif type == 1:
     #full
@@ -1057,7 +1133,7 @@ async def bet_list(ctx, type: Option(int, "User you want to get balance of.", ch
       if i == 0:
         msg = await ctx.respond(embed=embedd)
       else:
-        msg = await ctx.send(embed=embedd)
+        msg = await ctx.interaction.followup.send(embed=embedd)
       bet.message_ids.append((msg.id, msg.channel.id))
       replace_in_list("bet", bet.code, bet)
 #bet list end
