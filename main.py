@@ -11,6 +11,9 @@ from keepalive import keep_alive
 
 from io import BytesIO
 import collections
+#git clone https://github.com/Pycord-Development/pycord
+#cd pycord
+#python3 -m pip install -U .[voice]
 import discord
 from discord.commands import Option,OptionChoice , SlashCommandGroup
 from discord.ui import InputText, Modal
@@ -27,7 +30,6 @@ from datetime import datetime
 from discord.ext import commands
 import emoji
 
-print(discord.__version__)
 intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
@@ -117,6 +119,17 @@ async def current_bets_name_code(bot):
         name = (await smart_get_user(bet.user_id, bot)).display_name
         bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team(match)}", bet))
   return bet_list
+
+def get_last_tournament_name(amount):
+  matches = get_all_objects("match")
+  matches.reverse()
+  name_set = set()
+  for match in matches:
+    name_set.add(match.tournament_name)
+    if len(name_set) == amount:
+      if amount == 1:
+        return list(name_set)[0]
+      return list(name_set)
 
 
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
@@ -867,11 +880,41 @@ match = SlashCommandGroup(
   guild_ids = gid,
 )
 
+#match modal start
+class MatchModal(Modal):
+  
+  def __init__(self, *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    
+    self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter team two name.", placeholder='Get from VLR', min_length=1, max_length=100))
+    
+    self.add_item(InputText(label="Enter odds. Team one odds/Team 2 odds.", placeholder='eg: "2.34/1.75" or "1.43 3.34". Odds in decimal odds format', min_length=1, max_length=6))
+    self.add_item(InputText(label="Enter tournament name.", value=get_last_tournament_name(1), min_length=1, max_length=300))
+    self.add_item(InputText(label="Enter betting site name.", placeholder='In decimal odds format', min_length=1, max_length=100))
+
+  async def callback(self, interaction: discord.Interaction):
+    team_one = self.children[0].value
+    team_two = self.children[1].value
+    print(f"-{team_one}-")
+    
+    await interaction.response.send_message(f"Match created.")
+    
+#match modal end
+    
+#tournament autocomplete start (unused)
+async def tournament_list_autocomplete(ctx: discord.AutocompleteContext):
+  return get_last_tournament_name(5)
+#tournament autocomplete end (unused)
 
 #match create start
 @match.command(name = "create", description = "Create a match.")
 async def match_create(ctx):
-  print("4")
+    
+  match_modal = MatchModal(title="Create Match")
+  print("hi")
+  await ctx.interaction.response.send_modal(match_modal)
+  #await match_modal.wait()
 #match create end
 
 
@@ -928,24 +971,23 @@ bet = SlashCommandGroup(
 #bet modal start
 class BetModal(Modal):
   
-  def __init__(self, org_ctx, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
+  def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
-    self.org_ctx = org_ctx
     
     if error[0] is None: 
       team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
     else:
       team_label = error[0]
       
-    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}.', min_length=1, max_length=100))
+    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
 
     if error[1] is None: 
       amount_label = "Amount you want to bet."
     else:
       amount_label = error[1]
-    self.add_item(InputText(label=amount_label, placeholder=f"Your avalable balance is {round(user.get_balance())}.", min_length=1, max_length=20))
+    self.add_item(InputText(label=amount_label, placeholder=f"Your avalable balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
 
   async def callback(self, interaction: discord.Interaction):
     
@@ -1036,7 +1078,6 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #bet create start
 @bet.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=match_list_autocomplete)):
-  print(type(ctx))
   user = get_from_list("user", ctx.author.id)
   if user == None:
     create_user(ctx.author.id)
@@ -1048,7 +1089,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     await ctx.respond("Betting has closed.")
     return
     
-  bet_modal = BetModal(org_ctx=ctx, match=match, user=user, title="Create Bet")
+  bet_modal = BetModal(match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(bet_modal)
   await bet_modal.wait()
 #bet create end
