@@ -202,6 +202,29 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+name = "py-cord"
+version = "2.0.0b4"
+description = "A Python wrapper for the Discord API"
+category = "main"
+optional = false
+python-versions = ">=3.8.0"
+develop = false
+
+[package.dependencies]
+aiohttp = ">=3.6.0,<3.9.0"
+
+[package.extras]
+docs = ["sphinx (==4.4.0)", "sphinxcontrib-trio (==1.1.2)", "sphinxcontrib-websupport", "myst-parser"]
+speed = ["orjson (>=3.5.4)", "aiodns (>=1.1)", "brotlipy", "cchardet"]
+voice = ["PyNaCl (>=1.3.0,<1.6)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/Pycord-Development/pycord"
+reference = "master"
+resolved_reference = "0b54eee722f39c1961d83ea4019548e67654f366"
+
+[[package]]
 name = "replit"
 version = "3.2.4"
 description = "A library for interacting with features of repl.it"
@@ -281,7 +304,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "62614970c213b47bb6fa2d9c9cbc97594194249b1997eee7e3809109f33b884e"
+content-hash = "4ba3c917f4ee27f1a3f3dd0e0bc0f719acf8f64eaf1c52b06e227553646f484e"
 
 [metadata.files]
 aiohttp = [
@@ -628,6 +651,7 @@ orjson = [
     {file = "orjson-3.6.7-cp39-none-win_amd64.whl", hash = "sha256:d9a3288861bfd26f3511fb4081561ca768674612bac59513cb9081bb61fcc87f"},
     {file = "orjson-3.6.7.tar.gz", hash = "sha256:a4bb62b11289b7620eead2f25695212e9ac77fcfba76f050fa8a540fb5c32401"},
 ]
+py-cord = []
 replit = [
     {file = "replit-3.2.4-py3-none-any.whl", hash = "sha256:4fa5895e1e090ba23c179641bc88ab0486d1bea696515aa3147fce55733e29e1"},
     {file = "replit-3.2.4.tar.gz", hash = "sha256:39c660d57c479d321f143a04d75d1297accf24fc91c0113f56d6a279b20e9427"},
