@@ -170,8 +170,7 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
 
 
 def delete_balance_id(user_ambig, balance_id):
-  # to do, update everything ahead
-
+  print(balance_id)
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return "User not found"
@@ -179,10 +178,16 @@ def delete_balance_id(user_ambig, balance_id):
   if len(indices) > 1:
     print("More than one balance_id found")
   elif len(indices) == 0:
-    return "No balance_id found"
-  #to do
-  #reset_range = self.get_reset_range(indices[0])
-  #index = indices[0] + 1
+    return "No balancen id found"
+  reset_range = user.get_to_reset_range(indices[0])
+  
+  index = indices[0]
+  diff = user.balance[index][1] - user.balance[index-1][1]
+  print(diff)
+  for i in reset_range:
+    bal_list = list(user.balance[i])
+    bal_list[1] = bal_list[1] - diff
+    user.balance[i] = tuple(bal_list)
   balat = user.balance[indices[0]]
   
   user.balance.remove(balat)
@@ -256,6 +261,31 @@ def create_user(user_id):
   user = User(user_id, color_code, datetime.now())
   add_to_list("user", user)
   return user
+
+
+#color start
+def hex_to_color():
+  print("1")
+  
+def get_all_colors():
+  print("1")
+  
+def get_color(name):
+  print("1")
+  
+def add_color(name, hex):
+  print("1")
+  
+def remove_color(name):
+  print("1")
+  
+def rename_color(old_name, new_name):
+  print("1")
+  
+def recolor_color(name):
+  print("1")
+  #color end
+
 
 
 async def create_match_embedded(match_ambig):
@@ -411,9 +441,6 @@ def add_balance_user(user_ambig, change, description, date):
   replace_in_list("user", user.code, user)
   return user
 
-
-
-
 #returns user with new balance
 def change_prev_balance(user, balance_id, new_amount):
   index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
@@ -433,6 +460,12 @@ def change_prev_balance(user, balance_id, new_amount):
   return user
   
   
+def backup():
+  keys = db.keys()
+  for key in keys:
+    print(f"backing up {key}")
+    db[f"backup_{key}"] = db[key]
+  print("backed up all keys")
   
 
 
@@ -455,28 +488,16 @@ async def on_message(message):
     return
 
   print(message.author, message.content)
-  print(message.content == "")
   await bot.process_commands(message)
-
-  # hard reset but logs and channel ids
-  if message.content == "$clear the database of bad keys please and thank you":
-    return
-    all_keys = db.keys()
-    keys = []
-    for k in all_keys:
-      if not (k.startswith("log_") or k.endswith("_channel_id")):
-        keys.append(k)
-
-    db["log_" + get_uniqe_code("log")] = jsonpickle.encode(("a little called " + message.author.name + " ID: " + str(message.author.id) + " cleared database \nkeys include " + str(keys)), datetime.now())
-
-    for k in keys:
-      del db[k]
-    await message.channel.send("Good Bye World")
-
-    return
 
   if message.content.startswith("$"):
     return
+    
+  rand = random.randint(0, 50)
+  if rand == 0:
+    backup()
+
+  
 
 #choices start
 yes_no_choices = [
@@ -1219,6 +1240,11 @@ bot.add_application_command(loan)
 #loan end
 
 
+#backup
+@bot.command()
+async def backup_db(ctx):
+  backup()
+  
 
 
 #season reset command

@@ -86,9 +86,12 @@ class User:
       rrange = range(reset, resets[1 + resets.index(reset)])
       if reset == len(self.balance)-1:
         return None
-      if rrange.contains(index):
+      if index in rrange:
         return rrange
     return None
+
+  def get_to_reset_range(self, index):
+    return range(index, self.get_reset_range(index).stop)
 
   def to_string(self):
     return "Balance: " + str(self.balance)
