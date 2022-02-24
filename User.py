@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 class User:
-  def __init__(self, code, color_code, date_created):
+  def __init__(self, code, username, color_code, date_created):
     self.code = code
+    self.username = username
     self.color_code = color_code
 
     #a tuple (bet_id, balance after change, date)
@@ -23,6 +24,12 @@ class User:
     
     self.loans = []
 
+  def active_bet_ids_bets(self):
+    return [active_id[0] for active_id in self.active_bet_ids]
+
+  def active_bet_ids_matches(self):
+    return [active_id[1] for active_id in self.active_bet_ids]
+  
   def get_open_loans(self):
     open_loans = []
     for loan in self.loans:
@@ -43,7 +50,8 @@ class User:
 
   def unavailable(self):
     used = 0
-    for bet_id in self.active_bet_ids:
+    active_bet_ids_bets = self.active_bet_ids_bets()
+    for bet_id in active_bet_ids_bets:
       temp_bet = get_from_list("bet", bet_id)
       used += temp_bet.bet_amount
 
@@ -86,10 +94,13 @@ class User:
     return "Balance: " + str(self.balance)
       
   def get_new_balance_changes_embeds(self, amount):
-    
+
+    if amount <= 0:
+      return None
     if amount >= len(self.balance):
       amount = len(self.balance)
       before = 0
+      
     sorted_balances = sorted(self.balance, key=lambda x: x[2])
     new_balances = self.balance[-amount:]
     new_balances = sorted(new_balances, key=lambda x: x[2])
@@ -144,6 +155,9 @@ class User:
       else:
         before = 0
       embed_index += 1
+      
+    if len(embeds) == 0:
+      return None
     return embeds
 
   def get_graph_image(self, balances_ambig):

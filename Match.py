@@ -23,7 +23,7 @@ class Match:
 
     self.bet_ids = []
     self.message_ids = []
-
+    self.date_winner = None
     self.date_closed = None
     self.winner = 0
   
@@ -36,3 +36,14 @@ class Match:
 
   def short_to_string(self):
     return "Teams: " + str(self.t1) + " vs " + str(self.t2) + ", Odds: " + str(self.t1o) + " / " + str(self.t2o)
+
+  def winner_name(self):
+    if self.winner == 0:
+      return None
+    elif self.winner == 1:
+      return self.t1
+    else:
+      return self.t2
+
+  def basic_to_string(self):
+    return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
