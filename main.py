@@ -37,7 +37,6 @@ intents = discord.Intents.all()
 bot = commands.Bot(intents=intents, command_prefix="$")
 
 gid = [int(os.environ["GUILD_ID"])]
-print(gid)
 
 # matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
 # user is in user_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
@@ -88,7 +87,6 @@ async def get_user_from_member(ctx, user):
 async def user_from_autocorrect_tuple(ctx, t_list, text, prefix):
   
   objs = [t[1] for t in t_list if text == t[0]]
-  print("obj", objs)
   if len(objs) >= 2:
     print("More than one of text found", objs)
     if ctx is not None:
@@ -134,7 +132,10 @@ def all_matches_name_code():
   matches = get_all_objects("match")
   match_t_list = []
   for match in matches:
-    match_t_list.append((f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}", match))
+    if match.winner != 0:
+      match_t_list.append((f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}", match))
+    else:
+      match_t_list.append((f"{match.t1} vs {match.t2}, {match.tournament_name}", match))
   return match_t_list
 
 async def available_bets_name_code(bot):
@@ -149,22 +150,23 @@ async def available_bets_name_code(bot):
   return bet_list
 
 async def current_bets_name_code(bot):
-  matches = get_all_objects("match")
+  bets = get_all_objects("bet")
   bet_list = []
-  for match in matches:
-    if match.winner is None:
-      for bet_id in match.bet_ids:
-        bet = get_from_list("bet", bet_id)
-        name = (await smart_get_user(bet.user_id, bot)).display_name
-        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+  for bet in bets:
+    if bet.winner == 0:
+      name = (await smart_get_user(bet.user_id, bot)).display_name
+      bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
 async def all_bets_name_code(bot):
   bets = get_all_objects("bet")
   bet_list = []
   for bet in bets:
-    name = (await smart_get_user(bet.user_id, bot)).display_name
-    bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+    if bet.winner != 0:
+      name = (await smart_get_user(bet.user_id, bot)).display_name
+      bet_list.append((f"Paid out: {name}: {bet.bet_amount} on {bet.get_team()}", bet))
+    else:
+      bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
 def get_last_tournament_name(amount):
@@ -299,28 +301,6 @@ def create_user(user_id):
   return user
 
 
-#color start
-def hex_to_color():
-  print("1")
-  
-def get_all_colors():
-  print("1")
-  
-def get_color(name):
-  print("1")
-  
-def add_color(name, hex):
-  print("1")
-  
-def remove_color(name):
-  print("1")
-  
-def rename_color(old_name, new_name):
-  print("1")
-  
-def recolor_color(name):
-  print("1")
-  #color end
 
 
 
@@ -330,7 +310,6 @@ async def create_match_embedded(match_ambig):
     return None
 
   embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*tuple(int((match.code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
-
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
@@ -508,7 +487,7 @@ def backup():
 
 
 def roundup(x):
-  return int(math.round(x * 1000)) / 1000
+  return int(round(x * 1000)) / 1000
 
 
 @bot.event
@@ -552,7 +531,7 @@ open_close_choices = [
 
     
 #match start
-match = SlashCommandGroup(
+matchscg = SlashCommandGroup(
   name = "match", 
   description = "Create, edit, and view matches.",
   guild_ids = gid,
@@ -640,7 +619,7 @@ class MatchModal(Modal):
       msg = await inter.original_message()
     else:
       msg = await channel.send(embed=embedd)
-      await interaction.response.send_message(f"Match created in {channel.mention}.")
+      await interaction.response.send_message(f"Match created in {channel.mention}.", ephemeral = True)
       
     match.message_ids.append((msg.id, msg.channel.id))
     add_to_list("match", match)
@@ -721,35 +700,9 @@ async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
   return auto_completes
 #match match team autocomplete end
 
-  
-#match create start
-@match.command(name = "create", description = "Create a match.")
-async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=True, required=False)):
-    
-  match_modal = MatchModal(balance_odds=balance_odds, title="Create Match")
-  await ctx.interaction.response.send_modal(match_modal)
-  #await match_modal.wait()
-#match create end
 
-
-#match find start
-@match.command(name = "find", description = "Sends the embed of the match.")
-async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
-  #to do list some old ones
-  if (match := await user_from_autocorrect_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
-  
-  embedd = await create_match_embedded(match)
-  inter = await ctx.respond(embed=embedd)
-  msg = await inter.original_message()
-  
-  match.message_ids.append((msg.id, msg.channel.id))
-  replace_in_list("match", match.code, match)
-  
-#match find end
-
-  
 #match betting start
-@match.command(name = "betting", description = "Open and close betting.")
+@matchscg.command(name = "betting", description = "Open and close betting.")
 async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
 
   if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
@@ -766,10 +719,91 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
   embedd = await create_match_embedded(match)
   await edit_all_messages(match.message_ids, embedd)
 #match betting end
+  
+  
+#match create start
+@matchscg.command(name = "create", description = "Create a match.")
+async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+    
+  match_modal = MatchModal(balance_odds=balance_odds, title="Create Match")
+  await ctx.interaction.response.send_modal(match_modal)
+  #await match_modal.wait()
+#match create end
 
 
+#match delete start
+@matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
+async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_available_list_autocomplete)):
+  
+  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  if match.winner != 0:
+    await ctx.respond(f"Match winner has already been decided, you cannot delete the match.")
+    return
+    
+  gen_msg = await ctx.respond("Deleting match...")
+    
+  for bet_id in match.bet_ids:
+    bet = get_from_list("bet", bet_id)
+    await delete_all_messages(bet.message_ids)
+    remove_from_active_ids(bet.user_id, bet.code)
+    remove_from_list("bet", bet)
+  
+  await delete_all_messages(match.message_ids)
+  remove_from_list("match", match)
+  await gen_msg.edit_original_message(content=f"Deleted { match.basic_to_string()}, and all bets on the match.")
+#match delete end
+  
+
+#match find start
+@matchscg.command(name = "find", description = "Sends the embed of the match.")
+async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
+  #to do list some old ones
+  if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None:
+    if (match := await user_from_autocorrect_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  
+  embedd = await create_match_embedded(match)
+  inter = await ctx.respond(embed=embedd)
+  msg = await inter.original_message()
+  
+  match.message_ids.append((msg.id, msg.channel.id))
+  replace_in_list("match", match.code, match)
+#match find end
+
+
+#match list start
+@matchscg.command(name = "list", description = "Sends embed with all matches. If type is full it sends the whole embed of each match.")
+async def match_list(ctx, type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
+  matches = get_all_objects("match")
+  match_list = []
+  for match in matches:
+    if int(match.winner) == 0:
+      match_list.append(match)
+  if len(match_list) == 0:
+    await ctx.respond("No undecided matches.")
+    return
+
+  if type == 0:
+    #short
+    gen_msg = await ctx.respond("Generating list...")
+    embedd = await create_match_list_embedded("Matches:", match_list)
+    await gen_msg.edit_original_message(content = "", embed=embedd)
+    
+  elif type == 1:
+    #full
+    for i, match in enumerate(match_list):
+      embedd = await create_match_embedded(match)
+      if i == 0:
+        inter = await ctx.respond(embed=embedd)
+        msg = await inter.original_message()
+      else:
+        msg = await ctx.interaction.followup.send(embed=embedd)
+      match.message_ids.append((msg.id, msg.channel.id))
+      replace_in_list("match", match.code, match)
+#match list end
+  
+  
 #match winner start
-@match.command(name = "winner", description = "Set winner of match.")
+@matchscg.command(name = "winner", description = "Set winner of match.")
 async def match_winner(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_current_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_team_list_autocomplete)):
   
   if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
@@ -835,68 +869,13 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
 #match winner end
 
-
-#match delete start
-@match.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
-async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_available_list_autocomplete)):
   
-  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
-  if match.winner != 0:
-    await ctx.respond(f"Match winner has already been decided, you cannot delete the match.")
-    return
-    
-  gen_msg = await ctx.respond("Deleting match...")
-    
-  for bet_id in match.bet_ids:
-    bet = get_from_list("bet", bet_id)
-    await delete_all_messages(bet.message_ids)
-    remove_from_active_ids(bet.user_id, bet.code)
-    remove_from_list("bet", bet)
-  
-  await delete_all_messages(match.message_ids)
-  remove_from_list("match", match)
-  await gen_msg.edit_original_message(content=f"Deleted { match.basic_to_string()}, and all bets on the match.")
-#match end
-
-
-#match list start
-@match.command(name = "list", description = "Sends embed with all matches. If type is full it sends the whole embed of each match.")
-async def match_list(ctx, type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
-  matches = get_all_objects("match")
-  match_list = []
-  for match in matches:
-    if int(match.winner) == 0:
-      match_list.append(match)
-  if len(match_list) == 0:
-    await ctx.respond("No undecided matches.")
-    return
-
-  if type == 0:
-    #short
-    gen_msg = await ctx.respond("Generating list...")
-    embedd = await create_match_list_embedded("Matches:", match_list)
-    await gen_msg.edit_original_message(content = "", embed=embedd)
-    
-  elif type == 1:
-    #full
-    for i, match in enumerate(match_list):
-      embedd = await create_match_embedded(match)
-      if i == 0:
-        inter = await ctx.respond(embed=embedd)
-        msg = await inter.original_message()
-      else:
-        msg = await ctx.interaction.followup.send(embed=embedd)
-      match.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("match", match.code, match)
-#match list end
-
-  
-bot.add_application_command(match)
+bot.add_application_command(matchscg)
 #match end
     
   
 #bet start
-bet = SlashCommandGroup(
+betscg = SlashCommandGroup(
   name = "bet", 
   description = "Create, edit, and view bets.",
   guild_ids = gid,
@@ -912,6 +891,22 @@ class BetModal(Modal):
     
     if error[0] is None: 
       team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
+      if len(team_label) >= 45:
+        team_label = f"{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
+        if len(team_label) >= 45:
+          team_label = f"{match.t1} vs {match.t2}, {match.t1o}/{match.t2o}"
+          if len(team_label) >= 45:
+            team_label = f"{match.t1}/{match.t2}, {match.t1o}/{match.t2o}"
+            if len(team_label) >= 45:
+              firstt1w = match.t1.split(" ")[0]
+              firstt2w = match.t2.split(" ")[0]
+              team_label = f"{firstt1w} vs {firstt2w}. Odds: {match.t1o} / {match.t2o}"
+              if len(team_label) >= 45:
+                team_label = f"{firstt1w} vs {firstt2w}, {match.t1o} / {match.t2o}"
+                if len(team_label) >= 45:
+                  team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
+                  if len(team_label) >= 45:
+                    team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
     else:
       team_label = error[0]
       
@@ -977,7 +972,7 @@ class BetModal(Modal):
       msg = await inter.original_message()
     else:
       msg = await channel.send(embed=embedd)
-      await interaction.response.send_message(f"Bet created in {channel.mention}.")
+      await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
 
     bet.message_ids.append((msg.id, msg.channel.id))
     replace_in_list("match", match.code, match)
@@ -1021,7 +1016,6 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
         auto_completes.append(bet_t[0])
         if len(auto_completes) == 25:
           break
-  print(auto_completes)
         
   return auto_completes
 #bet list autocomplete end
@@ -1037,7 +1031,7 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 
 #bet create start
-@bet.command(name = "create", description = "Create a bet.")
+@betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
   user = get_from_list("user", ctx.author.id)
   if user == None:
@@ -1057,14 +1051,11 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 
 
 #bet cancel start
-@bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
+@betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
-  print("1")
   
   if (bet := await user_from_autocorrect_tuple(ctx, await available_bets_name_code(bot), bet, "bet")) is None: return
   
-
-  return
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
     await ctx.respond("Match betting has closed, you cannot cancel the bet.")
@@ -1089,10 +1080,11 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 
 
 #bet find start
-@bet.command(name = "find", description = "Sends the embed of the bet.")
+@betscg.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   #list some old matches
-  if (bet := await user_from_autocorrect_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
+  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: 
+    if (bet := await user_from_autocorrect_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
   
   embedd = await create_bet_embedded(bet)
   inter = await ctx.respond(embed=embedd)
@@ -1103,7 +1095,7 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 
 
 #bet list start
-@bet.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
+@betscg.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
   
   bets = get_all_objects("bet")
@@ -1134,7 +1126,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
       replace_in_list("bet", bet.code, bet)
 #bet list end
   
-bot.add_application_command(bet)
+bot.add_application_command(betscg)
 #bet end
 
 
@@ -1457,6 +1449,7 @@ async def clean_match_bet_ids_without_bet(ctx):
 
 @bot.command()
 async def add_team_names(ctx):
+  return
   bets = get_all_objects("bet")
   for bet in bets:
     match = get_from_list("match", bet.match_id)
