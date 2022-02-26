@@ -86,17 +86,27 @@ async def get_user_from_member(ctx, user):
 
 
 async def user_from_autocorrect_tuple(ctx, t_list, text, prefix):
-  obj = next((t[1] for t in t_list if text == t[0]), None)
-  if obj is None:
+  
+  objs = [t[1] for t in t_list if text == t[0]]
+  print("obj", objs)
+  if len(objs) >= 2:
+    print("More than one of text found", objs)
+    if ctx is not None:
+      await ctx.respond(f"Error please @pig. Try typing in code instead.")
+    return None
+  if len(objs) == 0:
     obj = get_from_list(prefix, text)
+  else:
+    obj = objs[0]
     
-  if obj is None:
+  if obj == [] or obj is None:
     if ctx is not None:
       await ctx.respond(f"{prefix.capitalize()} ID not found.")
+    return None
   return obj
 
 
-def get_all_avalable_matches():
+def get_all_available_matches():
   matches = get_all_objects("match")
   match_list = []
   for match in matches:
@@ -104,7 +114,7 @@ def get_all_avalable_matches():
       match_list.append(match)
   return match_list
 
-def avalable_matches_name_code():
+def available_matches_name_code():
   matches = get_all_objects("match")
   match_t_list = []
   for match in matches:
@@ -120,7 +130,14 @@ def current_matches_name_code():
       match_t_list.append((f"{match.t1} vs {match.t2}", match))
   return match_t_list
 
-async def current_bets_name_code(bot):
+def all_matches_name_code():
+  matches = get_all_objects("match")
+  match_t_list = []
+  for match in matches:
+    match_t_list.append((f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}", match))
+  return match_t_list
+
+async def available_bets_name_code(bot):
   matches = get_all_objects("match")
   bet_list = []
   for match in matches:
@@ -128,7 +145,26 @@ async def current_bets_name_code(bot):
       for bet_id in match.bet_ids:
         bet = get_from_list("bet", bet_id)
         name = (await smart_get_user(bet.user_id, bot)).display_name
-        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team(match)}", bet))
+        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+  return bet_list
+
+async def current_bets_name_code(bot):
+  matches = get_all_objects("match")
+  bet_list = []
+  for match in matches:
+    if match.winner is None:
+      for bet_id in match.bet_ids:
+        bet = get_from_list("bet", bet_id)
+        name = (await smart_get_user(bet.user_id, bot)).display_name
+        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+  return bet_list
+
+async def all_bets_name_code(bot):
+  bets = get_all_objects("bet")
+  bet_list = []
+  for bet in bets:
+    name = (await smart_get_user(bet.user_id, bot)).display_name
+    bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
 def get_last_tournament_name(amount):
@@ -170,8 +206,7 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
 
 
 def delete_balance_id(user_ambig, balance_id):
-  # to do, update everything ahead
-
+  print(balance_id)
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return "User not found"
@@ -179,10 +214,16 @@ def delete_balance_id(user_ambig, balance_id):
   if len(indices) > 1:
     print("More than one balance_id found")
   elif len(indices) == 0:
-    return "No balance_id found"
-  #to do
-  #reset_range = self.get_reset_range(indices[0])
-  #index = indices[0] + 1
+    return "No balancen id found"
+  reset_range = user.get_to_reset_range(indices[0])
+  
+  index = indices[0]
+  diff = user.balance[index][1] - user.balance[index-1][1]
+  print(diff)
+  for i in reset_range:
+    bal_list = list(user.balance[i])
+    bal_list[1] = bal_list[1] - diff
+    user.balance[i] = tuple(bal_list)
   balat = user.balance[indices[0]]
   
   user.balance.remove(balat)
@@ -256,6 +297,31 @@ def create_user(user_id):
   user = User(user_id, color_code, datetime.now())
   add_to_list("user", user)
   return user
+
+
+#color start
+def hex_to_color():
+  print("1")
+  
+def get_all_colors():
+  print("1")
+  
+def get_color(name):
+  print("1")
+  
+def add_color(name, hex):
+  print("1")
+  
+def remove_color(name):
+  print("1")
+  
+def rename_color(old_name, new_name):
+  print("1")
+  
+def recolor_color(name):
+  print("1")
+  #color end
+
 
 
 async def create_match_embedded(match_ambig):
@@ -411,9 +477,6 @@ def add_balance_user(user_ambig, change, description, date):
   replace_in_list("user", user.code, user)
   return user
 
-
-
-
 #returns user with new balance
 def change_prev_balance(user, balance_id, new_amount):
   index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
@@ -433,13 +496,19 @@ def change_prev_balance(user, balance_id, new_amount):
   return user
   
   
+def backup():
+  keys = db.keys()
+  for key in keys:
+    print(f"backing up {key}")
+    db[f"backup_{key}"] = db[key]
+  print("backed up all keys")
   
 
 
 
 
 def roundup(x):
-  return int(math.ceil(x * 1000)) / 1000
+  return int(math.round(x * 1000)) / 1000
 
 
 @bot.event
@@ -455,28 +524,16 @@ async def on_message(message):
     return
 
   print(message.author, message.content)
-  print(message.content == "")
   await bot.process_commands(message)
-
-  # hard reset but logs and channel ids
-  if message.content == "$clear the database of bad keys please and thank you":
-    return
-    all_keys = db.keys()
-    keys = []
-    for k in all_keys:
-      if not (k.startswith("log_") or k.endswith("_channel_id")):
-        keys.append(k)
-
-    db["log_" + get_uniqe_code("log")] = jsonpickle.encode(("a little called " + message.author.name + " ID: " + str(message.author.id) + " cleared database \nkeys include " + str(keys)), datetime.now())
-
-    for k in keys:
-      del db[k]
-    await message.channel.send("Good Bye World")
-
-    return
 
   if message.content.startswith("$"):
     return
+    
+  rand = random.randint(0, 50)
+  if rand == 0:
+    backup()
+
+  
 
 #choices start
 yes_no_choices = [
@@ -504,7 +561,7 @@ match = SlashCommandGroup(
 #match modal start
 class MatchModal(Modal):
   
-  def __init__(self, balance_odds=True, *args, **kwargs) -> None:
+  def __init__(self, balance_odds=0, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     
     self.balance_odds = balance_odds
@@ -549,17 +606,15 @@ class MatchModal(Modal):
       await interaction.response.send_message(f"Odds must be greater than 1.")
       return
     if self.balance_odds == 0:
-      odds1 = 1 / team_one_old_odds
-      odds2 = 1 / team_two_old_odds
-    
-      percentage1 = odds1 / (odds1 + odds2)
-      percentage2 = odds2 / (odds1 + odds2)
-    
-      odds1 = 1 / percentage1
-      odds2 = 1 / percentage2
-    
-      team_one_odds = roundup(odds1)
-      team_two_odds = roundup(odds2)
+      odds1 = team_one_old_odds - 1
+      odds2 = team_two_old_odds - 1
+      
+      oneflip = 1 / odds1
+      
+      percentage1 = (math.sqrt(odds2/oneflip))
+      
+      team_one_odds = roundup(odds1 / percentage1) + 1
+      team_two_odds = roundup(odds2 / percentage1) + 1
     else:
       team_one_odds = team_one_old_odds
       team_two_odds = team_two_old_odds
@@ -599,12 +654,50 @@ async def tournament_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #match list autocomplete start
 async def match_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
   match_t_list = current_matches_name_code()
-  auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
+  auto_completes = [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
+  if auto_completes == []:
+    text.replace(",", "")
+    text.replace(":", "")
+    text_keywords = text.split(" ")
+    all_match_t_list = all_matches_name_code()
+    all_match_t_list.reverse()
+    if len(text_keywords) == 0:
+      return []
+    for match_t in all_match_t_list:
+      match_detail = match_t[0].lower()
+      all_in = True
+      for text_keyword in text_keywords:
+        if text_keyword not in match_detail:
+          all_in = False
+          break
+      if all_in:
+        auto_completes.append(match_t[0])
+        if len(auto_completes) == 25:
+          break
+        
   return auto_completes
 #match list autocomplete end
   
+#match current list autocomplete start
+async def match_current_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = current_matches_name_code()
+  auto_completes = [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
+        
+  return auto_completes
+#match current list autocomplete end
 
+#match available list autocomplete start
+async def match_available_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = available_matches_name_code()
+  auto_completes = [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
+        
+  return auto_completes
+#match available list autocomplete end
+  
 #match open close list autocomplete start
 async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   type = ctx.options["type"]
@@ -621,7 +714,6 @@ async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   
 #match match team autocomplete start
 async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
-  print(ctx.focused)
   match = ctx.options["match"]
   if match is None: return []
   if (match := await user_from_autocorrect_tuple(None, current_matches_name_code(), match, "match")) is None: return []
@@ -644,7 +736,7 @@ async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt
 @match.command(name = "find", description = "Sends the embed of the match.")
 async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
   #to do list some old ones
-  if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocorrect_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
   
   embedd = await create_match_embedded(match)
   inter = await ctx.respond(embed=embedd)
@@ -678,7 +770,7 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
 
 #match winner start
 @match.command(name = "winner", description = "Set winner of match.")
-async def match_winner(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_team_list_autocomplete)):
+async def match_winner(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_current_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_team_list_autocomplete)):
   
   if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
   team.strip()
@@ -746,9 +838,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
 
 #match delete start
 @match.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
-async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_list_autocomplete)):
+async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_available_list_autocomplete)):
   
-  if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   if match.winner != 0:
     await ctx.respond(f"Match winner has already been decided, you cannot delete the match.")
     return
@@ -829,7 +921,7 @@ class BetModal(Modal):
       amount_label = "Amount you want to bet."
     else:
       amount_label = error[1]
-    self.add_item(InputText(label=amount_label, placeholder=f"Your avalable balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
+    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
 
   async def callback(self, interaction: discord.Interaction):
     
@@ -873,7 +965,7 @@ class BetModal(Modal):
         errortext += error[1]
       return
 
-    bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now())
+    bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now(), match.t1, match.t2, match.tournament_name)
 
     match.bet_ids.append(bet.code)
     add_to_active_ids(user.code, bet)
@@ -898,7 +990,7 @@ class BetModal(Modal):
   
 #new match list autocomplete start
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
-  match_t_list = avalable_matches_name_code()
+  match_t_list = available_matches_name_code()
   if (user := get_from_list("user", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
   active_bet_ids_matches = user.active_bet_ids_matches()
   auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
@@ -907,10 +999,41 @@ async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #bet list autocomplete start
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
   bet_t_list = await current_bets_name_code(bot)
-  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+  auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
+  if auto_completes == []:
+    text.replace(",", "")
+    text.replace(":", "")
+    text_keywords = text.split(" ")
+    all_bet_t_list = await all_bets_name_code(bot)
+    all_bet_t_list.reverse()
+    if len(text_keywords) == 0:
+      return []
+    for bet_t in all_bet_t_list:
+      bet_detail = bet_t[0].lower()
+      all_in = True
+      for text_keyword in text_keywords:
+        if text_keyword not in bet_detail:
+          all_in = False
+          break
+      if all_in:
+        auto_completes.append(bet_t[0])
+        if len(auto_completes) == 25:
+          break
+  print(auto_completes)
+        
   return auto_completes
 #bet list autocomplete end
+
+  
+#user bet list autocomplete start
+async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  bet_t_list = await available_bets_name_code(bot)
+  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+  return auto_completes
+
+#user bet list autocomplete end
 
 
 #bet create start
@@ -920,7 +1043,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
   if user == None:
     create_user(ctx.author.id)
     
-  if (match := await user_from_autocorrect_tuple(ctx, avalable_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   print(match)
     
   if match.date_closed is not None:
@@ -935,9 +1058,13 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 
 #bet cancel start
 @bet.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
-async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=bet_list_autocomplete)):
-  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
+  print("1")
   
+  if (bet := await user_from_autocorrect_tuple(ctx, await available_bets_name_code(bot), bet, "bet")) is None: return
+  
+
+  return
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
     await ctx.respond("Match betting has closed, you cannot cancel the bet.")
@@ -965,7 +1092,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 @bet.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   #list some old matches
-  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+  if (bet := await user_from_autocorrect_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
   
   embedd = await create_bet_embedded(bet)
   inter = await ctx.respond(embed=embedd)
@@ -1107,7 +1234,7 @@ async def graph_balance(ctx,
   elif type == 1:
     graph_type = "all"
   elif type == 2:
-    graph_type = amount
+    graph_type = user.balance[-(amount+1):]
   else:
     ctx.respond("Not a valid type.")
     return
@@ -1219,6 +1346,11 @@ bot.add_application_command(loan)
 #loan end
 
 
+#backup
+@bot.command()
+async def backup_db(ctx):
+  backup()
+  
 
 
 #season reset command
@@ -1305,6 +1437,36 @@ $debug user_dump: prints json dump"""
   else:
     await ctx.send("Not valid command. Use $debug help to get list of commands")
 
+@bot.command()
+async def clean_match_bet_ids_without_bet(ctx):
+  return
+  matches = get_all_objects("match")
+  bets = get_all_objects("bet")
+  for match in matches:
+    for bet_id in match.bet_ids:
+      in_bet = 0
+      for bet in bets:
+        if bet.code == bet_id:
+          in_bet += 1
+
+      if in_bet != 1:
+        print(bet_id, in_bet, match.code)
+        match.bet_ids.remove(bet_id)
+        replace_in_list("match", match.code, match)
+  print("end")
+
+@bot.command()
+async def add_team_names(ctx):
+  bets = get_all_objects("bet")
+  for bet in bets:
+    match = get_from_list("match", bet.match_id)
+    bet.t1 = match.t1
+    bet.t2 = match.t2
+    bet.tournament_name = match.tournament_name
+    replace_in_list("bet", bet.code, bet)
+  print("done")
+  
+    
 # debug command
 @bot.command()
 async def reset_bet_winners_to_match_winners(ctx):
