@@ -1234,7 +1234,7 @@ async def graph_balance(ctx,
   elif type == 1:
     graph_type = "all"
   elif type == 2:
-    graph_type = amount
+    graph_type = user.balance[-(amount+1):]
   else:
     ctx.respond("Not a valid type.")
     return
