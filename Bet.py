@@ -2,7 +2,12 @@ from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from
 import math
 
 class Bet:
-  def __init__(self, code, match_id, user_id, bet_amount, team_num, date_created):
+  def __init__(self, code, match_id, user_id, bet_amount, team_num, date_created, t1, t2, tournament_name):
+    
+    self.t1 = t1
+    self.t2 = t2
+    self.tournament_name = tournament_name
+    
     self.code = code
     self.match_id = match_id
     self.user_id = user_id
@@ -19,13 +24,11 @@ class Bet:
 
   
   
-  def get_team(self, match=None):
-    if match is None:
-      match = get_from_list("match", self.match_id)
+  def get_team(self):
     if self.team_num == 1:
-      return match.t1
+      return self.t1
     elif self.team_num == 2:
-      return match.t2
+      return self.t2
     
 
   def get_team_and_payout(self):
@@ -43,20 +46,20 @@ class Bet:
 
     return(team, payout)
 
-  def get_team_and_winner(self, match):
+  def get_team_and_winner(self):
 
     team = ""
     winner = ""
 
     if self.team_num == 1:
-      team = match.t1
+      team = self.t1
     elif self.team_num == 2:
-      team = match.t2
+      team = self.t2
 
     if self.winner == 1:
-      winner = match.t1
+      winner = self.t1
     elif self.winner == 2:
-      winner = match.t2
+      winner = self.t2
     elif self.winner == 0:
       winner = "None"
 
@@ -77,7 +80,7 @@ class Bet:
   def balance_to_string(self, balance):
     
     match = get_from_list("match", self.match_id)
-    (team, winner) = self.get_team_and_winner(match)
+    (team, winner) = self.get_team_and_winner()
 
     return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.bet_amount)}, Balance change: {math.floor(balance)}"
 
