@@ -27,6 +27,7 @@ from Match import Match
 from Bet import Bet
 from User import User
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user
+from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from datetime import datetime
 from discord.ext import commands
@@ -87,6 +88,7 @@ async def get_user_from_member(ctx, user):
 async def user_from_autocorrect_tuple(ctx, t_list, text, prefix):
   
   objs = [t[1] for t in t_list if text == t[0]]
+  
   if len(objs) >= 2:
     print("More than one of text found", objs)
     if ctx is not None:
@@ -295,8 +297,8 @@ def get_uniqe_code(prefix):
 
 def create_user(user_id):
   random.seed()
-  color_code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
-  user = User(user_id, color_code, datetime.now())
+  color = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(6)
+  user = User(user_id, color, datetime.now())
   add_to_list("user", user)
   return user
 
@@ -308,8 +310,7 @@ async def create_match_embedded(match_ambig):
   match = ambig_to_obj(match_ambig, "match")
   if match == None:
     return None
-
-  embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*tuple(int((match.code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
+  embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*hex_to_tuple(match.color)))
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
@@ -354,7 +355,7 @@ async def create_match_list_embedded(embed_title, matches_ambig):
 
 
 async def create_bet_list_embedded(embed_title, bets_ambig):
-  embed = discord.Embed(title=embed_title, color=discord.Color.red())
+  embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
     for bet_id in bets_ambig:
       bet = get_from_list("bet", bet_id)
@@ -370,7 +371,7 @@ async def create_bet_embedded(bet_ambig):
   if bet == None:
     return None
 
-  embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*tuple(int((bet.code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
+  embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=(await smart_get_user(bet.user_id, bot)).mention, inline=True)
   embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
@@ -402,7 +403,7 @@ async def create_user_embedded(user_ambig):
   if user == None:
     return None
 
-  embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*tuple(int((user.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4))))
+  embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*hex_to_tuple(user.color)))
   embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=False)
   embed.add_field(name="Account Balance:", value=math.floor(user.balance[-1][1]), inline=True)
   embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
@@ -529,7 +530,503 @@ open_close_choices = [
 ]
 #choices end
 
+
+
+
+#assign start
+assign = SlashCommandGroup(
+  name = "assign", 
+  description = "Assigns the discord channel it is put in to that channel type.",
+  guild_ids = gid,
+)
+
+#assign matches start
+@assign.command(name = "matches", description = "Where the end matches show up.")
+async def assign_matches(ctx):
+  db["match_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the match list channel.")
+#assign matches end
+
+#assign bets start
+@assign.command(name = "bets", description = "Where the end bets show up.")
+async def assign_bets(ctx):
+  db["bet_channel_id"] = ctx.channel.id
+  await ctx.respond("This channel is now the bet list channel.")
+#assign bets end
+
+bot.add_application_command(assign)
+#assign end
+
+
+
+#award start
+@bot.slash_command( 
+  name = "award", 
+  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
+  guild_ids = gid,
+)
+
+
+async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
+
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  abu = add_balance_user(user, amount, "award_" + description, datetime.now())
+  if abu == None:
+    await ctx.respond("User not found.")
+  else:
+    embedd = await create_user_embedded(user)
+    await ctx.respond(embed=embedd)
+#award end
+
+  
+
+#balance start
+@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"])
+async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
+  if user == None:
+    user = get_from_list("user", ctx.author.id)
+    if user == None:
+      create_user(ctx.author.id)
+  else:
+    user = get_from_list("user", user.id)
+    if user == None:
+      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
+      return
     
+  embedd = await create_user_embedded(user)
+  if embedd == None:
+    await ctx.respond("User not found.")
+    return
+  await ctx.respond(embed=embedd)
+#balance end
+
+
+
+  #bet start
+betscg = SlashCommandGroup(
+  name = "bet", 
+  description = "Create, edit, and view bets.",
+  guild_ids = gid,
+)
+
+#bet modal start
+class BetModal(Modal):
+  
+  def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    self.match = match
+    self.user = user
+    
+    if error[0] is None: 
+      team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
+      if len(team_label) >= 45:
+        team_label = f"{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
+        if len(team_label) >= 45:
+          team_label = f"{match.t1} vs {match.t2}, {match.t1o}/{match.t2o}"
+          if len(team_label) >= 45:
+            team_label = f"{match.t1}/{match.t2}, {match.t1o}/{match.t2o}"
+            if len(team_label) >= 45:
+              firstt1w = match.t1.split(" ")[0]
+              firstt2w = match.t2.split(" ")[0]
+              team_label = f"{firstt1w} vs {firstt2w}. Odds: {match.t1o} / {match.t2o}"
+              if len(team_label) >= 45:
+                team_label = f"{firstt1w} vs {firstt2w}, {match.t1o} / {match.t2o}"
+                if len(team_label) >= 45:
+                  team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
+                  if len(team_label) >= 45:
+                    team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
+    else:
+      team_label = error[0]
+      
+    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
+
+    if error[1] is None: 
+      amount_label = "Amount you want to bet."
+    else:
+      amount_label = error[1]
+    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
+
+  async def callback(self, interaction: discord.Interaction):
+    
+    match = self.match
+    user = self.user
+    team_num = self.children[0].value
+    amount = self.children[1].value
+    error = [None, None]
+    
+    if not is_digit(amount):
+      print("Amount has to be a positive whole integer.")
+      error[1] = "Amount must be a positive whole number."
+    
+    if not (int(team_num) == 1 or int(team_num) == 2 or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+      print("Team num has to either be 1 or 2.")
+      error[0] = f'Please enter "1", "2", "{match.t1}", or "{match.t2}". Odds: {match.t1o} / {match.t2o}.'
+
+    if int(amount) <= 0:
+      print("Cant bet negatives.")
+      error[1] = "Amount must be a positive whole number."
+
+    if not match.date_closed == None:
+      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+
+    code = get_uniqe_code("bet")
+
+    balance_left = user.get_balance() - int(amount)
+    if balance_left < 0:
+      print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+      error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+      print("⛔")
+    if not error == [None, None]:
+      errortxt = ""
+      if error[0] is not None:
+        errortext += error[0]
+        if error[1] is not None:
+          errortext += " "
+        #TODO
+        interaction.response.sent_msg(interaction)
+      if error[1] is not None:
+        errortext += error[1]
+      return
+    color = code[:6]
+    bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now(), match.t1, match.t2, match.tournament_name, color)
+
+    match.bet_ids.append(bet.code)
+    add_to_active_ids(user.code, bet)
+
+    embedd = await create_bet_embedded(bet)
+    
+    if (channel := await bot.fetch_channel(db["bet_channel_id"])) == interaction.channel:
+      inter = await interaction.response.send_message(embed=embedd)
+      msg = await inter.original_message()
+    else:
+      msg = await channel.send(embed=embedd)
+      await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
+
+    bet.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("match", match.code, match)
+    add_to_list("bet", bet)
+    embedd = await create_match_embedded(match)
+    await edit_all_messages(match.message_ids, embedd)
+    self.stop()
+#bet modal end
+
+  
+#new match list autocomplete start
+async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
+  match_t_list = available_matches_name_code()
+  if (user := get_from_list("user", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
+  active_bet_ids_matches = user.active_bet_ids_matches()
+  auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
+  return auto_completes
+#new match list autocomplete end
+
+#bet list autocomplete start
+async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  bet_t_list = await current_bets_name_code(bot)
+  auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
+  if auto_completes == []:
+    text.replace(",", "")
+    text.replace(":", "")
+    text_keywords = text.split(" ")
+    all_bet_t_list = await all_bets_name_code(bot)
+    all_bet_t_list.reverse()
+    if len(text_keywords) == 0:
+      return []
+    for bet_t in all_bet_t_list:
+      bet_detail = bet_t[0].lower()
+      all_in = True
+      for text_keyword in text_keywords:
+        if text_keyword not in bet_detail:
+          all_in = False
+          break
+      if all_in:
+        auto_completes.append(bet_t[0])
+        if len(auto_completes) == 25:
+          break
+        
+  return auto_completes
+#bet list autocomplete end
+
+  
+#user bet list autocomplete start
+async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  bet_t_list = await available_bets_name_code(bot)
+  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
+  return auto_completes
+#user bet list autocomplete end
+
+
+#bet create start
+@betscg.command(name = "create", description = "Create a bet.")
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
+  user = get_from_list("user", ctx.author.id)
+  if user == None:
+    create_user(ctx.author.id)
+    
+  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  print(match)
+    
+  if match.date_closed is not None:
+    await ctx.respond("Betting has closed.")
+    return
+    
+  bet_modal = BetModal(match=match, user=user, title="Create Bet")
+  await ctx.interaction.response.send_modal(bet_modal)
+  await bet_modal.wait()
+#bet create end
+
+
+#bet cancel start
+@betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
+async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
+  
+  if (bet := await user_from_autocorrect_tuple(ctx, await available_bets_name_code(bot), bet, "bet")) is None: return
+  
+  match = get_from_list("match", bet.match_id)
+  if (match is None) or (match.date_closed is not None):
+    await ctx.respond("Match betting has closed, you cannot cancel the bet.")
+    return
+    
+  gen_msg = await ctx.respond("Cancelling bet...")
+    
+  try:
+    match.bet_ids.remove(bet.code)
+    replace_in_list("match", match.code, match)
+    embedd = await create_match_embedded(match)
+    await edit_all_messages(match.message_ids, embedd)
+  except:
+    print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
+    
+  
+  await delete_all_messages(bet.message_ids)
+  remove_from_active_ids(bet.user_id, bet.code)
+  bet = remove_from_list("bet", bet.code)
+  await gen_msg.edit_original_message(content=f"Canceled {await bet.basic_to_string(bot, match)}.")
+#bet cancel end
+
+
+#bet find start
+@betscg.command(name = "find", description = "Sends the embed of the bet.")
+async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
+  #list some old matches
+  if (fbet := await user_from_autocorrect_tuple(None, await current_bets_name_code(bot), bet, "bet")) is None: 
+    if (fbet := await user_from_autocorrect_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
+  bet = fbet
+  embedd = await create_bet_embedded(bet)
+  inter = await ctx.respond(embed=embedd)
+  msg = await inter.original_message()
+  bet.message_ids.append((msg.id, msg.channel.id))
+  replace_in_list("bet", bet.code, bet)
+#bet find end
+
+
+#bet list start
+@betscg.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
+async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
+  
+  bets = get_all_objects("bet")
+  bet_list = []
+  for bet in bets:
+    if int(bet.winner) == 0:
+      bet_list.append(bet)
+  if len(bet_list) == 0:
+    await ctx.respond("No undecided bets.")
+    return
+
+  if type == 0:
+    #short
+    gen_msg = await ctx.respond("Generating list...")
+    embedd = await create_bet_list_embedded("Bets:", bet_list)
+    await gen_msg.edit_original_message(content = "", embed=embedd)
+    
+  elif type == 1:
+    #full
+    for i, bet in enumerate(bet_list):
+      embedd = await create_bet_embedded(bet)
+      if i == 0:
+        inter = await ctx.respond(embed=embedd)
+        msg = await inter.original_message()
+      else:
+        msg = await ctx.interaction.followup.send(embed=embedd)
+      bet.message_ids.append((msg.id, msg.channel.id))
+      replace_in_list("bet", bet.code, bet)
+#bet list end
+  
+bot.add_application_command(betscg)
+#bet end
+
+
+
+
+#profile start
+profile = SlashCommandGroup(
+  name = "profile", 
+  description = "Change your settings.",
+  guild_ids = gid,
+)
+
+
+#color picker autocomplete start
+async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
+  return get_all_colors().keys()
+#color picker autocomplete end
+
+  
+#profile color start
+@profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to add.")):
+  if color_code := get_color(color_name) is None:
+    await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
+    return
+    if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+    user.color = color_code
+#profile color end
+
+#bot.add_application_command(profile)
+#profile end
+
+
+#graph start
+graph = SlashCommandGroup(
+  name = "graph", 
+  description = "Shows an image of a graph to user.",
+  guild_ids = gid,
+)
+
+
+#graph balance start
+balance_choices = [
+  OptionChoice(name="season", value=0),
+  OptionChoice(name="all", value=1),
+  OptionChoice(name="last", value=2),
+]
+@graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
+async def graph_balance(ctx,
+  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
+  user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
+  amount: Option(int, "User you want to get balance of.", default = 20, required = False)):
+    
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if type == 0:
+    graph_type = "current"
+  elif type == 1:
+    graph_type = "all"
+  elif type == 2:
+    graph_type = user.balance[-(amount+1):]
+  else:
+    ctx.respond("Not a valid type.")
+    return
+    
+  with BytesIO() as image_binary:
+    gen_msg = await ctx.respond("Generating graph...")
+    user.get_graph_image(graph_type).save(image_binary, 'PNG')
+    image_binary.seek(0)
+    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+#graph balance end
+
+bot.add_application_command(graph)
+#graph end
+
+
+
+#leaderboard start
+@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.")
+async def leaderboard(ctx):
+  embedd = await create_leaderboard_embedded()
+  await ctx.respond(embed=embedd)
+#leaderboard end
+
+
+  
+#log start
+@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
+async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
+
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  if amount <= 0:
+    await ctx.respond("Amount has to be greater than 0.")
+    return
+    
+  gen_msg = await ctx.respond("Generating log...")
+  
+  embedds = user.get_new_balance_changes_embeds(amount)
+  if embedds == None:
+    await gen_msg.edit_original_message(content = "No log generated.")
+    return
+  
+  await gen_msg.edit_original_message(content="", embeds=embedds)
+#log end
+
+
+
+#loan start
+loan = SlashCommandGroup(
+  name = "loan", 
+  description = "Create and pay off loans.",
+  guild_ids = gid,
+)
+
+
+#loan create start
+@loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
+async def loan_create(ctx):
+    
+  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+
+  if user.get_clean_bal_loan() >= 100:
+    await ctx.respond("You must have less than 100 to make a loan")
+    return
+  user.loans.append((50, datetime.now, None))
+  replace_in_list("user", user.code, user)
+  await ctx.respond("You have been loaned 50")
+#loan create end
+
+  
+#loan count start
+@loan.command(name = "count", description = "See how many loans you have active.")
+async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  user = get_from_list("user", ctx.author.id)
+  await ctx.respond(f"You currently have {len(user.get_open_loans())} active loans")
+#loan count end
+
+  
+#loan pay start
+@loan.command(name = "pay", description = "See how many loans you have active.")
+async def loan_pay(ctx):
+  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+    
+  loan_amount = user.loan_bal()
+  if loan_amount == 0:
+    await ctx.respond("You currently have no loans")
+    return
+  anb = user.get_balance()
+  if(anb < loan_amount):
+    await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
+    return
+
+  loans = user.get_open_loans()
+  for loan in loans:
+    new_loan = list(loan)
+    new_loan[2] = datetime.now()
+    new_loan = tuple(new_loan)
+
+
+    index = user.loans.index(loan)
+    user.loans[index] = new_loan
+  replace_in_list("user", user.code, user)
+  await ctx.respond(f"You have paid off {len(loans)} loan(s)")
+#loan pay end
+
+bot.add_application_command(loan)
+#loan end
+
+
 #match start
 matchscg = SlashCommandGroup(
   name = "match", 
@@ -602,8 +1099,8 @@ class MatchModal(Modal):
     
     code = get_uniqe_code("match")
   
-    
-    match = Match(team_one, team_two, team_one_old_odds, team_two_old_odds, team_one_odds, team_two_odds, tournament_name, betting_site, interaction.user.id, datetime.today(), code)
+    color = code[:6]
+    match = Match(team_one, team_two, team_one_old_odds, team_two_old_odds, team_one_odds, team_two_odds, tournament_name, betting_site, interaction.user.id, datetime.today(), color, code)
 
     
     
@@ -758,9 +1255,9 @@ async def match_delete(ctx, match: Option(str, "Match you want to set winner of.
 @matchscg.command(name = "find", description = "Sends the embed of the match.")
 async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
   #to do list some old ones
-  if (match := await user_from_autocorrect_tuple(ctx, current_matches_name_code(), match, "match")) is None:
-    if (match := await user_from_autocorrect_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
-  
+  if (fmatch := await user_from_autocorrect_tuple(None, current_matches_name_code(), match, "match")) is None:
+    if (fmatch := await user_from_autocorrect_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  match = fmatch
   embedd = await create_match_embedded(match)
   inter = await ctx.respond(embed=embedd)
   msg = await inter.original_message()
@@ -872,470 +1369,6 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   
 bot.add_application_command(matchscg)
 #match end
-    
-  
-#bet start
-betscg = SlashCommandGroup(
-  name = "bet", 
-  description = "Create, edit, and view bets.",
-  guild_ids = gid,
-)
-
-#bet modal start
-class BetModal(Modal):
-  
-  def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
-    super().__init__(*args, **kwargs)
-    self.match = match
-    self.user = user
-    
-    if error[0] is None: 
-      team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
-      if len(team_label) >= 45:
-        team_label = f"{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
-        if len(team_label) >= 45:
-          team_label = f"{match.t1} vs {match.t2}, {match.t1o}/{match.t2o}"
-          if len(team_label) >= 45:
-            team_label = f"{match.t1}/{match.t2}, {match.t1o}/{match.t2o}"
-            if len(team_label) >= 45:
-              firstt1w = match.t1.split(" ")[0]
-              firstt2w = match.t2.split(" ")[0]
-              team_label = f"{firstt1w} vs {firstt2w}. Odds: {match.t1o} / {match.t2o}"
-              if len(team_label) >= 45:
-                team_label = f"{firstt1w} vs {firstt2w}, {match.t1o} / {match.t2o}"
-                if len(team_label) >= 45:
-                  team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
-                  if len(team_label) >= 45:
-                    team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
-    else:
-      team_label = error[0]
-      
-    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
-
-    if error[1] is None: 
-      amount_label = "Amount you want to bet."
-    else:
-      amount_label = error[1]
-    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
-
-  async def callback(self, interaction: discord.Interaction):
-    
-    match = self.match
-    user = self.user
-    team_num = self.children[0].value
-    amount = self.children[1].value
-    error = [None, None]
-    
-    if not is_digit(amount):
-      print("Amount has to be a positive whole integer.")
-      error[1] = "Amount must be a positive whole number."
-    
-    if not (int(team_num) == 1 or int(team_num) == 2 or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
-      print("Team num has to either be 1 or 2.")
-      error[0] = f'Please enter "1", "2", "{match.t1}", or "{match.t2}". Odds: {match.t1o} / {match.t2o}.'
-
-    if int(amount) <= 0:
-      print("Cant bet negatives.")
-      error[1] = "Amount must be a positive whole number."
-
-    if not match.date_closed == None:
-      await interaction.response.send_message("Betting has closed you cannot make a bet.")
-
-    code = get_uniqe_code("bet")
-
-    balance_left = user.get_balance() - int(amount)
-    if balance_left < 0:
-      print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
-      error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
-      print("⛔")
-    if not error == [None, None]:
-      errortxt = ""
-      if error[0] is not None:
-        errortext += error[0]
-        if error[1] is not None:
-          errortext += " "
-        #TODO
-        interaction.response.sent_msg(interaction)
-      if error[1] is not None:
-        errortext += error[1]
-      return
-
-    bet = Bet(code, match.code, user.code, int(amount), int(team_num), datetime.now(), match.t1, match.t2, match.tournament_name)
-
-    match.bet_ids.append(bet.code)
-    add_to_active_ids(user.code, bet)
-
-    embedd = await create_bet_embedded(bet)
-    
-    if (channel := await bot.fetch_channel(db["bet_channel_id"])) == interaction.channel:
-      inter = await interaction.response.send_message(embed=embedd)
-      msg = await inter.original_message()
-    else:
-      msg = await channel.send(embed=embedd)
-      await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
-
-    bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("match", match.code, match)
-    add_to_list("bet", bet)
-    embedd = await create_match_embedded(match)
-    await edit_all_messages(match.message_ids, embedd)
-    self.stop()
-#bet modal end
-
-  
-#new match list autocomplete start
-async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
-  match_t_list = available_matches_name_code()
-  if (user := get_from_list("user", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
-  active_bet_ids_matches = user.active_bet_ids_matches()
-  auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
-  return auto_completes
-#new match list autocomplete end
-
-#bet list autocomplete start
-async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  text = ctx.value.lower()
-  bet_t_list = await current_bets_name_code(bot)
-  auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
-  if auto_completes == []:
-    text.replace(",", "")
-    text.replace(":", "")
-    text_keywords = text.split(" ")
-    all_bet_t_list = await all_bets_name_code(bot)
-    all_bet_t_list.reverse()
-    if len(text_keywords) == 0:
-      return []
-    for bet_t in all_bet_t_list:
-      bet_detail = bet_t[0].lower()
-      all_in = True
-      for text_keyword in text_keywords:
-        if text_keyword not in bet_detail:
-          all_in = False
-          break
-      if all_in:
-        auto_completes.append(bet_t[0])
-        if len(auto_completes) == 25:
-          break
-        
-  return auto_completes
-#bet list autocomplete end
-
-  
-#user bet list autocomplete start
-async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  bet_t_list = await available_bets_name_code(bot)
-  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
-  return auto_completes
-
-#user bet list autocomplete end
-
-
-#bet create start
-@betscg.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
-  user = get_from_list("user", ctx.author.id)
-  if user == None:
-    create_user(ctx.author.id)
-    
-  if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
-  print(match)
-    
-  if match.date_closed is not None:
-    await ctx.respond("Betting has closed.")
-    return
-    
-  bet_modal = BetModal(match=match, user=user, title="Create Bet")
-  await ctx.interaction.response.send_modal(bet_modal)
-  await bet_modal.wait()
-#bet create end
-
-
-#bet cancel start
-@betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
-async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
-  
-  if (bet := await user_from_autocorrect_tuple(ctx, await available_bets_name_code(bot), bet, "bet")) is None: return
-  
-  match = get_from_list("match", bet.match_id)
-  if (match is None) or (match.date_closed is not None):
-    await ctx.respond("Match betting has closed, you cannot cancel the bet.")
-    return
-    
-  gen_msg = await ctx.respond("Cancelling bet...")
-    
-  try:
-    match.bet_ids.remove(bet.code)
-    replace_in_list("match", match.code, match)
-    embedd = await create_match_embedded(match)
-    await edit_all_messages(match.message_ids, embedd)
-  except:
-    print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
-    
-  
-  await delete_all_messages(bet.message_ids)
-  remove_from_active_ids(bet.user_id, bet.code)
-  bet = remove_from_list("bet", bet.code)
-  await gen_msg.edit_original_message(content=f"Canceled {await bet.basic_to_string(bot, match)}.")
-#bet cancel end
-
-
-#bet find start
-@betscg.command(name = "find", description = "Sends the embed of the bet.")
-async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
-  #list some old matches
-  if (bet := await user_from_autocorrect_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: 
-    if (bet := await user_from_autocorrect_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
-  
-  embedd = await create_bet_embedded(bet)
-  inter = await ctx.respond(embed=embedd)
-  msg = await inter.original_message()
-  bet.message_ids.append((msg.id, msg.channel.id))
-  replace_in_list("bet", bet.code, bet)
-#bet find end
-
-
-#bet list start
-@betscg.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
-async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
-  
-  bets = get_all_objects("bet")
-  bet_list = []
-  for bet in bets:
-    if int(bet.winner) == 0:
-      bet_list.append(bet)
-  if len(bet_list) == 0:
-    await ctx.respond("No undecided bets.")
-    return
-
-  if type == 0:
-    #short
-    gen_msg = await ctx.respond("Generating list...")
-    embedd = await create_bet_list_embedded("Bets:", bet_list)
-    await gen_msg.edit_original_message(content = "", embed=embedd)
-    
-  elif type == 1:
-    #full
-    for i, bet in enumerate(bet_list):
-      embedd = await create_bet_embedded(bet)
-      if i == 0:
-        inter = await ctx.respond(embed=embedd)
-        msg = await inter.original_message()
-      else:
-        msg = await ctx.interaction.followup.send(embed=embedd)
-      bet.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("bet", bet.code, bet)
-#bet list end
-  
-bot.add_application_command(betscg)
-#bet end
-
-
-
-#assign start
-assign = SlashCommandGroup(
-  name = "assign", 
-  description = "Assigns the discord channel it is put in to that channel type.",
-  guild_ids = gid,
-)
-
-#assign matches start
-@assign.command(name = "matches", description = "Where the end matches show up.")
-async def assign_matches(ctx):
-  db["match_channel_id"] = ctx.channel.id
-  await ctx.respond("This channel is now the match list channel.")
-#assign matches end
-
-#assign bets start
-@assign.command(name = "bets", description = "Where the end bets show up.")
-async def assign_bets(ctx):
-  db["bet_channel_id"] = ctx.channel.id
-  await ctx.respond("This channel is now the bet list channel.")
-#assign bets end
-
-bot.add_application_command(assign)
-#assign end
-
-
-
-#award start
-@bot.slash_command( 
-  name = "award", 
-  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
-  guild_ids = gid,
-)
-async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
-
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  abu = add_balance_user(user, amount, "award_" + description, datetime.now())
-  if abu == None:
-    await ctx.respond("User not found.")
-  else:
-    embedd = await create_user_embedded(user)
-    await ctx.respond(embed=embedd)
-#award end
-
-  
-
-#balance start
-@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"])
-async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
-  if user == None:
-    user = get_from_list("user", ctx.author.id)
-    if user == None:
-      create_user(ctx.author.id)
-  else:
-    user = get_from_list("user", user.id)
-    if user == None:
-      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
-      return
-    
-  embedd = await create_user_embedded(user)
-  if embedd == None:
-    await ctx.respond("User not found.")
-    return
-  await ctx.respond(embed=embedd)
-#balance end
-
-
-
-#graph start
-graph = SlashCommandGroup(
-  name = "graph", 
-  description = "Shows an image of a graph to user.",
-  guild_ids = gid,
-)
-
-
-#graph balance start
-balance_choices = [
-  OptionChoice(name="season", value=0),
-  OptionChoice(name="all", value=1),
-  OptionChoice(name="last", value=2),
-]
-@graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
-async def graph_balance(ctx,
-  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
-  user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
-  amount: Option(int, "User you want to get balance of.", default = 20, required = False)):
-    
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  if type == 0:
-    graph_type = "current"
-  elif type == 1:
-    graph_type = "all"
-  elif type == 2:
-    graph_type = user.balance[-(amount+1):]
-  else:
-    ctx.respond("Not a valid type.")
-    return
-    
-  with BytesIO() as image_binary:
-    gen_msg = await ctx.respond("Generating graph...")
-    user.get_graph_image(graph_type).save(image_binary, 'PNG')
-    image_binary.seek(0)
-    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
-#graph balance end
-
-bot.add_application_command(graph)
-#graph end
-
-
-
-#leaderboard start
-@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.")
-async def leaderboard(ctx):
-  embedd = await create_leaderboard_embedded()
-  await ctx.respond(embed=embedd)
-#leaderboard end
-
-
-  
-#log start
-@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
-async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
-
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  if amount <= 0:
-    await ctx.respond("Amount has to be greater than 0.")
-    return
-    
-  gen_msg = await ctx.respond("Generating log...")
-  
-  embedds = user.get_new_balance_changes_embeds(amount)
-  if embedds == None:
-    await gen_msg.edit_original_message(content = "No log generated.")
-    return
-  
-  await gen_msg.edit_original_message(content="", embeds=embedds)
-#log end
-
-
-
-#loan start
-loan = SlashCommandGroup(
-  name = "loan", 
-  description = "Create and pay off loans.",
-  guild_ids = gid,
-)
-
-
-#loan create start
-@loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
-async def loan_create(ctx):
-    
-  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-
-  if user.get_clean_bal_loan() >= 100:
-    await ctx.respond("You must have less than 100 to make a loan")
-    return
-  user.loans.append((50, datetime.now, None))
-  replace_in_list("user", user.code, user)
-  await ctx.respond("You have been loaned 50")
-#loan create end
-
-  
-#loan count start
-@loan.command(name = "count", description = "See how many loans you have active.")
-async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  user = get_from_list("user", ctx.author.id)
-  await ctx.respond(f"You currently have {len(user.get_open_loans())} active loans")
-#loan count end
-
-  
-#loan pay start
-@loan.command(name = "pay", description = "See how many loans you have active.")
-async def loan_pay(ctx):
-  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-    
-  loan_amount = user.loan_bal()
-  if loan_amount == 0:
-    await ctx.respond("You currently have no loans")
-    return
-  anb = user.get_balance()
-  if(anb < loan_amount):
-    await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
-    return
-
-  loans = user.get_open_loans()
-  for loan in loans:
-    new_loan = list(loan)
-    new_loan[2] = datetime.now()
-    new_loan = tuple(new_loan)
-
-
-    index = user.loans.index(loan)
-    user.loans[index] = new_loan
-  replace_in_list("user", user.code, user)
-  await ctx.respond(f"You have paid off {len(loans)} loan(s)")
-#loan pay end
-
-bot.add_application_command(loan)
-#loan end
 
 
 #backup
@@ -1501,10 +1534,21 @@ async def delete_last_bal(ctx):
 # debug command
 @bot.command()
 async def add_var(ctx):
+  db["colors"] = []
   matches = get_all_objects("match")
+  bets = get_all_objects("bet")
+  users = get_all_objects("user")
   for match in matches:
-    match.date_winner = match.date_closed
+    match.color = match.code[:6]
     replace_in_list("match", match.code, match)
+  for bet in bets:
+    bet.color = bet.code[:6]
+    replace_in_list("bet", bet.code, bet)
+  for user in users:
+    user.color = user.color_code[:6]
+    delattr(user, 'color_code')
+    replace_in_list("user", user.code, user)
+  print("done")
 
 # debug command
 @bot.command()

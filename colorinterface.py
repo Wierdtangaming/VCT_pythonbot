@@ -15,12 +15,12 @@ def get_all_colors():
   colors = db["colors"]
   print(type(colors))
   return colors
-
+  
 def save_colors(colors):
   db["colors"] = colors
 
 def hex_to_tuple(hex):
-  if len(hex) != 8:
+  if len(hex) != 6:
     return None
   return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
   

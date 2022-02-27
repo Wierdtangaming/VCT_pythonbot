@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 class User:
-  def __init__(self, code, username, color_code, date_created):
+  def __init__(self, code, username, color, date_created):
     self.code = code
     self.username = username
-    self.color_code = color_code
+    self.color = color
 
     #a tuple (bet_id, balance after change, date)
     #bet_id = id_[bet_id]: bet id
