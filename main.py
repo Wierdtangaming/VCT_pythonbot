@@ -307,10 +307,10 @@ def get_uniqe_code(prefix):
   return code
 
 
-def create_user(user_id):
+def create_user(user_id, username):
   random.seed()
   color = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(6)
-  user = User(user_id, color, datetime.now())
+  user = User(user_id, username, color, datetime.now())
   add_to_list("user", user)
   return user
 
@@ -586,7 +586,7 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
   if user == None:
     user = get_from_list("user", ctx.author.id)
     if user == None:
-      create_user(ctx.author.id)
+      create_user(ctx.author.id, ctx.author.display_name)
   else:
     user = get_from_list("user", user.id)
     if user == None:
@@ -762,7 +762,7 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
   user = get_from_list("user", ctx.author.id)
   if user == None:
-    create_user(ctx.author.id)
+    create_user(ctx.author.id, ctx.author.display_name)
     
   if (match := await user_from_autocorrect_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   print(match)
@@ -1605,6 +1605,7 @@ async def add_var(ctx):
     replace_in_list("bet", bet.code, bet)
   print("2")
   for user in users:
+    user.username = smart_get_user(user)
     user.color = user.color_code[:6]
     delattr(user, 'color_code')
     user.show_on_lb = True
