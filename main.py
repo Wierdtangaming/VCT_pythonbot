@@ -33,6 +33,7 @@ from datetime import datetime
 from discord.ext import commands
 import emoji
 from decimal import *
+from PIL import Image, ImageDraw
 
 
 intents = discord.Intents.all()
@@ -507,23 +508,9 @@ def roundup(x):
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
+  backup()
 
 
-@bot.event
-async def on_message(message):
-
-  if message.author == bot.user:
-    return
-
-  print(message.author, message.content)
-  await bot.process_commands(message)
-
-  if message.content.startswith("$"):
-    return
-    
-  rand = random.randint(0, 50)
-  if rand == 0:
-    backup()
 
   
 
@@ -884,7 +871,14 @@ colorscg = SlashCommandGroup(
 #color list start
 @colorscg.command(name = "list", description = "Lists all colors.")
 async def color_list(ctx):
-  print("1")
+  img = Image.new("RGBA", (800, 800), (0, 0, 0, 0))
+  d = ImageDraw.Draw(img)
+  d.text((50,50), "Hello World", fill=(255,255,0,0))
+  with BytesIO() as image_binary:
+    gen_msg = await ctx.respond("Generating color list...")
+    img.save(image_binary, 'PNG')
+    image_binary.seek(0)
+    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
 #color list end
 
   
@@ -912,7 +906,7 @@ async def color_remove(ctx, color_name: Option(str, "Name of color you want to r
 #color rename start
 @colorscg.command(name = "rename", description = "Renames the color.")
 async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename."), new_color_name: Option(str, "New name of color.")):
-  print("1")
+  await ctx.respond(rename_color(old_color_name, new_color_name))
 #color rename end
 
   
