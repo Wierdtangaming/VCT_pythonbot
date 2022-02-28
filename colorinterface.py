@@ -31,25 +31,26 @@ def get_color(name):
   
 def add_color(name, hex):
   name = name.lower()
+  cap_name = name.capitalize()
   hex = hex.lower()
   colors = get_all_colors()
   if old_color := colors.get(name) is not None:
-    cap_name = name.capitalize()
     return f"{cap_name} is already a color {old_color}."
   if not valid_hex(hex):
     return f"{hex} is not a valid hex code."
     
   colors[name] = hex
   save_colors(colors)
-  cap_name = name.capitalize()
-  return f"{cap_name} has been added to the color  list."
+  return f"{cap_name} has been added to the color list."
   
 def remove_color(name):
   name = name.lower()
   colors = get_all_colors()
-  if color := color.pop(name, None) is not None:
-    save_colors(colors)
-  return color
+  cap_name = name.capitalize()
+  if color := color.pop(name, None) is None:
+    return f"{cap_name} was not found in color list."
+  save_colors(colors)
+  return f"Removed {cap_name} from color list"
 
 def rename_color(old_name, new_name):
   if old_val := remove_color(ond_name) is None:
@@ -59,12 +60,13 @@ def rename_color(old_name, new_name):
   
 def recolor_color(name, hex):
   name = name.lower()
+  cap_name = name.capitalize()
   hex = hex.lower()
   colors = get_all_colors()
   if colors.get(name) is None:
-    cap_name = name.capitalize()
     return f"{cap_name} is not a color."
   if not valid_hex(hex):
     return f"{hex} is not a valid hex code."
   colors[name] = hex
   save_colors(colors)
+  return f"{cap_name} now has the color {hex}"

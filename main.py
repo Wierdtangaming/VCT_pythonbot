@@ -898,14 +898,14 @@ async def color_add(ctx, color_name: Option(str, "Name of color you want to add.
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
 async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
-  print("1")
+  await ctx.respond(recolor_color(color_name, hex))
 #color recolor end
 
   
 #color remove start
 @colorscg.command(name = "remove", description = "Removes the color from color list.")
 async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.")):
-  print("1")
+  await ctx.respond(remove_color(color_name))
 #color remove end
 
   
