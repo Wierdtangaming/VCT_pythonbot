@@ -969,11 +969,12 @@ profile = SlashCommandGroup(
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
-  if color_code := get_color(color_name) is None:
+  if (color_code := get_color(color_name)) is None:
     await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
     return
   if (user := await get_user_from_member(ctx, ctx.author)) is None: return
   user.color = color_code
+  replace_in_list("user", user.code, user)
   await ctx.respond(f"Profile color is now {color_name}.")
 #profile color end
 
