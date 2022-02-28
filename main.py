@@ -880,11 +880,6 @@ colorscg = SlashCommandGroup(
 )
 
 
-#color picker autocomplete start
-async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
-  return get_all_colors().keys()
-#color picker autocomplete end
-
   
 #color list start
 @colorscg.command(name = "list", description = "Lists all colors.")
@@ -892,24 +887,35 @@ async def color_list(ctx):
   print("1")
 #color list end
 
+  
 #color add start
 @colorscg.command(name = "add", description = "Adds the color to color list.")
 async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color.")):
-  print("1")
+  await ctx.respond(add_color(color_name, hex))
 #color add end
+
   
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
 async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
   print("1")
 #color recolor end
+
   
 #color remove start
 @colorscg.command(name = "remove", description = "Removes the color from color list.")
-async def color_remove(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
+async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.")):
   print("1")
 #color remove end
 
+  
+#color rename start
+@colorscg.command(name = "rename", description = "Renames the color.")
+async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename."), new_color_name: Option(str, "New name of color.")):
+  print("1")
+#color rename end
+
+  
 bot.add_application_command(colorscg)
 #color end
 
@@ -973,7 +979,7 @@ async def graph_balance(ctx,
   elif type == 2:
     graph_type = user.balance[-(amount+1):]
   else:
-    ctx.respond("Not a valid type.")
+    await ctx.respond("Not a valid type.")
     return
     
   with BytesIO() as image_binary:

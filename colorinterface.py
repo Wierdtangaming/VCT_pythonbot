@@ -41,6 +41,8 @@ def add_color(name, hex):
     
   colors[name] = hex
   save_colors(colors)
+  cap_name = name.capitalize()
+  return f"{cap_name} has been added to the color  list."
   
 def remove_color(name):
   name = name.lower()
