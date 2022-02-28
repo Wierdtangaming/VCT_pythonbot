@@ -1,7 +1,7 @@
 
 class Match:
   
-  def __init__(self, t1, t2, t1oo, t2oo, t1o, t2o, tournament_name, odds_source, creator, date_created, code):
+  def __init__(self, t1, t2, t1oo, t2oo, t1o, t2o, tournament_name, odds_source, creator, date_created, color, code):
     self.t1 = t1
     self.t2 = t2
     self.t1oo = t1oo
@@ -18,9 +18,11 @@ class Match:
 
     self.date_created = date_created
 
+    self.color = color
+    
     #code is a 8 lenth hexadecimal number
     self.code = code
-
+    
     self.bet_ids = []
     self.message_ids = []
     self.date_winner = None

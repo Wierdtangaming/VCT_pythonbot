@@ -2,7 +2,7 @@ from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from
 import math
 
 class Bet:
-  def __init__(self, code, match_id, user_id, bet_amount, team_num, date_created, t1, t2, tournament_name):
+  def __init__(self, code, match_id, user_id, bet_amount, team_num, date_created, t1, t2, tournament_name, color):
     
     self.t1 = t1
     self.t2 = t2
@@ -14,6 +14,8 @@ class Bet:
     self.bet_amount = bet_amount
     self.team_num = int(team_num)
     self.date_created = date_created
+
+    self.color = color
     #team num of winner
     self.winner = 0
     self.message_ids = []
@@ -69,13 +71,13 @@ class Bet:
     
     (team, payout) = self.get_team_and_payout()
 
-    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
+    return f"User: <@!{self.user_id}>, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
 
   async def basic_to_string(self, bot, match=None):
     if match is None:
       match = get_from_list("match", self.match_id)
 
-    return f"Bet: {self.code}, User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {self.get_team()}, Amount: {self.bet_amount}, Match ID: {match.code}"
+    return f"Bet: {self.code}, User: <@!{self.user_id}>, Team: {self.get_team()}, Amount: {self.bet_amount}, Match ID: {match.code}"
   
   def balance_to_string(self, balance):
     
