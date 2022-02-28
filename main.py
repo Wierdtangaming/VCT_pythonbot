@@ -32,6 +32,8 @@ import math
 from datetime import datetime
 from discord.ext import commands
 import emoji
+from decimal import *
+
 
 intents = discord.Intents.all()
 
@@ -135,7 +137,16 @@ def all_matches_name_code():
   match_t_list = []
   for match in matches:
     if match.winner != 0:
-      match_t_list.append((f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}", match))
+      s = f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}"
+      if len(s) >= 100:
+        s = f"Con: {match.t1} vs {match.t2}, {match.tournament_name}"
+        if len(s) >= 100:
+          s = f"Con: {match.t1}/{match.t2}, {match.tournament_name}"
+          if len(s) >= 100:
+            tsplit = match.tournament_name.split(" ")[0]
+            s = f"Con: {match.t1}/{match.t2}, {tsplit}"
+            
+      match_t_list.append((s, match))
     else:
       match_t_list.append((f"{match.t1} vs {match.t2}, {match.tournament_name}", match))
   return match_t_list
@@ -453,7 +464,7 @@ def add_balance_user(user_ambig, change, description, date):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
-  user.balance.append((description, round(user.balance[-1][1] + change, 5), date))
+  user.balance.append((description, round(user.balance[-1][1] + float(change), 5), date))
   replace_in_list("user", user.code, user)
   return user
 
@@ -479,8 +490,9 @@ def change_prev_balance(user, balance_id, new_amount):
 def backup():
   keys = db.keys()
   for key in keys:
-    print(f"backing up {key}")
-    db[f"backup_{key}"] = db[key]
+    if not key.startswith("backup_"):
+      print(f"backing up {key}")
+      db[f"backup_{key}"] = db[key]
   print("backed up all keys")
   
 
@@ -488,7 +500,7 @@ def backup():
 
 
 def roundup(x):
-  return int(round(x * 1000)) / 1000
+  return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
 
 
 @bot.event
@@ -860,6 +872,50 @@ bot.add_application_command(betscg)
 
 
 
+#color start
+colorscg = SlashCommandGroup(
+  name = "color", 
+  description = "Add, romove, rename, and recolor colors.",
+  guild_ids = gid,
+)
+
+
+#color picker autocomplete start
+async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
+  return get_all_colors().keys()
+#color picker autocomplete end
+
+  
+#color list start
+@colorscg.command(name = "list", description = "Lists all colors.")
+async def color_list(ctx):
+  print("1")
+#color list end
+
+#color add start
+@colorscg.command(name = "add", description = "Adds the color to color list.")
+async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color.")):
+  print("1")
+#color add end
+  
+#color recolor start
+@colorscg.command(name = "recolor", description = "Recolors the color.")
+async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
+  print("1")
+#color recolor end
+  
+#color remove start
+@colorscg.command(name = "remove", description = "Removes the color from color list.")
+async def color_remove(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
+  print("1")
+#color remove end
+
+bot.add_application_command(colorscg)
+#color end
+
+
+
+    
 #profile start
 profile = SlashCommandGroup(
   name = "profile", 
@@ -876,7 +932,7 @@ async def color_picker_autocomplete(ctx: discord.AutocompleteContext):
   
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to add.")):
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.")):
   if color_code := get_color(color_name) is None:
     await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
     return
@@ -1311,9 +1367,11 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     team = 2
   else:
     await ctx.respond(f"Invalid team name of {team} please enter {match.t1} or {match.t2}.")
+    return
   
   if int(match.winner) != 0:
     await ctx.respond(f"Winner has already been set to {match.winner_name()}")
+    return
 
   match.winner = team
   time = datetime.now()
@@ -1322,7 +1380,6 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   if match.date_closed is None:
     match.date_closed = time
     
-  replace_in_list("match", match.code, match)
   embedd = await create_match_embedded(match)
   await edit_all_messages(match.message_ids, embedd)
   
@@ -1356,6 +1413,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       users.append(user.code)
     else:
       print(f"where the bet_id from {bet_id}")
+  replace_in_list("match", match.code, match)
 
   no_same_list_user = []
   [no_same_list_user.append(x) for x in users if x not in no_same_list_user]
@@ -1541,12 +1599,15 @@ async def add_var(ctx):
   for match in matches:
     match.color = match.code[:6]
     replace_in_list("match", match.code, match)
+  print("3")
   for bet in bets:
     bet.color = bet.code[:6]
     replace_in_list("bet", bet.code, bet)
+  print("2")
   for user in users:
     user.color = user.color_code[:6]
     delattr(user, 'color_code')
+    user.show_on_lb = True
     replace_in_list("user", user.code, user)
   print("done")
 

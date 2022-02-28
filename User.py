@@ -9,7 +9,8 @@ class User:
     self.code = code
     self.username = username
     self.color = color
-
+    
+    self.show_on_lb = True
     #a tuple (bet_id, balance after change, date)
     #bet_id = id_[bet_id]: bet id
     #bet_id = award_[award_id]: awards
