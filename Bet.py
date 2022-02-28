@@ -71,13 +71,13 @@ class Bet:
     
     (team, payout) = self.get_team_and_payout()
 
-    return f"User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
+    return f"User: <@!{self.user_id}>, Team: {team}, Amount: {self.bet_amount}, Payout: {int(math.floor(payout))}"
 
   async def basic_to_string(self, bot, match=None):
     if match is None:
       match = get_from_list("match", self.match_id)
 
-    return f"Bet: {self.code}, User: {(await smart_get_user(self.user_id, bot)).mention}, Team: {self.get_team()}, Amount: {self.bet_amount}, Match ID: {match.code}"
+    return f"Bet: {self.code}, User: <@!{self.user_id}>, Team: {self.get_team()}, Amount: {self.bet_amount}, Match ID: {match.code}"
   
   def balance_to_string(self, balance):
     

@@ -27,13 +27,13 @@ from Match import Match
 from Bet import Bet
 from User import User
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user
-from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color
+from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
 from datetime import datetime
 from discord.ext import commands
 import emoji
 from decimal import *
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 
 intents = discord.Intents.all()
@@ -78,7 +78,12 @@ def get_user_from_id(id):
   
   if user == None:
     return None
-    
+
+def id_to_metion(id):
+  return f"<@!{id}>"
+
+
+  
 async def get_user_from_member(ctx, user):
   if user == None:
     user = ctx.author
@@ -155,29 +160,45 @@ def all_matches_name_code():
 async def available_bets_name_code(bot):
   matches = get_all_objects("match")
   bet_list = []
+  id_dict = {}
   for match in matches:
     if match.date_closed is None:
       for bet_id in match.bet_ids:
         bet = get_from_list("bet", bet_id)
-        name = (await smart_get_user(bet.user_id, bot)).display_name
+        if bet.user_id in id_dict:
+          name = id_dict[bet.user_id]
+        else: 
+          name = get_from_list("user", bet.user_id).username
+          id_dict[bet.user_id] = name
         bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
 async def current_bets_name_code(bot):
   bets = get_all_objects("bet")
   bet_list = []
+  id_dict = {}
   for bet in bets:
     if bet.winner == 0:
-      name = (await smart_get_user(bet.user_id, bot)).display_name
+      if bet.user_id in id_dict:
+        name = id_dict[bet.user_id]
+      else: 
+        name = get_from_list("user", bet.user_id).username
+        id_dict[bet.user_id] = name
       bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
 async def all_bets_name_code(bot):
   bets = get_all_objects("bet")
   bet_list = []
+  id_dict = {}
   for bet in bets:
     if bet.winner != 0:
-      name = (await smart_get_user(bet.user_id, bot)).display_name
+      if bet.user_id in id_dict:
+        name = id_dict[bet.user_id]
+      else: 
+        name = get_from_list("user", bet.user_id).username
+        id_dict[bet.user_id] = name
+        
       bet_list.append((f"Paid out: {name}: {bet.bet_amount} on {bet.get_team()}", bet))
     else:
       bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
@@ -327,7 +348,7 @@ async def create_match_embedded(match_ambig):
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
   embed.add_field(name="Odds Source:", value=match.odds_source, inline=True)
-  embed.add_field(name="Creator:", value=(await smart_get_user(match.creator, bot)).mention, inline=True)
+  embed.add_field(name="Creator:", value=id_to_metion(match.creator), inline=True)
   bet_str = str(", ".join(match.bet_ids))
   if bet_str == "":
     bet_str = "None"
@@ -385,7 +406,7 @@ async def create_bet_embedded(bet_ambig):
 
   embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
-  embed.add_field(name="User:", value=(await smart_get_user(bet.user_id, bot)).mention, inline=True)
+  embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
   match = get_from_list("match", bet.match_id)
   (team, payout) = bet.get_team_and_payout()
@@ -416,7 +437,7 @@ async def create_user_embedded(user_ambig):
     return None
 
   embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*hex_to_tuple(user.color)))
-  embed.add_field(name="Name:", value=(await smart_get_user(user.code, bot)).mention, inline=False)
+  embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
   embed.add_field(name="Account Balance:", value=math.floor(user.balance[-1][1]), inline=True)
   embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
   embed.add_field(name="Loan Balance:", value=math.floor(user.loan_bal()), inline=True)
@@ -425,7 +446,7 @@ async def create_user_embedded(user_ambig):
 
 async def create_leaderboard_embedded():
   users = get_all_objects("user")
-  user_rankings = [(user.code, user.balance[-1][1]) for user in users]
+  user_rankings = [(user, user.balance[-1][1]) for user in users]
   user_rankings.sort(key=lambda x: x[1])
   user_rankings.reverse()
   embed = discord.Embed(title="Leaderboard:", color=discord.Color.gold())
@@ -435,10 +456,12 @@ async def create_leaderboard_embedded():
     rank = ""
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
-      embed.add_field(name=rank + f": {(await smart_get_user(user_rank[0], bot)).display_name}", value=str(math.floor(user_rank[1])), inline=False)
+      name = user_rank[0].username
+      embed.add_field(name=rank + f": {name}", value=str(math.floor(user_rank[1])), inline=False)
     else:
       rank = emoji.emojize(medals[rank_num - 1])
-      embed.add_field(name=rank + f":  {(await smart_get_user(user_rank[0], bot)).display_name}", value=str(math.floor(user_rank[1])), inline=False)
+      name = user_rank[0].username
+      embed.add_field(name=rank + f":  {name}", value=str(math.floor(user_rank[1])), inline=False)
     rank_num += 1
   return embed
 
@@ -510,6 +533,12 @@ async def on_ready():
   print(bot.guilds)
   backup()
 
+#autocomplete start
+#color picker autocomplete start
+async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
+  return [x.capitalize() for x in get_all_colors().keys()]
+#color picker autocomplete end
+#autocomplete end
 
 
   
@@ -602,7 +631,7 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
 
 
 
-  #bet start
+#bet start
 betscg = SlashCommandGroup(
   name = "bet", 
   description = "Create, edit, and view bets.",
@@ -871,9 +900,21 @@ colorscg = SlashCommandGroup(
 #color list start
 @colorscg.command(name = "list", description = "Lists all colors.")
 async def color_list(ctx):
-  img = Image.new("RGBA", (800, 800), (0, 0, 0, 0))
+  print("getting list")
+  colors = get_all_colors_key_hex()
+  if len(colors) == 0:
+    await ctx.respond("No colors found.")
+    return
+  
+  font = ImageFont.truetype("whitneybold.otf", size=40)
+  img = Image.new("RGBA", (800, (int(len(colors)/2) * 100) + 200), (255,255,255,0))
   d = ImageDraw.Draw(img)
-  d.text((50,50), "Hello World", fill=(255,255,0,0))
+  for i, color in enumerate(colors):
+    x = ((i % 2) * 350) + 50
+    y = (int(i / 2) * 100) + 50
+    hex = color[1]
+    color_tup = hex_to_tuple(hex)
+    d.text((x,y), color[0].capitalize(), fill=(*color_tup,255), font=font)
   with BytesIO() as image_binary:
     gen_msg = await ctx.respond("Generating color list...")
     img.save(image_binary, 'PNG')
@@ -885,28 +926,28 @@ async def color_list(ctx):
 #color add start
 @colorscg.command(name = "add", description = "Adds the color to color list.")
 async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color.")):
-  await ctx.respond(add_color(color_name, hex))
+  await ctx.respond(add_color(color_name, hex), ephemeral = True)
 #color add end
 
   
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
-async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of."), hex: Option(str, "Hex color code of new color.")):
-  await ctx.respond(recolor_color(color_name, hex))
+async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of.", autocomplete=color_picker_autocomplete), hex: Option(str, "Hex color code of new color.")):
+  await ctx.respond(recolor_color(color_name, hex), ephemeral = True)
 #color recolor end
 
   
 #color remove start
 @colorscg.command(name = "remove", description = "Removes the color from color list.")
-async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.")):
-  await ctx.respond(remove_color(color_name))
+async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.", autocomplete=color_picker_autocomplete)):
+  await ctx.respond(remove_color(color_name)[0], ephemeral = True)
 #color remove end
 
   
 #color rename start
 @colorscg.command(name = "rename", description = "Renames the color.")
-async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename."), new_color_name: Option(str, "New name of color.")):
-  await ctx.respond(rename_color(old_color_name, new_color_name))
+async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename.", autocomplete=color_picker_autocomplete), new_color_name: Option(str, "New name of color.")):
+  await ctx.respond(rename_color(old_color_name, new_color_name), ephemeral = True)
 #color rename end
 
   
@@ -924,23 +965,19 @@ profile = SlashCommandGroup(
 )
 
 
-#color picker autocomplete start
-async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
-  return get_all_colors().keys()
-#color picker autocomplete end
-
   
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.")):
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
   if color_code := get_color(color_name) is None:
     await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
     return
-    if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-    user.color = color_code
+  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+  user.color = color_code
+  await ctx.respond(f"Profile color is now {color_name}.")
 #profile color end
 
-#bot.add_application_command(profile)
+bot.add_application_command(profile)
 #profile end
 
 
@@ -1161,9 +1198,6 @@ class MatchModal(Modal):
     
     
     #date_formatted = cmatch.date_created.strftime("%m/%d/%Y %H:%M:%S")
-    #s += "Teams: " + str(cmatch.t1) + " vs " + str(cmatch.t2) + "\nOdds: " + str(cmatch.t1o) + " / " + str(cmatch.t2o) + "\nTournament Name: " + str(cmatch.tournament_name) + "\nOdds Source: " + str(cmatch.odds_source) + "\nCreator: " + str((await smart_get_user(cmatch.creator, bot)).mention) + "\nCreated On: " + str(date_formatted)
-
-    #add confirm button
     
     embedd = await create_match_embedded(match)
 
@@ -1592,7 +1626,8 @@ async def delete_last_bal(ctx):
 # debug command
 @bot.command()
 async def add_var(ctx):
-  db["colors"] = []
+  print("4")
+  db["colors"] = {}
   matches = get_all_objects("match")
   bets = get_all_objects("bet")
   users = get_all_objects("user")
@@ -1605,7 +1640,7 @@ async def add_var(ctx):
     replace_in_list("bet", bet.code, bet)
   print("2")
   for user in users:
-    user.username = smart_get_user(user)
+    user.username = (await smart_get_user(user.code, bot)).display_name
     user.color = user.color_code[:6]
     delattr(user, 'color_code')
     user.show_on_lb = True
