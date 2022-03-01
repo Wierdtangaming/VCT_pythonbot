@@ -41,7 +41,7 @@ def add_color(name, hex):
   if (old_color := colors.get(name)) is not None:
     return f"{cap_name} is already a color {old_color}."
   if not valid_hex(hex):
-    return f"{hex} is not a valid hex code."
+    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
     
   colors[name] = hex
   save_colors(colors)
@@ -70,7 +70,7 @@ def recolor_color(name, hex):
   if colors.get(name) is None:
     return f"{cap_name} is not a color."
   if not valid_hex(hex):
-    return f"{hex} is not a valid hex code."
+    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
   colors[name] = hex
   save_colors(colors)
   return f"{cap_name} now has the color {hex}"
