@@ -454,6 +454,8 @@ async def create_leaderboard_embedded():
   rank_num = 1
   for user_rank in user_rankings:
     rank = ""
+    if not user_rank[0].show_on_lb:
+      continue
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
       name = user_rank[0].username
@@ -925,14 +927,14 @@ async def color_list(ctx):
   
 #color add start
 @colorscg.command(name = "add", description = "Adds the color to color list.")
-async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color.")):
+async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.")):
   await ctx.respond(add_color(color_name, hex), ephemeral = True)
 #color add end
 
   
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
-async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of.", autocomplete=color_picker_autocomplete), hex: Option(str, "Hex color code of new color.")):
+async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of.", autocomplete=color_picker_autocomplete), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.")):
   await ctx.respond(recolor_color(color_name, hex), ephemeral = True)
 #color recolor end
 
@@ -1469,6 +1471,16 @@ bot.add_application_command(matchscg)
 async def backup_db(ctx):
   backup()
   
+#hidden command
+@bot.command()
+async def hide_from_leaderboard(ctx):
+  if (user := await get_user_from_member(None, ctx.author)) is None: return
+  user.show_on_lb = not user.show_on_lb
+  replace_in_list("user", user.code, user)
+  print(user.show_on_lb)
+  
+
+
 
 
 #season reset command
@@ -1623,10 +1635,12 @@ async def delete_last_bal(ctx):
       print(user.balance)
       replace_in_list("user", user.code, user)
 
+      
 
 # debug command
 @bot.command()
 async def add_var(ctx):
+  return
   print("4")
   db["colors"] = {}
   matches = get_all_objects("match")
