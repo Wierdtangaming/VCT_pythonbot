@@ -7,8 +7,6 @@
 # test prefix unique with 1 long in test code
 
 
-from keepalive import keep_alive
-
 from io import BytesIO
 import collections
 #git clone https://github.com/Pycord-Development/pycord
@@ -1692,5 +1690,4 @@ async def update_bet_ids(ctx):
     replace_in_list("user", user.code, user)
 
 
-keep_alive()
 bot.run(os.getenv("TOKEN"))

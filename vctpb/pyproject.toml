@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "repl_python3_VCT-Predictions-Bot"
+name = "vctpb"
 version = "0.1.0"
 description = ""
-authors = ["MaxOrtman <<>>"]
+authors = ["MaxOrtman "]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -16,8 +16,10 @@ aiohttp = "^3.8.1"
 orjson = "^3.6.7"
 numpy = "^1.22.2"
 py-cord = {git = "https://github.com/Pycord-Development/pycord"}
+matplotlib = "^3.5.1"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.scripts]
+start = "start:start"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
