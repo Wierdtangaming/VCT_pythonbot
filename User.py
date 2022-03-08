@@ -1,4 +1,4 @@
-from dbinterface import get_from_list
+from dbinterface import get_from_list, replace_in_list
 import discord
 import io
 import matplotlib.pyplot as plt
@@ -54,6 +54,13 @@ class User:
     active_bet_ids_bets = self.active_bet_ids_bets()
     for bet_id in active_bet_ids_bets:
       temp_bet = get_from_list("bet", bet_id)
+      if temp_bet == None:
+        print(bet_id)
+        ids = [t for t in self.active_bet_ids if bet_id == t[0]]
+        for id in ids:
+          self.active_bet_ids.remove(id)
+        replace_in_list("user", self.code, self)
+        continue
       used += temp_bet.bet_amount
 
     return used
@@ -112,7 +119,7 @@ class User:
     before = self.balance[-2][1]
     embed_amount = int((amount - 1) / 25) + 1
     
-    embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color_code[0:8])[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
+    embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
     embed_index = 0
     
     bal_index = 3
@@ -165,6 +172,80 @@ class User:
     return embeds
 
   def get_graph_image(self, balances_ambig):
+    if type(balances_ambig) == list:
+      balances = balances_ambig
+    elif type(balances_ambig) == str:
+      if balances_ambig == "full":
+        balances = self.balance
+      elif balances_ambig == "current":
+        balances = [self.balance[x] for x in self.get_reset_range(-1)]
+      else:
+        return None
+    else:
+      balances = [self.balance[x] for x in balances_ambig]
+
+    print(len(balances))
+      
+    label = []
+    balance = []
+    colors = []
+    line_colors = []
+    before = None
+    for bet_id, amount, date in balances:
+      if not before == None:
+        if amount > before:
+          line_colors.append('g')
+        elif amount < before:
+          line_colors.append('r')
+        else:
+          line_colors.append('k')
+      before = amount
+      if bet_id.startswith('id_'):
+        label.append(bet_id[3:])
+        balance.append(amount)
+        colors.append('b')
+      elif bet_id.startswith('award_'):
+        label.append(bet_id[6:])
+        balance.append(amount)
+        colors.append('xkcd:gold')
+      elif bet_id == 'start':
+        label.append('start')
+        balance.append(amount)
+        colors.append('k')
+      elif bet_id.startswith('reset_'):
+        label.append('reset')
+        balance.append(amount)
+        colors.append('k')
+      else:
+        label.append(bet_id)
+        balance.append(amount)
+        colors.append('k')
+    
+    #make a 800 x 800 figure
+    fig, ax = plt.subplots(figsize=(8,8))
+    #plot the balance
+    for i in range(len(line_colors)-1):
+      ax.plot([i, i+1], [balance[i], balance[i+1]], label=[label[i], ""], color=line_colors[i])
+    
+    llc = len(line_colors)
+    ax.plot([llc-1, llc], [balance[llc-1], balance[llc]], label=[label[llc-1], label[llc]], color=line_colors[llc-1], zorder=1)
+    ax.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
+    
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    im = Image.open(buf)
+    return im
+
+
+    
+  def get_multi_graph_image(users, balances_ambig):
+    all_balances = []
+    for user in users:
+      for balance in user.balance:
+        all_balances.append((balance[0], balance[2]))
+
+    all_balances = sorted(all_balances, key=lambda x: x[1])
     if type(balances_ambig) == list:
       balances = balances_ambig
     elif type(balances_ambig) == str:
