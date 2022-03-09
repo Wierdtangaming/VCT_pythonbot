@@ -1,5 +1,5 @@
 
-from replit import db
+from savefiles import get_file, save_file
 
 #color start
 def valid_hex(hex):
@@ -12,15 +12,15 @@ def valid_hex(hex):
     return False
 
 def get_all_colors():
-  colors = dict(db["colors"])
+  colors = dict(get_file("colors"))
   return colors
 
 def get_all_colors_key_hex():
-  colors = dict(db["colors"])
+  colors = dict(get_file("colors"))
   return list(colors.items())
 
 def save_colors(colors):
-  db["colors"] = colors
+  save_file("color", colors, True)
 
 def hex_to_tuple(hex):
   if len(hex) != 6:
