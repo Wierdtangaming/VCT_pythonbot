@@ -278,7 +278,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "py-cord"
-version = "2.0.0b4"
+version = "2.0.0b5"
 description = "A Python wrapper for the Discord API"
 category = "main"
 optional = false
@@ -297,7 +297,7 @@ voice = ["PyNaCl (>=1.3.0,<1.6)"]
 type = "git"
 url = "https://github.com/Pycord-Development/pycord"
 reference = "master"
-resolved_reference = "0b54eee722f39c1961d83ea4019548e67654f366"
+resolved_reference = "0469d1330fab87b17cceee44044b9bf601cf7880"
 
 [[package]]
 name = "pyparsing"
@@ -320,6 +320,14 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
 
 [package.dependencies]
 six = ">=1.5"
+
+[[package]]
+name = "pytz"
+version = "2021.3"
+description = "World timezone definitions, modern and historical"
+category = "main"
+optional = false
+python-versions = "*"
 
 [[package]]
 name = "replit"
@@ -433,7 +441,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "1d60ade503d025c1be2add64cff9aeb9e4f08d05281e4f3dd8e92ac2225eac44"
+content-hash = "7034268388096d9dd436bd5a20a0eb37a90dd486cdbfaae736130733dbfae3f5"
 
 [metadata.files]
 aiohttp = [
@@ -920,6 +928,10 @@ pyparsing = [
 python-dateutil = [
     {file = "python-dateutil-2.8.2.tar.gz", hash = "sha256:0123cacc1627ae19ddf3c27a5de5bd67ee4586fbdd6440d9748f8abb483d3e86"},
     {file = "python_dateutil-2.8.2-py2.py3-none-any.whl", hash = "sha256:961d03dc3453ebbc59dbdea9e4e11c5651520a876d0f4db161e8674aae935da9"},
+]
+pytz = [
+    {file = "pytz-2021.3-py2.py3-none-any.whl", hash = "sha256:3672058bc3453457b622aab7a1c3bfd5ab0bdae451512f6cf25f64ed37f5b87c"},
+    {file = "pytz-2021.3.tar.gz", hash = "sha256:acad2d8b20a1af07d4e4c9d2e9285c5ed9104354062f275f3fcd88dcef4f1326"},
 ]
 replit = [
     {file = "replit-3.2.4-py3-none-any.whl", hash = "sha256:4fa5895e1e090ba23c179641bc88ab0486d1bea696515aa3147fce55733e29e1"},
