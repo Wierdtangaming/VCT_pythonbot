@@ -5,6 +5,8 @@ import jsonpickle
 import sys
 import shutil
 from replit import db
+from savedata import save_to_github
+import time
 
 def get_date_string():
   central = timezone('US/Central')
@@ -63,10 +65,17 @@ def save_file(name, obj, savekey, path="files/"):
   fs = jsonpickle.decode(r.read())
   if fs != obj:
     create_error_file("save error", f"Didn't save {name} to {path_and_file}.")
+    
+  start_time = time.time()
+  save_to_github()
+  print("save", time.time() - start_time, "to run")
   
 def delete_file(name, path):
   path_and_file = f"{path}{name}.txt"
   print(f"deleting {path_and_file}")
+  start_time = time.time()
+  save_to_github()
+  print("save", time.time() - start_time, "to run")
 
 
 def delete_folder(name, path):
@@ -77,12 +86,19 @@ def delete_folder(name, path):
   except OSError as e:
     create_error_file("delete error", f"couldn't remove {name} path {path_and_file}.")
     print("Error: %s - %s." % (e.filename, e.strerror))
+  start_time = time.time()
+  save_to_github()
+  print("save", time.time() - start_time, "to run")
 
 
 def create_error_file(name, s):
   datestring = get_date_string()
   save_file(f"{name}-{datestring}", f"{s}\n{datestring}", False, path="errors/")
   print(name, s)
+  start_time = time.time()
+  save_to_github()
+  print("save", time.time() - start_time, "to run")
+  
 
 
 def equate(x):
