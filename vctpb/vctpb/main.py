@@ -4,8 +4,6 @@
 # have it replace by code not by value
 # test prefix unique with 1 long in test code
 
-from keepalive import keep_alive
-keep_alive()
 
 
 from io import BytesIO
