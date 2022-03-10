@@ -15,6 +15,7 @@ import collections
 #python3 -m pip install -U .[voice]
 
 #pip install git+https://github.com/Pycord-Development/pycord
+#poetry add git+https://github.com/Pycord-Development/pycord
 import discord
 from discord.commands import Option, OptionChoice, SlashCommandGroup
 from discord.ui import InputText, Modal
@@ -35,6 +36,7 @@ from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_f
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
 from savefiles import get_date_string, save_file, get_file, get_all_names, delete_old_backup
 
+print(discord)
 intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")

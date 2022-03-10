@@ -1,2 +1,1 @@
-[packager]
-ignoredPackages = ["discord"]
+entrypoint = "vctpb/vctpb/main.py"
