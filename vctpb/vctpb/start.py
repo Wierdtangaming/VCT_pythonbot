@@ -1,5 +1,4 @@
 
 def start():
-  print("Hello")
-    
-import main
+  print("Starting")
+  import main
