@@ -103,7 +103,15 @@ class User:
 
   def to_string(self):
     return "Balance: " + str(self.balance)
-      
+
+  def remove_balance_id(self, id):
+    for balance in self.balance:
+      if balance[0] == id:
+        self.balance.remove(balance)
+        break
+    replace_in_list("user", self.code, self)
+
+  
   def get_new_balance_changes_embeds(self, amount):
 
     if amount <= 0:

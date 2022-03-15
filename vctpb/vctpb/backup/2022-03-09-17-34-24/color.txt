@@ -1,1 +1,0 @@
-{"blurple": "7289da", "teal": "1abc9c", "green": "2ecc71", "aqua": "00ffff"}

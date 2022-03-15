@@ -32,7 +32,7 @@ from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, delete_old_backup
+from savefiles import get_date_string, save_file, get_file, get_all_names, delete_old_backup, make_folder
 
 intents = discord.Intents.all()
 
@@ -292,6 +292,7 @@ def add_balance_user(user_ambig, change, description, date):
   if user == None:
     return None
   user.balance.append((description, round(user.balance[-1][1] + float(change), 5), date))
+  user.balance.sort(key=lambda x: x[2])
   replace_in_list("user", user.code, user)
   return user
 
@@ -318,8 +319,8 @@ def backup():
   keys = get_all_names()
   date_string = get_date_string()
   print(date_string)
+  make_folder(date_string, f"backup/")
   date_path = f"backup/{date_string}/"
-  os.mkdir(date_path)
   for key in keys:
     if not key.startswith("backup_"):
       val = get_file(key)
@@ -341,14 +342,9 @@ from savedata import save_to_github
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
-  
-  start_time = time.time()
-  save_to_github()
-  print ("My program took", time.time() - start_time, "to run")
 
-  return
   backup()
-
+  save_to_github(f"initial test")
 #autocomplete start
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
@@ -1139,6 +1135,21 @@ async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
   return auto_completes
 #match match team autocomplete end
 
+  
+#match winner autocomplete start
+async def match_winner_list_autocomplete(ctx: discord.AutocompleteContext):
+  match = ctx.options["match"]
+  if match is None: return []
+  if (match := await user_from_autocomplete_tuple(None, all_matches_name_code(), match, "match")) is None: return []
+  
+  strin = "None"
+  if match.t1 == "None" or match.t2 == "None":
+    strin = "Set winner to none"
+  auto_completes = [match.t1, match.t2, strin]
+  
+  return auto_completes
+#match winner autocomplete end
+  
 
 #match betting start
 @matchscg.command(name = "betting", description = "Open and close betting.")
@@ -1247,9 +1258,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   
   if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
   team.strip()
-  if (team == 1) or (team == match.t1):
+  if (team == "1") or (team == match.t1):
     team = 1
-  elif (team == 2) or (team == match.t2):
+  elif (team == "2") or (team == match.t2):
     team = 2
   else:
     await ctx.respond(f"Invalid team name of {team} please enter {match.t1} or {match.t2}.")
@@ -1273,10 +1284,10 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   #change when autocomplete
   if team == 1:
     odds = match.t1o
-    await ctx.respond("Winner has been set to " + match.t1)
+    await ctx.respond(f"Winner has been set to {match.t1}.")
   else:
     odds = match.t2o
-    await ctx.respond("Winner has been set to " + match.t2)
+    await ctx.respond(f"Winner has been set to {match.t2}.")
 
   msg_ids = []
   users = []
@@ -1310,6 +1321,94 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
 #match winner end
 
+
+#match reset start
+@matchscg.command(name = "reset", description = "Change winner or go back to no winner.")
+async def match_winner(ctx, match: Option(str, "Match you want to reset winner of.", autocomplete=match_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_winner_list_autocomplete), new_date: Option(int, "Do you want to reset the winner set date?", choices = yes_no_choices)):
+  if (match := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  if new_date == 0:
+    new_date = True
+  else:
+    new_date = False
+  
+  team.strip()
+  if (team == "1") or (team == match.t1):
+    team = 1
+  elif (team == "2") or (team == match.t2):
+    team = 2
+  elif (team == "0") or (team == "None") or (team == "Set winner to none"):
+    team = 0
+  else:
+    await ctx.respond(f"Invalid team name of {team} please enter {match.t1}, {match.t2}, or None.")
+    return
+  
+  if int(match.winner) == team:
+    await ctx.respond(f"Winner has already been set to {match.winner_name()}")
+    return
+    
+  gen_msg = await ctx.respond("Reseting match...")
+  
+  match.winner = team
+  if new_date:
+    match.date_winner = get_date()
+  
+  if match.date_closed is None:
+    match.date_closed = match.date_winner
+    
+  embedd = await create_match_embedded(match)
+  await edit_all_messages(match.message_ids, embedd)
+
+  for bet_id in match.bet_ids:
+    bet = get_from_list("bet", bet_id)
+    user = get_from_list("user", bet.user_id)
+    user.remove_balance_id(f"id_{bet.code}")
+
+  if match.winner == 0:
+    await gen_msg.edit_original_message("Winner has been set to None.")
+    replace_in_list("match", match.code, match)
+    return
+  
+  odds = 0.0
+  #change when autocomplete
+  if team == 1:
+    odds = match.t1o
+    await gen_msg.edit_original_message(f"Winner has been set to {match.t1}.")
+  else:
+    odds = match.t2o
+    await gen_msg.edit_original_message(f"Winner has been set to {match.t2}.")
+
+  msg_ids = []
+  users = []
+  date = match.date_winner
+  for bet_id in match.bet_ids:
+    bet = get_from_list("bet", bet_id)
+    if not bet == None:
+      #to do print out embedds of bets
+      bet.winner = int(match.winner)
+      payout = -bet.bet_amount
+      if bet.team_num == team:
+        payout += bet.bet_amount * odds
+      user = get_from_list("user", bet.user_id)
+      remove_from_active_ids(user, bet.code)
+      add_balance_user(user, payout, "id_" + str(bet.code), date)
+
+      replace_in_list("bet", bet.code, bet)
+      embedd = await create_bet_embedded(bet)
+      msg_ids.append((bet.message_ids, embedd))
+      users.append(user.code)
+    else:
+      print(f"where the bet_id from {bet_id}")
+  replace_in_list("match", match.code, match)
+
+  no_same_list_user = []
+  [no_same_list_user.append(x) for x in users if x not in no_same_list_user]
+  for user in no_same_list_user:
+    embedd = await create_user_embedded(user)
+    await ctx.send(embed=embedd)
+
+  [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+#match reset end
+  
   
 bot.add_application_command(matchscg)
 #match end
@@ -1476,10 +1575,20 @@ async def delete_last_bal(ctx):
       replace_in_list("user", user.code, user)
 
       
-
+from datetime import datetime
+from pytz import timezone
+import pytz 
 # debug command
 @bot.command()
 async def add_var(ctx):
+  users = get_all_objects("user")
+  central = timezone('US/Central')
+  for user in users:
+    for bal in user.balance:
+      if bal[2].tzinfo is None:
+        user.balance[user.balance.index(bal)] = (bal[0] , bal[1], pytz.utc.localize(bal[2], is_dst=None).astimezone(central))
+    replace_in_list("user", user.code, user)
+  print("done")
   return
 
 # debug command

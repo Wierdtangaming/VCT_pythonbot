@@ -41,7 +41,7 @@ class Match:
 
   def winner_name(self):
     if self.winner == 0:
-      return None
+      return "None"
     elif self.winner == 1:
       return self.t1
     else:

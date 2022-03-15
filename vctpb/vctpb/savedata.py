@@ -1,30 +1,53 @@
 import os
-import subprocess
-from pexpect import popen_spawn
+from github import Github
+import shutil
 
-def save_to_github():
+
+def save_to_github(message):
   print(os.getcwd())
   user = os.environ['GithubUsername']
-  password = os.environ['GithubPassword']
+  token = os.environ['GithubToken']
+
   
-  cmd = f"cd {os.getcwd()}/vctpb/vctpb"
-  returned_value = subprocess.call(cmd, shell=True)  # returns the exit code in unix
+  g = Github(user, token)
+  repo = g.get_user().get_repo("dev-save-data")
+  all_files = []
+  contents = repo.get_contents("")
+
+
+  shutil.make_archive("backup", "zip", "savedata")
+
+
+
+
+
+
+
+
+
+
+
+
+  return
   
-  cmd = "git add ." 
-  subprocess.call(cmd, shell=True)
+  while contents:
+    file_content = contents.pop(0)
+    if file_content.type == "dir":
+      contents.extend(repo.get_contents(file_content.path))
+    else:
+      file = file_content 
+      all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
   
-  cmd = 'git commit -m "python project update"'
-  subprocess.call(cmd, shell=True)
+  with open('', 'r') as file:
+    content = file.read()
   
-  cmd = "git remote set-url origin https://github.com/Tehsurfer/git-test.git"
-  subprocess.call(cmd, shell=True)
-  
-  cmd = "git push "
-  child_process = popen_spawn.PopenSpawn(cmd)
-  child_process.expect('User')
-  child_process.sendline(user)
-  child_process.expect('Password')
-  child_process.sendline(password)
-  print('returned value:', returned_value)
-  
-  print('end of commands')
+  # Upload to github
+  git_prefix = 'dev-save-data/'
+  git_file = git_prefix + 'backup/'
+  if git_file in all_files:
+    contents = repo.get_contents(git_file)
+    repo.update_file(contents.path, "committing files", content, contents.sha, branch="master")
+    print(git_file + ' UPDATED')
+  else:
+    repo.create_file(git_file, "committing files", content, branch="master")
+    print(git_file + ' CREATED')

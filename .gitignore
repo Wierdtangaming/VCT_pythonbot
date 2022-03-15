@@ -1,3 +1,5 @@
 .replit
+savedata/
 poetry.lock
 pyproject.toml
+backup.zip

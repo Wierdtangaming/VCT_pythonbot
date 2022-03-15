@@ -1,2 +1,2 @@
-python3 -m poetry add pytz emoji jsonpickle git+https://github.com/Pycord-Development/pycord
+python3 -m poetry add pytz emoji jsonpickle pygithub git+https://github.com/Pycord-Development/pycord
 poetry add git+https://github.com/Pycord-Development/pycord

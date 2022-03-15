@@ -5,7 +5,6 @@ import jsonpickle
 import sys
 import shutil
 from replit import db
-from savedata import save_to_github
 import time
 
 def get_date_string():
@@ -26,13 +25,13 @@ def get_days(date_string):
   return(day_of_year - datetime(1970,1,1)).days
 
 def get_all_names(path="files/", ext=False):
-  names = os.listdir(path)
+  names = os.listdir(f"savedata/{path}")
   if ext:
     return names
   return [os.path.splitext(name)[0] for name in names]
 
 def get_prefix(prefix, path="files/", ext=False):
-  names = os.listdir(path)
+  names = os.listdir(f"savedata/{path}")
   prefix_names = [name for name in names if name.startswith(prefix)]
   if ext:
     return prefix_names
@@ -40,7 +39,7 @@ def get_prefix(prefix, path="files/", ext=False):
 
 def get_file(name, path="files/"):
   rs = jsonpickle.decode(db.get_raw(name))
-  path_and_file = f"{path}{name}.txt"
+  path_and_file = f"savedata/{path}{name}.txt"
   r = open(path_and_file, "r")
   fs = jsonpickle.decode(r.read())
   if fs != rs:
@@ -55,49 +54,39 @@ def get_file(name, path="files/"):
 def save_file(name, obj, savekey, path="files/"):
   if savekey:
     db[name] = obj
-  path_and_file = f"{path}{name}.txt"
-  f = open(path_and_file, "w")
-  f.write(jsonpickle.encode(obj))
-  f.close()
+  path_and_file = f"savedata/{path}{name}.txt"
+  with open(path_and_file, "w") as f:
+    f.write(jsonpickle.encode(obj))
 
   
   r = open(path_and_file, "r")
   fs = jsonpickle.decode(r.read())
   if fs != obj:
     create_error_file("save error", f"Didn't save {name} to {path_and_file}.")
-    
-  start_time = time.time()
-  save_to_github()
-  print("save", time.time() - start_time, "to run")
+
+def make_folder(name, path):
+  os.mkdir(f"savedata/{path}{name}/")
+
   
 def delete_file(name, path):
-  path_and_file = f"{path}{name}.txt"
+  path_and_file = f"savedata/{path}{name}.txt"
   print(f"deleting {path_and_file}")
-  start_time = time.time()
-  save_to_github()
-  print("save", time.time() - start_time, "to run")
 
 
 def delete_folder(name, path):
-  path_and_file = f"{path}{name}"
+  path_and_file = f"savedata/{path}{name}"
   try:
     shutil.rmtree(path_and_file)
     print(f"deleted folder {path_and_file}")
   except OSError as e:
     create_error_file("delete error", f"couldn't remove {name} path {path_and_file}.")
     print("Error: %s - %s." % (e.filename, e.strerror))
-  start_time = time.time()
-  save_to_github()
-  print("save", time.time() - start_time, "to run")
 
 
 def create_error_file(name, s):
   datestring = get_date_string()
   save_file(f"{name}-{datestring}", f"{s}\n{datestring}", False, path="errors/")
-  print(name, s)
-  start_time = time.time()
-  save_to_github()
-  print("save", time.time() - start_time, "to run")
+  
   
 
 
@@ -170,7 +159,7 @@ def delete_old_backup():
   for layer in layer_list:
     if len(layer[1]) > 1:
       for name in layer[1][:-1]:
-        delete_file(name, "backup/")
+        delete_folder(name, "backup/")
 
   print("done delete backup")
         
