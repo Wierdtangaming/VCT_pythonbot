@@ -42,7 +42,30 @@ def get_file(name, path="files/"):
   fs = jsonpickle.decode(r.read())
     
   return fs
-      
+  
+def set_setting_test():
+  with open(f"savedata/settings/save_repo.txt", "w") as f:
+    f.write(jsonpickle.encode("dev-save-repo"))
+    
+  with open(f"savedata/settings/discord_token.txt", "w") as f:
+    f.write(jsonpickle.encode("devdiscordtoken"))
+    
+  with open(f"savedata/settings/github_token.txt", "w") as f:
+    f.write(jsonpickle.encode("devgithubtoken"))
+    
+  with open(f"savedata/settings/guild_ids.txt", "w") as f:
+    f.write(jsonpickle.encode([731630214194659388]))
+  
+  
+def get_setting(name):
+  #set_setting_test()
+  #print("settings_saved")
+  path_and_file = f"savedata/settings/{name}.txt"
+  r = open(path_and_file, "r")
+  val = r.read()
+  fs = jsonpickle.decode(val)
+  return fs
+  
 
 def save_file(name, obj, path="files/"):
   path_and_file = f"savedata/{path}{name}.txt"

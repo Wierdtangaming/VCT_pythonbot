@@ -2,7 +2,7 @@ import os
 from github import Github
 from zipfile import ZipFile
 import zipfile
-from savefiles import create_error_file
+from savefiles import get_setting, create_error_file
 
 from savefiles import backup
 
@@ -15,12 +15,11 @@ def backup_full():
 
 
 def save_to_github(message, backupf=False):
-
-  user = os.environ['GithubUsername']
-  token = os.environ['GithubToken']
   
-  g = Github(user, token)
-  repo = g.get_user().get_repo("dev-save-data")
+  g = Github(os.getenv(get_setting("github_token")))
+  
+  repo_name = get_setting("save_repo")
+  repo = g.get_user().get_repo(repo_name)
   all_files = []
   contents = repo.get_contents("")
 
@@ -101,13 +100,11 @@ def are_equivalent(filename1, filename2):
       # Do some simple checks first
       # Do the ZipFiles contain the same the files?
       if zipinfo1.keys() != zipinfo2.keys():
-        print("1", len(zipinfo1.keys()), len(zipinfo2.keys()))
         return False
       
       # Do the files in the archives have the same CRCs? (This is a 32-bit CRC of the
       # uncompressed item. Is that good enough to confirm the files are the same?)
       if any(zipinfo1[name].CRC != zipinfo2[name].CRC for name in zipinfo1.keys()):
-        print("2")
         return False
       
       # Skip/omit this loop if matching names and CRCs is good enough.
@@ -124,11 +121,9 @@ def are_equivalent(filename1, filename2):
             buffer2 = file2.read(BUFSIZE)
             
             if buffer1 != buffer2:
-              print("3")
               return False
             
             if not buffer1:
               break
-                  
-      print("4")  
+                   
       return True

@@ -33,7 +33,7 @@ from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup
+from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
 from savedata import save_to_github, backup_full
 
@@ -42,7 +42,7 @@ intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
 
-gid = [int(os.environ["GUILD_ID"])]
+gid = get_setting("guild_ids")
 
 
 # matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
@@ -335,12 +335,12 @@ async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
   
-  backup_timer.start()
+  auto_backup_timer.start()
   print("on ready done")
 
 
-@tasks.loop(minutes=30)
-async def backup_timer():
+@tasks.loop(hours=100)
+async def auto_backup_timer():
   print("timer")
   backup_full()
   
@@ -1619,5 +1619,6 @@ async def update_bet_ids(ctx):
         user.balance[user.balance.index(bal)] = ("reset_2022 Stage 1" , user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
 
     replace_in_list("user", user.code, user)
-
-bot.run(os.getenv("TOKEN"))
+token_path = get_setting("discord_token")
+dis_token = os.getenv(token_path)
+bot.run(dis_token)

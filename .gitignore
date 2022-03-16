@@ -2,5 +2,5 @@
 savedata/
 poetry.lock
 pyproject.toml
-backup.zip
 gitbackup.zip
+backup.zip
