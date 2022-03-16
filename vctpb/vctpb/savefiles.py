@@ -4,7 +4,6 @@ from pytz import timezone
 import jsonpickle
 import sys
 import shutil
-from replit import db
 import time
 
 def get_date_string():
@@ -38,22 +37,14 @@ def get_prefix(prefix, path="files/", ext=False):
   return [os.path.splitext(prefix_name)[0] for prefix_name in prefix_names]
 
 def get_file(name, path="files/"):
-  rs = jsonpickle.decode(db.get_raw(name))
   path_and_file = f"savedata/{path}{name}.txt"
   r = open(path_and_file, "r")
   fs = jsonpickle.decode(r.read())
-  if fs != rs:
-    print(type(fs), type(rs))
-    print(str(fs)[:50], str(rs)[:50])
-    save_file(name, rs, False)
-    create_error_file("get error", f"get not the same as DB {name} to {path_and_file}.")
     
-  return rs
+  return fs
       
 
-def save_file(name, obj, savekey, path="files/"):
-  if savekey:
-    db[name] = obj
+def save_file(name, obj, path="files/"):
   path_and_file = f"savedata/{path}{name}.txt"
   with open(path_and_file, "w") as f:
     f.write(jsonpickle.encode(obj))
@@ -85,7 +76,7 @@ def delete_folder(name, path):
 
 def create_error_file(name, s):
   datestring = get_date_string()
-  save_file(f"{name}-{datestring}", f"{s}\n{datestring}", False, path="errors/")
+  save_file(f"{name}-{datestring}", f"{s}\n{datestring}", path="errors/")
   
 def backup():
   keys = get_all_names()
@@ -96,7 +87,7 @@ def backup():
   for key in keys:
     if not key.startswith("backup_"):
       val = get_file(key)
-      save_file(key, val, False, path=date_path)
+      save_file(key, val, path=date_path)
   delete_old_backup()
 
 

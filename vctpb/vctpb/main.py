@@ -383,14 +383,14 @@ assign = SlashCommandGroup(
 #assign matches start
 @assign.command(name = "matches", description = "Where the end matches show up.")
 async def assign_matches(ctx):
-  save_file("match_channel_id", ctx.channel.id, True)
+  save_file("match_channel_id", ctx.channel.id)
   await ctx.respond("This channel is now the match list channel.")
 #assign matches end
 
 #assign bets start
 @assign.command(name = "bets", description = "Where the end bets show up.")
 async def assign_bets(ctx):
-  save_file("bet_channel_id", ctx.channel.id, True)
+  save_file("bet_channel_id", ctx.channel.id)
   await ctx.respond("This channel is now the bet list channel.")
 #assign bets end
 
@@ -719,7 +719,7 @@ async def color_list(ctx):
     return
   
   font = ImageFont.truetype("vctpb/font/whitneybold.otf", size=40)
-  img = Image.new("RGBA", (800, (int(len(colors)/2) * 100) + 200), (255,255,255,0))
+  img = Image.new("RGBA", (800, (int((len(colors)+1)/2) * 100) + 100), (255,255,255,0))
   d = ImageDraw.Draw(img)
   for i, color in enumerate(colors):
     x = ((i % 2) * 350) + 50

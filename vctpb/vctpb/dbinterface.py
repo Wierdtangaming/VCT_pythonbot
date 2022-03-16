@@ -22,17 +22,17 @@ def add_to_list(prefix, obj):
   print(jsonpickle.encode(obj))
   objects = get_all_objects(prefix)
   if len(objects) == 0:
-    save_file(prefix + "_list_1", [jsonpickle.encode(obj)], True)
+    save_file(prefix + "_list_1", [jsonpickle.encode(obj)])
     return
   list_num = math.floor(len(objects) / 50)
   list_prog = len(objects) % 50
   if list_prog == 0:
-    save_file(prefix + "_list_" + str(list_num + 1), [jsonpickle.encode(obj)], True)
+    save_file(prefix + "_list_" + str(list_num + 1), [jsonpickle.encode(obj)])
     return
   list_to_add = get_file(prefix + "_list_" + str(list_num + 1))
   list_to_add.append(jsonpickle.encode(obj))
   
-  save_file(prefix + "_list_" + str(list_num + 1), list_to_add, True)
+  save_file(prefix + "_list_" + str(list_num + 1), list_to_add)
 
 
 def replace_in_list(prefix, obj_code, obj):
@@ -47,7 +47,7 @@ def replace_in_list(prefix, obj_code, obj):
       for listdbobj in list_to_replace:
         if jsonpickle.decode(listdbobj).code == obj_code:
           list_to_replace[list_index] = jsonpickle.encode(obj)
-          save_file(prefix + "_list_" + str(list_num + 1), list_to_replace, True)
+          save_file(prefix + "_list_" + str(list_num + 1), list_to_replace)
           return
         list_index += 1
 
@@ -83,7 +83,7 @@ def remove_from_list(prefix, obj_ambig):
     delete_file(prefix + "_list_" + str(list_num + 1))
     return obj_found
 
-  save_file(prefix + "_list_" + str(list_num + 1), list_to_add, True)
+  save_file(prefix + "_list_" + str(list_num + 1), list_to_add)
   if list_num + 1 == get_prefix(prefix + "_list_"):
     return obj_found
   for x in range(list_num + 1, len(get_prefix(prefix + "_list_"))):
@@ -92,12 +92,12 @@ def remove_from_list(prefix, obj_ambig):
     list2 = get_file(prefix + "_list_" + str(x + 1))
     list1.append(list2[0])
     list2.remove(list2[0])
-    save_file(prefix + "_list_" + str(x), list1, True)
+    save_file(prefix + "_list_" + str(x), list1)
 
     if len(list2) == 0:
       delete_file(prefix + "_list_" + str(x + 1))
     else:
-      save_file(prefix + "_list_" + str(x + 1), list2, True)
+      save_file(prefix + "_list_" + str(x + 1), list2)
 
   return obj_found
 

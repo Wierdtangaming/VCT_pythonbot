@@ -20,7 +20,7 @@ def get_all_colors_key_hex():
   return list(colors.items())
 
 def save_colors(colors):
-  save_file("colors", colors, True)
+  save_file("colors", colors)
 
 def hex_to_tuple(hex):
   if len(hex) != 6:
