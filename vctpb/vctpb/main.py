@@ -17,6 +17,7 @@ import collections
 import discord
 from discord.commands import Option, OptionChoice, SlashCommandGroup
 from discord.ui import InputText, Modal
+from discord.ext import tasks
 import os
 import random
 import jsonpickle
@@ -32,7 +33,10 @@ from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, delete_old_backup, make_folder
+from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup
+import time
+from savedata import save_to_github, backup_full
+
 
 intents = discord.Intents.all()
 
@@ -45,6 +49,7 @@ gid = [int(os.environ["GUILD_ID"])]
 # user is in user_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
 # bet is in bet_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
 # logs are log_[ID] holds (log, date)
+
 
 
 
@@ -314,37 +319,32 @@ def change_prev_balance(user, balance_id, new_amount):
     new_amount = user.balance[i][1] + difference
   return user
 
-  
-def backup():
-  keys = get_all_names()
-  date_string = get_date_string()
-  print(date_string)
-  make_folder(date_string, f"backup/")
-  date_path = f"backup/{date_string}/"
-  for key in keys:
-    if not key.startswith("backup_"):
-      val = get_file(key)
-      save_file(key, val, False, path=date_path)
-  print("backed up all keys")
-  delete_old_backup()
-  
 
-
+  
 
 
 def roundup(x):
   return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
 
-import time
-from savedata import save_to_github
+
+
+  
 
 @bot.event
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
+  
+  backup_timer.start()
+  print("on ready done")
 
-  backup()
-  save_to_github(f"initial test")
+
+@tasks.loop(minutes=30)
+async def backup_timer():
+  print("timer")
+  backup_full()
+  
+  
 #autocomplete start
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
@@ -718,7 +718,7 @@ async def color_list(ctx):
     await ctx.respond("No colors found.")
     return
   
-  font = ImageFont.truetype("whitneybold.otf", size=40)
+  font = ImageFont.truetype("vctpb/font/whitneybold.otf", size=40)
   img = Image.new("RGBA", (800, (int(len(colors)/2) * 100) + 200), (255,255,255,0))
   d = ImageDraw.Draw(img)
   for i, color in enumerate(colors):

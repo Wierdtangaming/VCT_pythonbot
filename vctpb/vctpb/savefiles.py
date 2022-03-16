@@ -87,7 +87,17 @@ def create_error_file(name, s):
   datestring = get_date_string()
   save_file(f"{name}-{datestring}", f"{s}\n{datestring}", False, path="errors/")
   
-  
+def backup():
+  keys = get_all_names()
+  date_string = get_date_string()
+  print(date_string)
+  make_folder(date_string, f"backup/")
+  date_path = f"backup/{date_string}/"
+  for key in keys:
+    if not key.startswith("backup_"):
+      val = get_file(key)
+      save_file(key, val, False, path=date_path)
+  delete_old_backup()
 
 
 def equate(x):
