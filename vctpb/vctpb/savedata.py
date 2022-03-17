@@ -15,7 +15,7 @@ def backup_full():
 
 
 def save_to_github(message, backupf=False):
-  
+  print("1")
   g = Github(os.getenv(get_setting("github_token")))
   
   repo_name = get_setting("save_repo")
@@ -24,6 +24,7 @@ def save_to_github(message, backupf=False):
   contents = repo.get_contents("")
   #shutil.make_archive("backup", 'zip', "savedata/")
   d = "backup"
+  print("3")
   
   try:
     os.remove("backup.zip")
@@ -38,6 +39,7 @@ def save_to_github(message, backupf=False):
         zf.write(name, name)
     zf.close()
     
+  print("4")
   while contents:
     file_content = contents.pop(0)
     if file_content.type == "dir":
@@ -46,6 +48,7 @@ def save_to_github(message, backupf=False):
       file = file_content 
       all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
 
+  print("576")
   try:
     os.remove("gitbackup.zip")
   except:
@@ -55,21 +58,28 @@ def save_to_github(message, backupf=False):
   with open("gitbackup.zip", "wb") as f:
     f.write(content.decoded_content)
 
+  print("8")
   
   if are_equivalent("backup.zip", "gitbackup.zip"):
     print("Local and github are the same.")
     return
 
+  print("jh")
   
   if backupf:
     backup()
 
+  print("sd")
   try:
     os.remove("backup.zip")
   except:
     print("file backup.zip not found")
     
-  os.remove("backup.zip")
+  print("hfg")
+  try:
+    os.remove("backup.zip")
+  except:
+    print("second file backup.zip not found")
   with ZipFile(d + '.zip', "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
     for root, _, filenames in os.walk("savedata/"):
       for name in filenames:
