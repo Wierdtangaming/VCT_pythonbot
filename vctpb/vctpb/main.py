@@ -718,7 +718,7 @@ async def color_list(ctx):
     await ctx.respond("No colors found.")
     return
   
-  font = ImageFont.truetype("vctpb/font/whitneybold.otf", size=40)
+  font = ImageFont.truetype("font/whitneybold.otf", size=40)
   img = Image.new("RGBA", (800, (int((len(colors)+1)/2) * 100) + 100), (255,255,255,0))
   d = ImageDraw.Draw(img)
   for i, color in enumerate(colors):
@@ -1619,6 +1619,8 @@ async def update_bet_ids(ctx):
         user.balance[user.balance.index(bal)] = ("reset_2022 Stage 1" , user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
 
     replace_in_list("user", user.code, user)
+
+
 token_path = get_setting("discord_token")
 dis_token = os.getenv(token_path)
 bot.run(dis_token)
