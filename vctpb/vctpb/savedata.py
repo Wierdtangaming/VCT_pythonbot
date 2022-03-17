@@ -22,11 +22,14 @@ def save_to_github(message, backupf=False):
   repo = g.get_user().get_repo(repo_name)
   all_files = []
   contents = repo.get_contents("")
-
   #shutil.make_archive("backup", 'zip', "savedata/")
   d = "backup"
-
-  os.remove("backup.zip")
+  
+  try:
+    os.remove("backup.zip")
+  except:
+    print("file backup.zip not found")
+    
   with ZipFile(d + '.zip', "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
     for root, _, filenames in os.walk("savedata/"):
       for name in filenames:
@@ -43,8 +46,11 @@ def save_to_github(message, backupf=False):
       file = file_content 
       all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
 
-  
-  os.remove("gitbackup.zip")
+  try:
+    os.remove("gitbackup.zip")
+  except:
+    print("file gitbackup.zip not found")
+    
   content = repo.get_contents(all_files[0])
   with open("gitbackup.zip", "wb") as f:
     f.write(content.decoded_content)
@@ -58,6 +64,10 @@ def save_to_github(message, backupf=False):
   if backupf:
     backup()
 
+  try:
+    os.remove("backup.zip")
+  except:
+    print("file backup.zip not found")
     
   os.remove("backup.zip")
   with ZipFile(d + '.zip', "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
