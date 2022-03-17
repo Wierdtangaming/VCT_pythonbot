@@ -69,17 +69,13 @@ def save_to_github(message, backupf=False):
   if backupf:
     backup()
 
-  print("sd")
-  try:
-    os.remove("backup.zip")
-  except:
-    print("file backup.zip not found")
     
   print("hfg")
   try:
     os.remove("backup.zip")
   except:
     print("second file backup.zip not found")
+  
   with ZipFile(d + '.zip', "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
     for root, _, filenames in os.walk("savedata/"):
       for name in filenames:
@@ -89,7 +85,6 @@ def save_to_github(message, backupf=False):
     zf.close()
     
   
-  #data = base64.b64encode(open("backup.zip", "rb").read())
   data = open("backup.zip", "rb").read()
   
   repo.update_file("backup.zip", message, data, content.sha)
