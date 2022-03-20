@@ -1,5 +1,6 @@
 .replit
 savedata/
+settings/
 poetry.lock
 pyproject.toml
 gitbackup.zip

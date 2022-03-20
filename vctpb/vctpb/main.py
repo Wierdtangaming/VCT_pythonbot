@@ -1425,7 +1425,6 @@ async def hide_from_leaderboard(ctx):
   user.show_on_lb = not user.show_on_lb
   replace_in_list("user", user.code, user)
   print(user.show_on_lb)
-  
 
 
 
@@ -1620,7 +1619,6 @@ async def update_bet_ids(ctx):
     replace_in_list("user", user.code, user)
 
 
-token_path = get_setting("discord_token")
-dis_token = os.getenv(token_path)
-
-bot.run(dis_token)
+token = get_setting("discord_token")
+print(f"discord: {token}")
+bot.run(token)

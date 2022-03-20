@@ -59,9 +59,7 @@ def set_setting_test():
   
   
 def get_setting(name):
-  #set_setting_test()
-  #print("settings_saved")
-  path_and_file = f"savedata/settings/{name}.txt"
+  path_and_file = f"settings/{name}.txt"
   r = open(path_and_file, "r")
   val = r.read()
   fs = jsonpickle.decode(val)

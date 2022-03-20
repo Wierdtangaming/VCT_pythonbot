@@ -22,7 +22,9 @@ def is_new_day():
 
 
 def save_to_github(message):
-  g = Github(os.getenv(get_setting("github_token")))
+  token = get_setting("github_token")
+  print(f"github: {token}")
+  g = Github(token)
   
   repo_name = get_setting("save_repo")
   repo = g.get_user().get_repo(repo_name)
