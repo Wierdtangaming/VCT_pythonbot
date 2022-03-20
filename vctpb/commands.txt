@@ -1,0 +1,2 @@
+git remote set-url origin https://github.com/MaxOrtGit/VCT-Predictions-Bot.git
+poetry run python vctpb/main.py

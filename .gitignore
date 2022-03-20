@@ -1,3 +1,8 @@
-files/
-backup/
-errors/
+.replit
+savedata/
+settings/
+poetry.lock
+pyproject.toml
+gitbackup.zip
+backup.zip
+.DS_Store
