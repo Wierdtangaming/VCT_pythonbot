@@ -1,2 +1,11 @@
+
+#run
+tmux new -s beta
 cd vctpb
 python3 -m poetry run python3 vctpb/main.py
+
+#on reopen
+tmux a -t beta
+
+#close
+#ctr-d
