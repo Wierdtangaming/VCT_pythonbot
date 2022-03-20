@@ -70,3 +70,11 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix):
       await ctx.respond(f"{prefix.capitalize()} ID not found.")
     return None
   return obj
+
+
+def get_user_from_username(username):
+  users = get_all_objects("user")
+  for user in users:
+    if user.username == username:
+      return user
+  return None
