@@ -17,7 +17,7 @@ import collections
 import discord
 from discord.commands import Option, OptionChoice, SlashCommandGroup
 from discord.ui import InputText, Modal
-from discord.ext import tasks
+from discord.ext import tasks, commands
 import os
 import random
 import jsonpickle
@@ -27,7 +27,6 @@ from User import User
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
-from discord.ext import commands
 import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
@@ -35,7 +34,7 @@ from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_f
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
 from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
-from savedata import save_to_github, backup_full
+from savedata import backup_full
 
 
 intents = discord.Intents.all()
@@ -1623,4 +1622,5 @@ async def update_bet_ids(ctx):
 
 token_path = get_setting("discord_token")
 dis_token = os.getenv(token_path)
+
 bot.run(dis_token)

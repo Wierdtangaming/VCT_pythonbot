@@ -2,20 +2,26 @@ import os
 from github import Github
 from zipfile import ZipFile
 import zipfile
-from savefiles import get_setting, create_error_file
+from savefiles import get_setting, create_error_file, backup, get_days, get_all_names, get_date_string
 
-from savefiles import backup
 
 BUFSIZE = 1024
 
 def backup_full():
-  save_to_github("backup", backupf=True)
+  save_to_github("backup")
+
+def is_new_day():
+  file_names = get_all_names(path="backup/")
+  file_names.sort(key=lambda x: get_days(x))
+  last_day = get_days(file_names[-1])
+  today_day = get_days(get_date_string())
+  return last_day != today_day
 
 
 
 
-def save_to_github(message, backupf=False):
-  print("1")
+
+def save_to_github(message):
   g = Github(os.getenv(get_setting("github_token")))
   
   repo_name = get_setting("save_repo")
@@ -24,7 +30,6 @@ def save_to_github(message, backupf=False):
   contents = repo.get_contents("")
   #shutil.make_archive("backup", 'zip', "savedata/")
   d = "backup"
-  print("3")
   
   try:
     os.remove("backup.zip")
@@ -39,7 +44,6 @@ def save_to_github(message, backupf=False):
         zf.write(name, name)
     zf.close()
     
-  print("4")
   while contents:
     file_content = contents.pop(0)
     if file_content.type == "dir":
@@ -48,7 +52,6 @@ def save_to_github(message, backupf=False):
       file = file_content 
       all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
 
-  print("576")
   try:
     os.remove("gitbackup.zip")
   except:
@@ -58,19 +61,15 @@ def save_to_github(message, backupf=False):
   with open("gitbackup.zip", "wb") as f:
     f.write(content.decoded_content)
 
-  print("8")
   
-  if are_equivalent("backup.zip", "gitbackup.zip"):
+  if are_equivalent("backup.zip", "gitbackup.zip") and not is_new_day(): 
     print("Local and github are the same.")
     return
 
-  print("jh")
   
-  if backupf:
-    backup()
-
+  backup()
+  
     
-  print("hfg")
   try:
     os.remove("backup.zip")
   except:

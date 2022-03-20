@@ -19,6 +19,7 @@ def get_seconds(date_string):
   return int(hour) * 3600 + int(min) * 60 + int(sec)
 
 def get_days(date_string):
+  print(date_string)
   year, month, day = (date_string_to_vars(date_string))[:3]
   day_of_year = datetime(int(year), int(month), int(day))
   return(day_of_year - datetime(1970,1,1)).days
