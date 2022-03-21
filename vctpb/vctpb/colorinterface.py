@@ -3,13 +3,19 @@ from savefiles import get_file, save_file
 
 #color start
 def valid_hex(hex):
-  if len(hex) != 6:
-    return False
+  if len(hex) != 6 and len(hex) != 7:
+    return None
+
+  if len(hex) == 7 and hex[0] != "#":
+    return None
+  else:
+    
+    hex = hex[-6:]
   try:
     int(hex, 16)
-    return True
+    return hex
   except ValueError:
-    return False
+    return None
 
 def get_all_colors():
   colors = dict(get_file("colors"))
@@ -40,9 +46,11 @@ def add_color(name, hex):
   colors = get_all_colors()
   if (old_color := colors.get(name)) is not None:
     return f"{cap_name} is already a color {old_color}."
-  if not valid_hex(hex):
-    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
-    
+
+  old_hex = hex
+  if (hex := valid_hex(hex)) is None:
+    return f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters."
+
   colors[name] = hex
   save_colors(colors)
   return f"{cap_name} has been added to the color list."
@@ -69,8 +77,10 @@ def recolor_color(name, hex):
   colors = get_all_colors()
   if colors.get(name) is None:
     return f"{cap_name} is not a color."
-  if not valid_hex(hex):
-    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
+  old_hex = hex
+  if (hex := valid_hex(hex)) is None:
+    return f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters."
+
   colors[name] = hex
   save_colors(colors)
   return f"{cap_name} now has the color {hex}"
