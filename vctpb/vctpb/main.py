@@ -1643,6 +1643,7 @@ async def delete_last_bal(ctx):
 # debug command
 @bot.command()
 async def add_var(ctx):
+  return
   users = get_all_objects("user")
   for user in users:
     print(user.balance[-1][1])
@@ -1655,7 +1656,6 @@ async def add_var(ctx):
     replace_in_list("user", user.code, user)
 
   print("done")
-  return
 
 
 # debug command
