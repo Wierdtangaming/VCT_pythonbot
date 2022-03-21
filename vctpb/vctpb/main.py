@@ -1486,14 +1486,12 @@ async def hide_from_leaderboard(ctx):
 
 #season reset command
 @bot.command()
-async def reset_season(ctx):
+async def reset_season(ctx, name):
   # to do make the command also include season name
-  return
   users = get_all_objects("user")
   date = get_date()
   for user in users:
-    user.balance.pop()
-    user.balance.append(("reset 2", 500, date))
+    user.balance.append((f"reset_{user.uniqe_code}_{name}", 500, date))
     replace_in_list("user", user.code, user)
 
 #debug
@@ -1643,6 +1641,25 @@ async def delete_last_bal(ctx):
 # debug command
 @bot.command()
 async def add_var(ctx):
+  users = get_all_objects("user")
+  reset_dict = {}
+  for user in users:
+    for i, bal in enumerate(user.balance):
+      bet_id, amount, time = bal
+      if bet_id.startswith("award_"):
+        code = user.uniqe_code("award_")
+        bet_id = bet_id[:bet_id.index("award_")+6] + code + "_" + bet_id[bet_id.index("award_")+6:]
+        print(bet_id)
+        
+      elif bet_id.startswith("reset_"):
+        if bet_id in reset_dict:
+          bet_id = reset_dict[bet_id]
+        else:
+          code = user.uniqe_code("reset_")
+          #insert code after reset_
+          bet_id = bet_id[:bet_id.index("reset_")+6] + code + "_" + bet_id[bet_id.index("reset_")+6:]
+        print(bet_id)
+
   return
   users = get_all_objects("user")
   for user in users:

@@ -4,6 +4,7 @@ import io
 import matplotlib.pyplot as plt
 from PIL import Image
 from decimal import Decimal
+import random
 
 
 class User:
@@ -27,6 +28,23 @@ class User:
     #a tuple (balance, date created, date paid)
     
     self.loans = []
+
+  def uniqe_code(self, prefix):
+    all_bal = self.balance
+    prefix_bal = [x for x in all_bal if x[0].startswith(prefix)]
+    codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
+    code = ""
+    copy = True
+    while copy:
+      copy = False
+
+      random.seed()
+      code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
+      for k in codes:
+        if k == code:
+          copy = True
+    print(code)
+    return code
 
   def active_bet_ids_bets(self):
     return [active_id[0] for active_id in self.active_bet_ids]
