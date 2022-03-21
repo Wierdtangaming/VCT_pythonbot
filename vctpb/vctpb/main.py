@@ -8,6 +8,7 @@
 
 from io import BytesIO
 import collections
+import re
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -23,14 +24,14 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User
+from User import User, get_multi_graph_image
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
 import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple
+from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
 from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
@@ -203,6 +204,8 @@ def delete_balance_id(user_ambig, balance_id):
   
   user.balance.remove(balat)
   replace_in_list("user", user.code, user)
+  print(f"removed {balance_id}")
+  return "Removed"
 
 
 def print_all_balance(user_ambig):
@@ -338,7 +341,7 @@ async def on_ready():
   print("on ready done")
 
 
-@tasks.loop(hours=100)
+@tasks.loop(minutes=30)
 async def auto_backup_timer():
   print("timer")
   backup_full()
@@ -421,7 +424,7 @@ async def award(ctx, user: Option(discord.Member, "User you wannt to award"), am
   
 
 #balance start
-@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"])
+@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
 async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
   if user == None:
     user = get_from_list("user", ctx.author.id)
@@ -836,35 +839,84 @@ balance_choices = [
   OptionChoice(name="season", value=0),
   OptionChoice(name="all", value=1),
   OptionChoice(name="last", value=2),
-  OptionChoice(name="compare", value=3),
 ]
+
 @graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
 async def graph_balance(ctx,
   type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   amount: Option(int, "How many you want to look back. For last only.", default = 20, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
-    
-  if (user := await get_user_from_member(ctx, user)) is None: return
+  print("graph balance")
+
+  if compare == "":
+    if (user := await get_user_from_member(ctx, user)) is None: return
+    if type == 0:
+      graph_type = "current"
+    elif type == 1:
+      graph_type = "all"
+    elif type == 2:
+      graph_type = user.balance[-(amount+1):]
+    else:
+      await ctx.respond("Not a valid type.")
+      return
+
+    with BytesIO() as image_binary:
+      gen_msg = await ctx.respond("Generating graph...")
+      image = user.get_graph_image(graph_type)
+      if isinstance(image, str):
+        await ctx.respond(image)
+        return
+      image.save(image_binary, 'PNG')
+      image_binary.seek(0)
+      await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+    return
   
+
+  usernames_split = compare.split(" ")
+  
+  users = []
+  dbusers = get_all_objects("user")
+
+  for dbuser in dbusers:
+    if dbuser.username in compare:
+      users.append(dbuser)
+
+  
+  if len(users) == 1:
+    await ctx.respond("You need to compare more than one user.")
+    return
+
+  
+  usernames = " ".join([user.username for user in users])
+
+  for username_word in usernames_split:
+    if username_word not in usernames:
+      await ctx.respond(f"User {username_word} not found.")
+      return
+
+  print(users)
   if type == 0:
     graph_type = "current"
   elif type == 1:
     graph_type = "all"
   elif type == 2:
-    graph_type = user.balance[-(amount+1):]
-  elif type == 3:
-    if compare == "":
-      pass
+    graph_type = ("last", amount)
   else:
     await ctx.respond("Not a valid type.")
     return
-    
+
   with BytesIO() as image_binary:
     gen_msg = await ctx.respond("Generating graph...")
-    user.get_graph_image(graph_type).save(image_binary, 'PNG')
+    image = get_multi_graph_image(users, graph_type)
+    if isinstance(image, str):
+      await ctx.respond(image)
+      return
+    image.save(image_binary, 'PNG')
     image_binary.seek(0)
     await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+    
+  
 #graph balance end
 
 bot.add_application_command(graph)
@@ -873,7 +925,7 @@ bot.add_application_command(graph)
 
 
 #leaderboard start
-@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.")
+@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.", guild_ids = gid)
 async def leaderboard(ctx):
   embedd = await create_leaderboard_embedded()
   await ctx.respond(embed=embedd)
@@ -882,7 +934,7 @@ async def leaderboard(ctx):
 
   
 #log start
-@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
+@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)", guild_ids = gid)
 async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
 
   if (user := await get_user_from_member(ctx, user)) is None: return
@@ -1534,6 +1586,18 @@ async def add_team_names(ctx):
     replace_in_list("bet", bet.code, bet)
   print("done")
   
+# debug command
+@bot.command()
+async def check_balance_order(ctx):
+  #check if the order of user balance and the order of timer in balance[2] are the same
+  users = get_all_objects("user")
+  for user in users:
+    sorted = user.balance.copy()
+    sorted.sort(key=lambda x: x[2])
+    if sorted != user.balance:
+      print(f"{user.code} balance order is wrong")
+  print("done")
+
     
 # debug command
 @bot.command()
@@ -1579,6 +1643,7 @@ import pytz
 # debug command
 @bot.command()
 async def add_var(ctx):
+  return
   users = get_all_objects("user")
   central = timezone('US/Central')
   for user in users:
@@ -1592,12 +1657,14 @@ async def add_var(ctx):
 # debug command
 @bot.command()
 async def test_get_object(ctx):
+  return
   user = get_from_list("user", ctx.author.id)
   replace_in_list("user", user.code, user)
   print("done")
 
 @bot.command()
 async def find_common_ids(ctx):
+  return
   matches = get_all_objects("match")
   bets = get_all_objects("bet")
   
@@ -1620,5 +1687,5 @@ async def update_bet_ids(ctx):
 
 
 token = get_setting("discord_token")
-print(f"discord: {token}")
+#print(f"discord: {token}")
 bot.run(token)

@@ -179,18 +179,18 @@ class User:
       return None
     return embeds
 
-  def get_graph_image(self, balances_ambig):
-    if type(balances_ambig) == list:
-      balances = balances_ambig
-    elif type(balances_ambig) == str:
-      if balances_ambig == "full":
+  def get_graph_image(self, balance_range_ambig):
+    if type(balance_range_ambig) == list:
+      balances = balance_range_ambig
+    elif type(balance_range_ambig) == str:
+      if balance_range_ambig == "all":
         balances = self.balance
-      elif balances_ambig == "current":
+      elif balance_range_ambig == "current":
         balances = [self.balance[x] for x in self.get_reset_range(-1)]
       else:
-        return None
+        return f"invalid range of {balance_range_ambig}"
     else:
-      balances = [self.balance[x] for x in balances_ambig]
+      balances = [self.balance[x] for x in balance_range_ambig]
 
     print(len(balances))
       
@@ -247,75 +247,60 @@ class User:
 
 
     
-  def get_multi_graph_image(users, balances_ambig):
-    all_balances = []
-    for user in users:
-      for balance in user.balance:
-        all_balances.append((balance[0], balance[2]))
+def get_multi_graph_image(users, balance_range_ambig):
+  all_balances = []
 
-    all_balances = sorted(all_balances, key=lambda x: x[1])
-    if type(balances_ambig) == list:
-      balances = balances_ambig
-    elif type(balances_ambig) == str:
-      if balances_ambig == "full":
-        balances = self.balance
-      elif balances_ambig == "current":
-        balances = [self.balance[x] for x in self.get_reset_range(-1)]
-      else:
-        return None
+  all_balances = sorted(all_balances, key=lambda x: x[1])
+  if type(balance_range_ambig) == str:
+    if balance_range_ambig == "all":
+      for i, user in enumerate(users):
+        for balance in user.balance:
+          all_balances.append((i, balance))
+    elif balance_range_ambig == "current":
+      for i, user in enumerate(users):
+        for balance_index in user.get_reset_range(-1):
+          all_balances.append((i, user.balance[balance_index]))
     else:
-      balances = [self.balance[x] for x in balances_ambig]
+      return f"invalid range of {balance_range_ambig}"
+  else:
+    return f"invalid range of {balance_range_ambig}"
+  
+  all_balances = sorted(all_balances, key=lambda x: x[1][2])
+  ids = [(bal[0], bal[1][0]) for bal in all_balances]
+  print(ids)
+    
+  x = []
+  y = []
+  colors = []
+  user_color = [user.color for user in users]
+  lines_x = [[] for user in users]
+  lines_y = [[] for user in users]
+  xval = -1
+  last_id = None
+  for user_index, balance in all_balances:
+    bet_id, amount, date = balance
+    if not last_id == bet_id:
+      xval += 1
+      last_id = bet_id
+    x.append(xval)
+    y.append(amount)
+    lines_x[user_index].append(xval)
+    lines_y[user_index].append(amount)
+  
+  #make a 800 x 800 figure
+  fig, ax = plt.subplots(figsize=(8,8))
 
-    print(len(balances))
-      
-    label = []
-    balance = []
-    colors = []
-    line_colors = []
-    before = None
-    for bet_id, amount, date in balances:
-      if not before == None:
-        if amount > before:
-          line_colors.append('g')
-        elif amount < before:
-          line_colors.append('r')
-        else:
-          line_colors.append('k')
-      before = amount
-      if bet_id.startswith('id_'):
-        label.append(bet_id[3:])
-        balance.append(amount)
-        colors.append('b')
-      elif bet_id.startswith('award_'):
-        label.append(bet_id[6:])
-        balance.append(amount)
-        colors.append('xkcd:gold')
-      elif bet_id == 'start':
-        label.append('start')
-        balance.append(amount)
-        colors.append('k')
-      elif bet_id.startswith('reset_'):
-        label.append('reset')
-        balance.append(amount)
-        colors.append('k')
-      else:
-        label.append(bet_id)
-        balance.append(amount)
-        colors.append('k')
-    
-    #make a 800 x 800 figure
-    fig, ax = plt.subplots(figsize=(8,8))
-    #plot the balance
-    for i in range(len(line_colors)-1):
-      ax.plot([i, i+1], [balance[i], balance[i+1]], label=[label[i], ""], color=line_colors[i])
-    
-    llc = len(line_colors)
-    ax.plot([llc-1, llc], [balance[llc-1], balance[llc]], label=[label[llc-1], label[llc]], color=line_colors[llc-1], zorder=1)
-    ax.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    im = Image.open(buf)
-    return im
+  for user_index, line_x in enumerate(lines_x):
+    if len(line_x) <= 1:
+      return f"Not enough data for {users[user_index].username}"
+  #plot the balance
+  for user_index in range(len(users)):
+    print(f"color {user_color[user_index]}")
+    ax.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
+  
+  buf = io.BytesIO()
+  plt.savefig(buf, format='png')
+  buf.seek(0)
+  im = Image.open(buf)
+  return im
     

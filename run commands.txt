@@ -1,11 +1,11 @@
 
 #run
-tmux new -s beta
-cd vctpb
+tmux new -s vctpb
+cd VCT-Prediction-Bot/vctpb
 python3 -m poetry run python3 vctpb/main.py
 
 #on reopen
-tmux a -t beta
+tmux a -t vctpb
 
 #close
 #ctr-d
