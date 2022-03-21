@@ -408,13 +408,12 @@ bot.add_application_command(assign)
   description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
   guild_ids = gid,
 )
-
-
 async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
 
   if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  abu = add_balance_user(user, amount, "award_" + description, get_date())
+  bet_id = "award_" + user.get_unique_code("award_") + "_" + description
+  print(bet_id)
+  abu = add_balance_user(user, amount, bet_id, get_date())
   if abu == None:
     await ctx.respond("User not found.")
   else:
