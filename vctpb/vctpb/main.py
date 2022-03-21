@@ -1646,6 +1646,7 @@ async def delete_last_bal(ctx):
 # debug command
 @bot.command()
 async def add_var(ctx):
+  return
   users = get_all_objects("user")
   reset_dict = {}
   for user in users:
