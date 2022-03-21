@@ -3,6 +3,8 @@ import discord
 import io
 import matplotlib.pyplot as plt
 from PIL import Image
+from decimal import Decimal
+
 
 class User:
   def __init__(self, code, username, color, date_created):
@@ -11,13 +13,14 @@ class User:
     self.color = color
     
     self.show_on_lb = True
-    #a tuple (bet_id, balance after change, date)
+    #a tuple (bet_id, balance after change, change, date)
+    #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
     #bet_id = award_[award_id]: awards
     #bet_id = start: start balance
-    #bet_id = reset: changed balance with command
+    #bet_id = reset_[reset_name]: changed balance with command
     
-    self.balance = [("start", 500, date_created)]
+    self.balance = [("start", Decimal(500), date_created)]
     
     self.active_bet_ids = []
 
@@ -124,7 +127,7 @@ class User:
     new_balances = sorted(new_balances, key=lambda x: x[2])
     new_balances.reverse()
     before = self.balance[-2][1]
-    embed_amount = int((amount - 1) / 15) + 1
+    embed_amount = int((amount - 1) / 25) + 1
     
     embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
     embed_index = 0
@@ -132,7 +135,7 @@ class User:
     bal_index = 3
     print(len(embeds))
     for balance in new_balances:
-      endex = int(embed_index / 15)
+      endex = int(embed_index / 25)
       #a tuple (bet_id, balance after change, date)
       #bet_id = id_[bet_id]: bet id
       #bet_id = award_[award_id]: awards
