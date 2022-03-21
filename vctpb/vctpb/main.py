@@ -37,6 +37,7 @@ from objembed import create_match_embedded, create_match_list_embedded, create_b
 from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
 from savedata import backup_full
+import matplotlib.colors as mcolors
 
 
 intents = discord.Intents.all()
@@ -342,7 +343,7 @@ async def on_ready():
   print("on ready done")
 
 
-@tasks.loop(minutes=30)
+@tasks.loop(minutes=20)
 async def auto_backup_timer():
   print("timer")
   backup_full()
@@ -351,7 +352,7 @@ async def auto_backup_timer():
 #autocomplete start
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
-  return [x.capitalize() for x in get_all_colors().keys()]
+  return [x.capitalize() for x in get_all_colors().keys() if ctx.value.lower() in x.lower()]
 #color picker autocomplete end
 #autocomplete end
 
@@ -710,6 +711,45 @@ colorscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
+#color xkcd autocomplete start
+async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
+  val = ctx.value.lower() 
+  colors = [x[5:].lower() for x in mcolors.XKCD_COLORS.keys() if val in x]
+  
+  colors = colors[::-1]
+  same = []
+  start = []
+  half_start = []
+  contain = []
+  val_words = val.split(" ")
+  for color in colors:
+    color_words = color.split(" ")
+    if color.startswith(val):
+      start.append(color)
+    else:
+      half = True
+      for word in val_words:
+        word_in = False
+        for color_word in color_words:
+          if color_word.startswith(word):
+            word_in = True
+        if not word_in:
+          half = False
+          break
+      if half:
+        half_start.append(color)
+      elif color == val:
+        same.append(color)
+      elif ctx.value.lower() in color.lower():
+        contain.append(color)
+    
+  colors = same + start + half_start + contain
+  colors = [color.capitalize() for color in colors]
+  print("")
+  print(colors)
+  print(half_start)
+  return colors
+#color xkcd autocomplete end
 
   
 #color list start
@@ -740,8 +780,16 @@ async def color_list(ctx):
   
 #color add start
 @colorscg.command(name = "add", description = "Adds the color to color list.")
-async def color_add(ctx, color_name: Option(str, "Name of color you want to add."), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.")):
-  await ctx.respond(add_color(color_name, hex), ephemeral = True)
+async def color_add(ctx, custom_color_name:Option(str, "Name of color you want to add.", required=False), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False), xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False)):
+  if xkcd_color_name is not None:
+    hex = mcolors.XKCD_COLORS[f"xkcd:{xkcd_color_name.lower()}"]
+    if custom_color_name is not None:
+      xkcd_color_name = custom_color_name
+    await ctx.respond(add_color(xkcd_color_name, hex), ephemeral = True)
+  elif custom_color_name is not None and hex is not None:
+    await ctx.respond(add_color(custom_color_name, hex), ephemeral = True)
+  else:
+    await ctx.respond("Please enter a name and hex code or a xkcd color.", ephemeral = True)
 #color add end
 
   
