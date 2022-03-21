@@ -29,9 +29,10 @@ class User:
     
     self.loans = []
 
-  def uniqe_code(self, prefix):
-    all_bal = self.balance
-    prefix_bal = [x for x in all_bal if x[0].startswith(prefix)]
+
+  def get_unique_code(self, prefix):
+    #combine all_bal into one array
+    prefix_bal = [x for x in self.balance if x[0].startswith(prefix)]
     codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
     code = ""
     copy = True
@@ -43,7 +44,6 @@ class User:
       for k in codes:
         if k == code:
           copy = True
-    print(code)
     return code
 
   def active_bet_ids_bets(self):
@@ -321,3 +321,21 @@ def get_multi_graph_image(users, balance_range_ambig):
   im = Image.open(buf)
   return im
     
+def all_user_unique_code(prefix, users):
+  all_bal = [user.balance for user in users]
+  #combine all_bal into one array
+  prefix_bal = []
+  for bal in all_bal:
+    prefix_bal += [x for x in bal if x[0].startswith(prefix)]
+  codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
+  code = ""
+  copy = True
+  while copy:
+    copy = False
+
+    random.seed()
+    code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
+    for k in codes:
+      if k == code:
+        copy = True
+  return code

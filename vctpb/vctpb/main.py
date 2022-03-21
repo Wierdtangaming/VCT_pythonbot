@@ -25,7 +25,7 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image
+from User import User, get_multi_graph_image, all_user_unique_code
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
@@ -299,7 +299,7 @@ def add_balance_user(user_ambig, change, description, date):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
-  user.balance.append((description, Decimal(str(round(user.balance[-1][1] + float(change), 5))), date))
+  user.balance.append((description, Decimal(str(round(user.balance[-1][1] + Decimal(str(change)), 5))), date))
   user.balance.sort(key=lambda x: x[2])
   replace_in_list("user", user.code, user)
   return user
@@ -427,6 +427,7 @@ async def award(ctx, user: Option(discord.Member, "User you wannt to award"), am
 #balance start
 @bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
 async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
+  print("balance")
   if user == None:
     user = get_from_list("user", ctx.author.id)
     if user == None:
@@ -543,8 +544,8 @@ class BetModal(Modal):
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
     else:
-      msg = await channel.send(embed=embedd)
       await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
+      msg = await channel.send(embed=embedd)
 
     bet.message_ids.append((msg.id, msg.channel.id))
     replace_in_list("match", match.code, match)
@@ -1489,10 +1490,14 @@ async def hide_from_leaderboard(ctx):
 async def reset_season(ctx, name):
   # to do make the command also include season name
   users = get_all_objects("user")
+
+  code = all_user_unique_code("reset_", users)
   date = get_date()
   for user in users:
-    user.balance.append((f"reset_{user.uniqe_code}_{name}", 500, date))
+    name = f"reset_{code}_{name}"
+    user.balance.append((f"reset_{code}_{name}", Decimal(500), date))
     replace_in_list("user", user.code, user)
+  await ctx.send(f"Season reset. New season {name} has sarted.")
 
 #debug
 @bot.command()
@@ -1646,33 +1651,26 @@ async def add_var(ctx):
   for user in users:
     for i, bal in enumerate(user.balance):
       bet_id, amount, time = bal
+      bet_id = bet_id.split("_")[0] + "_" + bet_id.split("_")[-1]
       if bet_id.startswith("award_"):
-        code = user.uniqe_code("award_")
+        code = user.get_unique_code("award_")
         bet_id = bet_id[:bet_id.index("award_")+6] + code + "_" + bet_id[bet_id.index("award_")+6:]
         print(bet_id)
+        user.balance[i] = (bet_id, amount, time)
         
       elif bet_id.startswith("reset_"):
         if bet_id in reset_dict:
           bet_id = reset_dict[bet_id]
         else:
-          code = user.uniqe_code("reset_")
+          code = user.get_unique_code("reset_")
           #insert code after reset_
+          old_bet_id = bet_id
           bet_id = bet_id[:bet_id.index("reset_")+6] + code + "_" + bet_id[bet_id.index("reset_")+6:]
+          reset_dict[old_bet_id] = bet_id
         print(bet_id)
-
-  return
-  users = get_all_objects("user")
-  for user in users:
-    print(user.balance[-1][1])
-    for i, bal in enumerate(user.balance):
-      rou = str(round(bal[1], 5))
-      dec = Decimal(rou)
-      user.balance[i] = (bal[0], dec, bal[2])
-    print(user.balance[-1][1])
-
+        user.balance[i] = (bet_id, amount, time)
     replace_in_list("user", user.code, user)
-
-  print("done")
+  print("done add var")
 
 
 # debug command
