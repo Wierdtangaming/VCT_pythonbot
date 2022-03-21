@@ -745,9 +745,6 @@ async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext):
     
   colors = same + start + half_start + contain
   colors = [color.capitalize() for color in colors]
-  print("")
-  print(colors)
-  print(half_start)
   return colors
 #color xkcd autocomplete end
 
@@ -782,6 +779,9 @@ async def color_list(ctx):
 @colorscg.command(name = "add", description = "Adds the color to color list.")
 async def color_add(ctx, custom_color_name:Option(str, "Name of color you want to add.", required=False), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False), xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False)):
   if xkcd_color_name is not None:
+    if hex is not None:
+      await ctx.respond("You can't add a hex code and a xkcd color name.")
+      return
     hex = mcolors.XKCD_COLORS[f"xkcd:{xkcd_color_name.lower()}"]
     if custom_color_name is not None:
       xkcd_color_name = custom_color_name
