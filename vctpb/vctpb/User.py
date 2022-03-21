@@ -124,7 +124,7 @@ class User:
     new_balances = sorted(new_balances, key=lambda x: x[2])
     new_balances.reverse()
     before = self.balance[-2][1]
-    embed_amount = int((amount - 1) / 15) + 1
+    embed_amount = int((amount - 1) / 25) + 1
     
     embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
     embed_index = 0
@@ -132,7 +132,7 @@ class User:
     bal_index = 3
     print(len(embeds))
     for balance in new_balances:
-      endex = int(embed_index / 15)
+      endex = int(embed_index / 25)
       #a tuple (bet_id, balance after change, date)
       #bet_id = id_[bet_id]: bet id
       #bet_id = award_[award_id]: awards

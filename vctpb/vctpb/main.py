@@ -949,8 +949,10 @@ async def log(ctx, amount: Option(int, "How many balance changed you want to see
   if embedds == None:
     await gen_msg.edit_original_message(content = "No log generated.")
     return
-  
-  await gen_msg.edit_original_message(content="", embeds=embedds)
+    
+  await gen_msg.edit_original_message(content="", embed=embedds[0])
+  for embedd in embedds[1:]:
+    await ctx.channel.send(embed=embedd)
 #log end
 
 
