@@ -55,7 +55,6 @@ class User:
     for bet_id in active_bet_ids_bets:
       temp_bet = get_from_list("bet", bet_id)
       if temp_bet == None:
-        print(bet_id)
         ids = [t for t in self.active_bet_ids if bet_id == t[0]]
         for id in ids:
           self.active_bet_ids.remove(id)
@@ -267,7 +266,6 @@ def get_multi_graph_image(users, balance_range_ambig):
   
   all_balances = sorted(all_balances, key=lambda x: x[1][2])
   ids = [(bal[0], bal[1][0]) for bal in all_balances]
-  print(ids)
     
   x = []
   y = []
@@ -295,7 +293,6 @@ def get_multi_graph_image(users, balance_range_ambig):
       return f"Not enough data for {users[user_index].username}"
   #plot the balance
   for user_index in range(len(users)):
-    print(f"color {user_color[user_index]}")
     ax.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
   
   buf = io.BytesIO()
