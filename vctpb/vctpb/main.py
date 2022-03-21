@@ -1596,7 +1596,7 @@ async def check_balance_order(ctx):
     sorted.sort(key=lambda x: x[2])
     if sorted != user.balance:
       print(f"{user.code} balance order is wrong")
-  print("done")
+  print("check order done")
 
     
 # debug command
