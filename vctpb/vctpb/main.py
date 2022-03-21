@@ -808,7 +808,7 @@ graph = SlashCommandGroup(
 async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
   value = ctx.value.strip()
   users = get_all_objects("user")
-  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users]
+  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
   clean_usernames = [username_t[0] for username_t in usernames_t]
   no_break_usernames = [username_t[1] for username_t in usernames_t]
   for username_t in usernames_t:
