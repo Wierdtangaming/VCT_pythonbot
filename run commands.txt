@@ -1,7 +1,7 @@
 
 #run
 tmux new -s vctpb
-cd vctpb
+cd VCT-Prediction-Bot/vctpb
 python3 -m poetry run python3 vctpb/main.py
 
 #on reopen
