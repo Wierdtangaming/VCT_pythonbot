@@ -9,6 +9,7 @@
 from io import BytesIO
 import collections
 import re
+from tokenize import Double
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -298,7 +299,7 @@ def add_balance_user(user_ambig, change, description, date):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
-  user.balance.append((description, round(user.balance[-1][1] + float(change), 5), date))
+  user.balance.append((description, Decimal(str(round(user.balance[-1][1] + float(change), 5))), date))
   user.balance.sort(key=lambda x: x[2])
   replace_in_list("user", user.code, user)
   return user
@@ -949,7 +950,7 @@ async def log(ctx, amount: Option(int, "How many balance changed you want to see
   if embedds == None:
     await gen_msg.edit_original_message(content = "No log generated.")
     return
-    
+
   await gen_msg.edit_original_message(content="", embed=embedds[0])
   for embedd in embedds[1:]:
     await ctx.channel.send(embed=embedd)
@@ -1639,20 +1640,59 @@ async def delete_last_bal(ctx):
       replace_in_list("user", user.code, user)
 
       
-from datetime import datetime
-from pytz import timezone
-import pytz 
 # debug command
 @bot.command()
 async def add_var(ctx):
+  users = get_all_objects("user")
+  for user in users:
+    print(user.balance[-1][1])
+    for i, bal in enumerate(user.balance):
+      rou = str(round(bal[1], 5))
+      dec = Decimal(rou)
+      user.balance[i] = (bal[0], dec, bal[2])
+    print(user.balance[-1][1])
+
+    replace_in_list("user", user.code, user)
+
+  print("done")
+  return
+
+
+# debug command
+@bot.command()
+async def add_diff(ctx):
   return
   users = get_all_objects("user")
-  central = timezone('US/Central')
   for user in users:
+    last = None
+    for i, bal in enumerate(user.balance):
+      if len(bal) == 3:
+        diff = None
+        if last is None or bal[0] == "start" or bal[0].startswith("reset_"):
+          diff = None
+          user.balance[i] = (bal[0], round(bal[1], 5), None, bal[2])
+        else:
+          diff = bal[1] - last
+          user.balance[i] = (bal[0], round(bal[1], 5), round(diff, 5), bal[2])
+        last = bal[1]
+    
+    x = Decimal(0)
+    good = True
     for bal in user.balance:
-      if bal[2].tzinfo is None:
-        user.balance[user.balance.index(bal)] = (bal[0] , bal[1], pytz.utc.localize(bal[2], is_dst=None).astimezone(central))
-    replace_in_list("user", user.code, user)
+      if bal[2] is None:
+        x = Decimal(bal[1])
+        continue 
+      x += bal[2]
+      if x != bal[1]:
+        print(f"{user.username} balance order is wrong. {bal}: {x} != {bal[1]}")
+        good = False
+    if good:
+      print(f"{user.username} balance order is good")
+    else:
+      print(f"{user.username} balance order is wrong")
+    print([(bal[0], bal[1], bal[2]) for bal in user.balance])
+    #replace_in_list("user", user.code, user)
+
   print("done")
   return
 

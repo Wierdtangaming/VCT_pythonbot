@@ -3,6 +3,8 @@ import discord
 import io
 import matplotlib.pyplot as plt
 from PIL import Image
+from decimal import Decimal
+
 
 class User:
   def __init__(self, code, username, color, date_created):
@@ -11,13 +13,14 @@ class User:
     self.color = color
     
     self.show_on_lb = True
-    #a tuple (bet_id, balance after change, date)
+    #a tuple (bet_id, balance after change, change, date)
+    #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
     #bet_id = award_[award_id]: awards
     #bet_id = start: start balance
-    #bet_id = reset: changed balance with command
+    #bet_id = reset_[reset_name]: changed balance with command
     
-    self.balance = [("start", 500, date_created)]
+    self.balance = [("start", Decimal(500), date_created)]
     
     self.active_bet_ids = []
 
