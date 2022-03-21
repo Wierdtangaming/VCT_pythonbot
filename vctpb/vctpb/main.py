@@ -204,6 +204,8 @@ def delete_balance_id(user_ambig, balance_id):
   
   user.balance.remove(balat)
   replace_in_list("user", user.code, user)
+  print(f"removed {balance_id}")
+  return "Removed"
 
 
 def print_all_balance(user_ambig):
@@ -846,6 +848,7 @@ async def graph_balance(ctx,
   amount: Option(int, "How many you want to look back. For last only.", default = 20, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
   print("graph balance")
+
   if compare == "":
     if (user := await get_user_from_member(ctx, user)) is None: return
     if type == 0:
@@ -860,7 +863,11 @@ async def graph_balance(ctx,
 
     with BytesIO() as image_binary:
       gen_msg = await ctx.respond("Generating graph...")
-      user.get_graph_image(graph_type).save(image_binary, 'PNG')
+      image = user.get_graph_image(graph_type)
+      if isinstance(image, str):
+        await ctx.respond(image)
+        return
+      image.save(image_binary, 'PNG')
       image_binary.seek(0)
       await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
     return
@@ -901,7 +908,11 @@ async def graph_balance(ctx,
 
   with BytesIO() as image_binary:
     gen_msg = await ctx.respond("Generating graph...")
-    get_multi_graph_image(users, graph_type).save(image_binary, 'PNG')
+    image = get_multi_graph_image(users, graph_type)
+    if isinstance(image, str):
+      await ctx.respond(image)
+      return
+    image.save(image_binary, 'PNG')
     image_binary.seek(0)
     await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
     

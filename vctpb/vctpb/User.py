@@ -188,7 +188,7 @@ class User:
       elif balance_range_ambig == "current":
         balances = [self.balance[x] for x in self.get_reset_range(-1)]
       else:
-        return None
+        return f"invalid range of {balance_range_ambig}"
     else:
       balances = [self.balance[x] for x in balance_range_ambig]
 
@@ -261,9 +261,9 @@ def get_multi_graph_image(users, balance_range_ambig):
         for balance_index in user.get_reset_range(-1):
           all_balances.append((i, user.balance[balance_index]))
     else:
-      return None
+      return f"invalid range of {balance_range_ambig}"
   else:
-    return None
+    return f"invalid range of {balance_range_ambig}"
   
   all_balances = sorted(all_balances, key=lambda x: x[1][2])
   ids = [(bal[0], bal[1][0]) for bal in all_balances]
@@ -286,28 +286,17 @@ def get_multi_graph_image(users, balance_range_ambig):
     y.append(amount)
     lines_x[user_index].append(xval)
     lines_y[user_index].append(amount)
-    if bet_id.startswith('id_'):
-      colors.append('b')
-    elif bet_id.startswith('award_'):
-      colors.append('xkcd:gold')
-    elif bet_id == 'start':
-      colors.append('k')
-    elif bet_id.startswith('reset_'):
-      colors.append('k')
-    else:
-      colors.append('k')
   
   #make a 800 x 800 figure
   fig, ax = plt.subplots(figsize=(8,8))
 
-  print(lines_x)
-  print(lines_y)
+  for user_index, line_x in enumerate(lines_x):
+    if len(line_x) <= 1:
+      return f"Not enough data for {users[user_index].username}"
   #plot the balance
   for user_index in range(len(users)):
     print(f"color {user_color[user_index]}")
     ax.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
-    
-  ax.scatter(x, y, s=30, color = colors, zorder=10)
   
   buf = io.BytesIO()
   plt.savefig(buf, format='png')
