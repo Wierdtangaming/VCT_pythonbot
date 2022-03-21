@@ -339,7 +339,7 @@ async def on_ready():
   print("on ready done")
 
 
-@tasks.loop(hours=100)
+@tasks.loop(minutes=30)
 async def auto_backup_timer():
   print("timer")
   backup_full()
@@ -422,7 +422,7 @@ async def award(ctx, user: Option(discord.Member, "User you wannt to award"), am
   
 
 #balance start
-@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"])
+@bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
 async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
   if user == None:
     user = get_from_list("user", ctx.author.id)
@@ -845,7 +845,7 @@ async def graph_balance(ctx,
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   amount: Option(int, "How many you want to look back. For last only.", default = 20, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
-
+  print("graph balance")
   if compare == "":
     if (user := await get_user_from_member(ctx, user)) is None: return
     if type == 0:
@@ -914,7 +914,7 @@ bot.add_application_command(graph)
 
 
 #leaderboard start
-@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.")
+@bot.slash_command(name = "leaderboard", description = "Gives leaderboard of balances.", guild_ids = gid)
 async def leaderboard(ctx):
   embedd = await create_leaderboard_embedded()
   await ctx.respond(embed=embedd)
@@ -923,7 +923,7 @@ async def leaderboard(ctx):
 
   
 #log start
-@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)")
+@bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)", guild_ids = gid)
 async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
 
   if (user := await get_user_from_member(ctx, user)) is None: return
@@ -1676,5 +1676,5 @@ async def update_bet_ids(ctx):
 
 
 token = get_setting("discord_token")
-print(f"discord: {token}")
+#print(f"discord: {token}")
 bot.run(token)
