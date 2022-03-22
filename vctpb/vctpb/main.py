@@ -711,10 +711,11 @@ colorscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
+xkcd_colors = mcolors.XKCD_COLORS.keys()
 #color xkcd autocomplete start
 async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
   val = ctx.value.lower() 
-  colors = [x[5:].lower() for x in mcolors.XKCD_COLORS.keys() if val in x]
+  colors = [x[5:].lower() for x in xkcd_colors if val in x]
   
   colors = colors[::-1]
   same = []
@@ -740,7 +741,7 @@ async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext):
         half_start.append(color)
       elif color == val:
         same.append(color)
-      elif ctx.value.lower() in color.lower():
+      else:
         contain.append(color)
     
   colors = same + start + half_start + contain
@@ -782,7 +783,7 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
     if hex is not None:
       await ctx.respond("You can't add a hex code and a xkcd color name.")
       return
-    hex = mcolors.XKCD_COLORS[f"xkcd:{xkcd_color_name.lower()}"]
+    hex = xkcd_colors[f"xkcd:{xkcd_color_name.lower()}"]
     if custom_color_name is not None:
       xkcd_color_name = custom_color_name
     await ctx.respond(add_color(xkcd_color_name, hex), ephemeral = True)
@@ -1253,6 +1254,48 @@ async def match_winner_list_autocomplete(ctx: discord.AutocompleteContext):
 #match winner autocomplete end
   
 
+#match bets start
+@matchscg.command(name = "bets", description = "What bets.")
+async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomplete=match_list_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
+  #to do list some old ones
+  
+  if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "match")) is None:
+    if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  match = fmatch
+
+  
+
+  bet_ids = match.bet_ids
+  bet_list = []
+  for bet_id in bet_ids:
+    bet_list.append(get_from_list("bet", bet_id))
+
+  if len(bet_list) == 0:
+    await ctx.respond(f"No bets on match {match.t1} vs {match.t2}.")
+    return
+  if type == 0:
+    #short
+    gen_msg = await ctx.respond("Generating bets...")
+    embedd = await create_bet_list_embedded(f"Bets on Match:", bet_list, bot)
+    await gen_msg.edit_original_message(content = "", embed=embedd)
+    
+  elif type == 1:
+    #full
+    for i, bet in enumerate(bet_list):
+      embedd = await create_bet_embedded(bet)
+      if i == 0:
+        inter = await ctx.respond(embed=embedd)
+        msg = await inter.original_message()
+      else:
+        msg = await ctx.interaction.followup.send(embed=embedd)
+      bet.message_ids.append((msg.id, msg.channel.id))
+      replace_in_list("bet", bet.code, bet)
+#bet list end
+  
+
+#match bets end
+
+
 #match betting start
 @matchscg.command(name = "betting", description = "Open and close betting.")
 async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
@@ -1279,7 +1322,6 @@ async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt
     
   match_modal = MatchModal(balance_odds=balance_odds, title="Create Match")
   await ctx.interaction.response.send_modal(match_modal)
-  #await match_modal.wait()
 #match create end
 
 
