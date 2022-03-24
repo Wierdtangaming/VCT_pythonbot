@@ -513,6 +513,11 @@ class BetCreateModal(Modal):
     if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
       print("Team num has to either be 1 or 2.")
       error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+    else:
+      if team_num.lower() == match.t1.lower():
+        team_num = "1"
+      elif team_num.lower() == match.t2.lower():
+        team_num = "2"
 
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
@@ -613,7 +618,11 @@ class BetEditModal(Modal):
     if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
       print("Team num has to either be 1 or 2.")
       error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
-
+    else:
+      if team_num.lower() == match.t1.lower():
+        team_num = "1"
+      elif team_num.lower() == match.t2.lower():
+        team_num = "2"
     
 
     if not match.date_closed == None:
@@ -1221,7 +1230,6 @@ class MatchCreateModal(Modal):
       
     splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
     for spliter in splits:
-      print(spliter)
       if odds_combined.count(spliter) == 1:
         team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
         break
@@ -1279,18 +1287,19 @@ class MatchCreateModal(Modal):
 #match edit modal start
 class MatchEditModal(Modal):
   
-  def __init__(self, match, *args, **kwargs) -> None:
+  def __init__(self, match, balance_odds, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     
     self.match = match
+    self.balance_odds = balance_odds
     
-    self.add_item(InputText(label="Enter team one name.", value=match.team_one, min_length=1, max_length=100))
-    self.add_item(InputText(label="Enter team two name.", value=match.team_two, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter team one name.", value=match.t1, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter team two name.", value=match.t2, min_length=1, max_length=100))
     
-    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=f"{match.odds1}/{match.odds2}", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
+    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=f"{match.t1oo}/{match.t2oo}", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
     self.add_item(InputText(label="Enter tournament name.", value=match.tournament_name, min_length=1, max_length=300))
     
-    self.add_item(InputText(label="Enter odds source.", value=match.betting_site, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter odds source.", value=match.odds_source, min_length=1, max_length=100))
 
   
   async def callback(self, interaction: discord.Interaction):
@@ -1306,7 +1315,6 @@ class MatchEditModal(Modal):
       
     splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
     for spliter in splits:
-      print(spliter)
       if odds_combined.count(spliter) == 1:
         team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
         break
@@ -1338,14 +1346,14 @@ class MatchEditModal(Modal):
       team_two_odds = team_two_old_odds
       
     match = self.match
-    match.team_one = team_one
-    match.team_two = team_two
-    match.odds1 = team_one_old_odds
-    match.odds2 = team_two_old_odds
+    match.t1 = team_one
+    match.t2 = team_two
+    match.t1oo = team_one_old_odds
+    match.t2oo = team_two_old_odds
+    match.t1o = team_one_odds
+    match.t2o = team_two_odds
     match.tournament_name = tournament_name
-    match.betting_site = betting_site
-    match.odds1 = team_one_odds
-    match.odds2 = team_two_odds
+    match.odds_source = betting_site
 
     embedd = await create_match_embedded(match)
 
@@ -1411,6 +1419,15 @@ async def match_available_list_autocomplete(ctx: discord.AutocompleteContext):
   return auto_completes
 #match available list autocomplete end
   
+#match bet free available list autocomplete start
+async def match_bet_free_available_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = available_matches_name_code()
+  auto_completes = [match_t[0] for match_t in match_t_list if ((text in match_t[0].lower()) and (match_t[1].bet_ids == []))]
+        
+  return auto_completes
+  
+
 #match open close list autocomplete start
 async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   type = ctx.options["type"]
@@ -1520,7 +1537,7 @@ async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt
 
 #match delete start
 @matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
-async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_available_list_autocomplete)):
+async def match_delete(ctx, match: Option(str, "Match you want to delete.", autocomplete=match_available_list_autocomplete)):
   
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   if match.winner != 0:
@@ -1559,10 +1576,12 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
-async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_available_list_autocomplete)):
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
-  
-  await ctx.interaction.response.send_modal(MatchEditModal(match=match, title="Edit Match"))
+  if match.bet_ids != []:
+    await ctx.respond(f"Match must have no bets. You must delete the bets before editing the match. (To delete other users bets type in their bet code).")
+    return
+  await ctx.interaction.response.send_modal(MatchEditModal(match=match, balance_odds=balance_odds, title="Edit Match"))
 #match edit end
 
 
