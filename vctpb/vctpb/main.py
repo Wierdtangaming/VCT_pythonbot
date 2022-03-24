@@ -454,8 +454,9 @@ betscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#bet modal start
-class BetModal(Modal):
+
+#bet create modal start
+class BetCreateModal(Modal):
   
   def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
@@ -480,6 +481,8 @@ class BetModal(Modal):
                   team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
                   if len(team_label) >= 45:
                     team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
+                    if len(team_label) >= 45:
+                      team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
     else:
       team_label = error[0]
       
@@ -502,36 +505,41 @@ class BetModal(Modal):
     if not is_digit(amount):
       print("Amount has to be a positive whole integer.")
       error[1] = "Amount must be a positive whole number."
+    else:
+      if int(amount) <= 0:
+        print("Cant bet negatives.")
+        error[1] = "Amount must be a positive whole number."
     
-    if not (int(team_num) == 1 or int(team_num) == 2 or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
       print("Team num has to either be 1 or 2.")
-      error[0] = f'Please enter "1", "2", "{match.t1}", or "{match.t2}". Odds: {match.t1o} / {match.t2o}.'
-
-    if int(amount) <= 0:
-      print("Cant bet negatives.")
-      error[1] = "Amount must be a positive whole number."
+      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+    else:
+      if team_num.lower() == match.t1.lower():
+        team_num = "1"
+      elif team_num.lower() == match.t2.lower():
+        team_num = "2"
 
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
     code = get_uniqe_code("bet")
-
-    balance_left = user.get_balance() - int(amount)
-    if balance_left < 0:
-      print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
-      error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
-      print("⛔")
+    if error[1] is None:
+      balance_left = user.get_balance() - int(amount)
+      if balance_left < 0:
+        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+    
     if not error == [None, None]:
-      errortxt = ""
+      errortext = ""
       if error[0] is not None:
         errortext += error[0]
         if error[1] is not None:
-          errortext += " "
-        #TODO
-        interaction.response.sent_msg(interaction)
+          errortext += "\n"
       if error[1] is not None:
         errortext += error[1]
+      await interaction.response.send_message(errortext, ephemeral = True)
       return
+
     color = code[:6]
     bet = Bet(code, match.code, user.code, int(amount), int(team_num), get_date(), match.t1, match.t2, match.tournament_name, color)
 
@@ -552,8 +560,106 @@ class BetModal(Modal):
     add_to_list("bet", bet)
     embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
-    self.stop()
-#bet modal end
+#bet create modal end
+
+#bet edit modal start
+class BetEditModal(Modal):
+  
+  def __init__(self, match: Match, user: User, bet = Bet, *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    self.match = match
+    self.user = user
+    self.bet = bet
+    
+    team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
+    if len(team_label) >= 45:
+      team_label = f"{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
+      if len(team_label) >= 45:
+        team_label = f"{match.t1} vs {match.t2}, {match.t1o}/{match.t2o}"
+        if len(team_label) >= 45:
+          team_label = f"{match.t1}/{match.t2}, {match.t1o}/{match.t2o}"
+          if len(team_label) >= 45:
+            firstt1w = match.t1.split(" ")[0]
+            firstt2w = match.t2.split(" ")[0]
+            team_label = f"{firstt1w} vs {firstt2w}. Odds: {match.t1o} / {match.t2o}"
+            if len(team_label) >= 45:
+              team_label = f"{firstt1w} vs {firstt2w}, {match.t1o} / {match.t2o}"
+              if len(team_label) >= 45:
+                team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
+                if len(team_label) >= 45:
+                  team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
+                  if len(team_label) >= 45:
+                    team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
+    
+      
+    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', value = bet.get_team(), min_length=1, max_length=100))
+
+    amount_label = "Amount you want to bet."
+    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", value = bet.bet_amount, min_length=1, max_length=20))
+
+  async def callback(self, interaction: discord.Interaction):
+    
+    match = self.match
+    user = self.user
+    bet = self.bet
+
+    team_num = self.children[0].value
+    amount = self.children[1].value
+    error = [None, None]
+    
+    if not is_digit(amount):
+      print("Amount has to be a positive whole integer.")
+      error[1] = "Amount must be a positive whole number."
+    else:
+      if int(amount) <= 0:
+        print("Cant bet negatives.")
+        error[1] = "Amount must be a positive whole number."
+
+    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+      print("Team num has to either be 1 or 2.")
+      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+    else:
+      if team_num.lower() == match.t1.lower():
+        team_num = "1"
+      elif team_num.lower() == match.t2.lower():
+        team_num = "2"
+    
+
+    if not match.date_closed == None:
+      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+
+    if error[0] is None:
+      balance_left = user.get_balance() - int(amount)
+      if balance_left < 0:
+        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+
+    if not error == [None, None]:
+      errortext = ""
+      if error[0] is not None:
+        errortext += error[0]
+        if error[1] is not None:
+          errortext += "\n"
+      if error[1] is not None:
+        errortext += error[1]
+      await interaction.response.send_message(errortext)
+      return
+    
+    bet.bet_amount = int(amount)
+    bet.team_num = int(team_num)
+
+    match.bet_ids.append(bet.code)
+
+    embedd = await create_bet_embedded(bet)
+    
+    inter = await interaction.response.send_message(embed=embedd)
+    msg = await inter.original_message()
+
+    await edit_all_messages(bet.message_ids, embedd)
+    bet.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("bet", bet.code, bet)
+
+#bet edit modal end
 
   
 #new match list autocomplete start
@@ -616,9 +722,8 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     await ctx.respond("Betting has closed.")
     return
     
-  bet_modal = BetModal(match=match, user=user, title="Create Bet")
+  bet_modal = BetCreateModal(match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(bet_modal)
-  await bet_modal.wait()
 #bet create end
 
 
@@ -649,6 +754,23 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
   bet = remove_from_list("bet", bet.code)
   await gen_msg.edit_original_message(content=f"Canceled {await bet.basic_to_string(bot, match)}.")
 #bet cancel end
+
+
+#bet edit start
+@betscg.command(name = "edit", description = "Edit a bet.")
+async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_bet_list_autocomplete)):
+  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+  
+  match = get_from_list("match", bet.match_id)
+  if (match is None) or (match.date_closed is not None):
+    await ctx.respond("Match betting has closed, you cannot edit the bet.")
+    return
+  
+  user = get_from_list("user", bet.user_id)
+
+  bet_modal = BetEditModal(bet=bet, match=match, user=user, title="Edit Bet")
+  await ctx.interaction.response.send_modal(bet_modal)
+#bet edit end
 
 
 #bet find start
@@ -1078,8 +1200,8 @@ matchscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#match modal start
-class MatchModal(Modal):
+#match create modal start
+class MatchCreateModal(Modal):
   
   def __init__(self, balance_odds=0, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
@@ -1102,13 +1224,12 @@ class MatchModal(Modal):
     tournament_name = self.children[3].value.strip()
     betting_site = self.children[4].value.strip()
     
-    print(f"-{team_one}-")
+    
     if odds_combined.count(" ") > 1:
       odds_combined.strip(" ")
       
     splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
     for spliter in splits:
-      print(spliter)
       if odds_combined.count(spliter) == 1:
         team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
         break
@@ -1161,8 +1282,91 @@ class MatchModal(Modal):
       
     match.message_ids.append((msg.id, msg.channel.id))
     add_to_list("match", match)
+#match create modal end
+
+#match edit modal start
+class MatchEditModal(Modal):
+  
+  def __init__(self, match, balance_odds, *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
     
-#match modal end
+    self.match = match
+    self.balance_odds = balance_odds
+    
+    self.add_item(InputText(label="Enter team one name.", value=match.t1, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter team two name.", value=match.t2, min_length=1, max_length=100))
+    
+    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=f"{match.t1oo}/{match.t2oo}", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
+    self.add_item(InputText(label="Enter tournament name.", value=match.tournament_name, min_length=1, max_length=300))
+    
+    self.add_item(InputText(label="Enter odds source.", value=match.odds_source, min_length=1, max_length=100))
+
+  
+  async def callback(self, interaction: discord.Interaction):
+    team_one = self.children[0].value.strip()
+    team_two = self.children[1].value.strip()
+    odds_combined = self.children[2].value.strip()
+    tournament_name = self.children[3].value.strip()
+    betting_site = self.children[4].value.strip()
+    
+    
+    if odds_combined.count(" ") > 1:
+      odds_combined.strip(" ")
+      
+    splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
+    for spliter in splits:
+      if odds_combined.count(spliter) == 1:
+        team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
+        break
+    else:
+      await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].")
+      return
+      
+    if (to_float(team_one_old_odds) is None) or (to_float(team_two_old_odds) is None): 
+      await interaction.response.send_message(f"Odds are not valid. Odds must be valid decimal numbers.")
+      return
+    
+    team_one_old_odds = to_float(team_one_old_odds)
+    team_two_old_odds = to_float(team_two_old_odds)
+    if team_one_old_odds <= 1 or team_two_old_odds <= 1:
+      await interaction.response.send_message(f"Odds must be greater than 1.")
+      return
+    if self.balance_odds == 0:
+      odds1 = team_one_old_odds - 1
+      odds2 = team_two_old_odds - 1
+      
+      oneflip = 1 / odds1
+      
+      percentage1 = (math.sqrt(odds2/oneflip))
+      
+      team_one_odds = roundup(odds1 / percentage1) + 1
+      team_two_odds = roundup(odds2 / percentage1) + 1
+    else:
+      team_one_odds = team_one_old_odds
+      team_two_odds = team_two_old_odds
+      
+    match = self.match
+    match.t1 = team_one
+    match.t2 = team_two
+    match.t1oo = team_one_old_odds
+    match.t2oo = team_two_old_odds
+    match.t1o = team_one_odds
+    match.t2o = team_two_odds
+    match.tournament_name = tournament_name
+    match.odds_source = betting_site
+
+    embedd = await create_match_embedded(match)
+
+    inter = await interaction.response.send_message(embed=embedd)
+    msg = await inter.original_message()
+    await edit_all_messages(match.message_ids, embedd)
+    match.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("match", match)
+#match edit modal end
+
+    
+
+
     
 #tournament autocomplete start (unused)
 async def tournament_list_autocomplete(ctx: discord.AutocompleteContext):
@@ -1215,6 +1419,15 @@ async def match_available_list_autocomplete(ctx: discord.AutocompleteContext):
   return auto_completes
 #match available list autocomplete end
   
+#match bet free available list autocomplete start
+async def match_bet_free_available_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = available_matches_name_code()
+  auto_completes = [match_t[0] for match_t in match_t_list if ((text in match_t[0].lower()) and (match_t[1].bet_ids == []))]
+        
+  return auto_completes
+  
+
 #match open close list autocomplete start
 async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   type = ctx.options["type"]
@@ -1290,9 +1503,6 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
         msg = await ctx.interaction.followup.send(embed=embedd)
       bet.message_ids.append((msg.id, msg.channel.id))
       replace_in_list("bet", bet.code, bet)
-#bet list end
-  
-
 #match bets end
 
 
@@ -1320,14 +1530,14 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
 @matchscg.command(name = "create", description = "Create a match.")
 async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
     
-  match_modal = MatchModal(balance_odds=balance_odds, title="Create Match")
+  match_modal = MatchCreateModal(balance_odds=balance_odds, title="Create Match")
   await ctx.interaction.response.send_modal(match_modal)
 #match create end
 
 
 #match delete start
 @matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
-async def match_delete(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_available_list_autocomplete)):
+async def match_delete(ctx, match: Option(str, "Match you want to delete.", autocomplete=match_available_list_autocomplete)):
   
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   if match.winner != 0:
@@ -1362,6 +1572,17 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
   match.message_ids.append((msg.id, msg.channel.id))
   replace_in_list("match", match.code, match)
 #match find end
+
+
+#match edit start
+@matchscg.command(name = "edit", description = "Edit a match.")
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  if match.bet_ids != []:
+    await ctx.respond(f"Match must have no bets. You must delete the bets before editing the match. (To delete other users bets type in their bet code).")
+    return
+  await ctx.interaction.response.send_modal(MatchEditModal(match=match, balance_odds=balance_odds, title="Edit Match"))
+#match edit end
 
 
 #match list start
