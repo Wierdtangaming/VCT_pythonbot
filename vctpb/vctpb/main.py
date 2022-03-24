@@ -454,8 +454,9 @@ betscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#bet modal start
-class BetModal(Modal):
+
+#bet create modal start
+class BetCreateModal(Modal):
   
   def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
@@ -480,6 +481,8 @@ class BetModal(Modal):
                   team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
                   if len(team_label) >= 45:
                     team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
+                    if len(team_label) >= 45:
+                      team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
     else:
       team_label = error[0]
       
@@ -502,36 +505,36 @@ class BetModal(Modal):
     if not is_digit(amount):
       print("Amount has to be a positive whole integer.")
       error[1] = "Amount must be a positive whole number."
+    else:
+      if int(amount) <= 0:
+        print("Cant bet negatives.")
+        error[1] = "Amount must be a positive whole number."
     
-    if not (int(team_num) == 1 or int(team_num) == 2 or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
       print("Team num has to either be 1 or 2.")
-      error[0] = f'Please enter "1", "2", "{match.t1}", or "{match.t2}". Odds: {match.t1o} / {match.t2o}.'
-
-    if int(amount) <= 0:
-      print("Cant bet negatives.")
-      error[1] = "Amount must be a positive whole number."
+      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
 
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
     code = get_uniqe_code("bet")
-
-    balance_left = user.get_balance() - int(amount)
-    if balance_left < 0:
-      print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
-      error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
-      print("⛔")
+    if error[1] is None:
+      balance_left = user.get_balance() - int(amount)
+      if balance_left < 0:
+        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+    
     if not error == [None, None]:
-      errortxt = ""
+      errortext = ""
       if error[0] is not None:
         errortext += error[0]
         if error[1] is not None:
-          errortext += " "
-        #TODO
-        interaction.response.sent_msg(interaction)
+          errortext += "\n"
       if error[1] is not None:
         errortext += error[1]
+      await interaction.response.send_message(errortext, ephemeral = True)
       return
+
     color = code[:6]
     bet = Bet(code, match.code, user.code, int(amount), int(team_num), get_date(), match.t1, match.t2, match.tournament_name, color)
 
@@ -553,7 +556,103 @@ class BetModal(Modal):
     embedd = await create_match_embedded(match)
     await edit_all_messages(match.message_ids, embedd)
     self.stop()
-#bet modal end
+#bet create modal end
+
+
+#bet edit modal start
+class BetEditModal(Modal):
+  
+  def __init__(self, match: Match, user: User, bet = Bet, *args, **kwargs) -> None:
+    super().__init__(*args, **kwargs)
+    self.match = match
+    self.user = user
+    self.bet = bet
+    
+    team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
+    if len(team_label) >= 45:
+      team_label = f"{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
+      if len(team_label) >= 45:
+        team_label = f"{match.t1} vs {match.t2}, {match.t1o}/{match.t2o}"
+        if len(team_label) >= 45:
+          team_label = f"{match.t1}/{match.t2}, {match.t1o}/{match.t2o}"
+          if len(team_label) >= 45:
+            firstt1w = match.t1.split(" ")[0]
+            firstt2w = match.t2.split(" ")[0]
+            team_label = f"{firstt1w} vs {firstt2w}. Odds: {match.t1o} / {match.t2o}"
+            if len(team_label) >= 45:
+              team_label = f"{firstt1w} vs {firstt2w}, {match.t1o} / {match.t2o}"
+              if len(team_label) >= 45:
+                team_label = f"{firstt1w} vs {firstt2w}, {match.t1o}/{match.t2o}"
+                if len(team_label) >= 45:
+                  team_label = f"{firstt1w}/{firstt2w}, {match.t1o}/{match.t2o}"
+                  if len(team_label) >= 45:
+                    team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
+    
+      
+    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', value = bet.get_team(), min_length=1, max_length=100))
+
+    amount_label = "Amount you want to bet."
+    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", value = bet.bet_amount, min_length=1, max_length=20))
+
+  async def callback(self, interaction: discord.Interaction):
+    
+    match = self.match
+    user = self.user
+    bet = self.bet
+
+    team_num = self.children[0].value
+    amount = self.children[1].value
+    error = [None, None]
+    
+    if not is_digit(amount):
+      print("Amount has to be a positive whole integer.")
+      error[1] = "Amount must be a positive whole number."
+    else:
+      if int(amount) <= 0:
+        print("Cant bet negatives.")
+        error[1] = "Amount must be a positive whole number."
+
+    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+      print("Team num has to either be 1 or 2.")
+      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+
+    
+
+    if not match.date_closed == None:
+      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+
+    if error[0] is None:
+      balance_left = user.get_balance() - int(amount)
+      if balance_left < 0:
+        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+
+    if not error == [None, None]:
+      errortext = ""
+      if error[0] is not None:
+        errortext += error[0]
+        if error[1] is not None:
+          errortext += "\n"
+      if error[1] is not None:
+        errortext += error[1]
+      await interaction.response.send_message(errortext)
+      return
+    
+    bet.bet_amount = int(amount)
+    bet.team_num = int(team_num)
+
+    match.bet_ids.append(bet.code)
+
+    embedd = await create_bet_embedded(bet)
+    
+    inter = await interaction.response.send_message(embed=embedd)
+    msg = await inter.original_message()
+
+    bet.message_ids.append((msg.id, msg.channel.id))
+    await edit_all_messages(match.message_ids, embedd)
+    replace_in_list("bet", bet.code, bet)
+    self.stop()
+#bet edit modal end
 
   
 #new match list autocomplete start
@@ -616,7 +715,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     await ctx.respond("Betting has closed.")
     return
     
-  bet_modal = BetModal(match=match, user=user, title="Create Bet")
+  bet_modal = BetCreateModal(match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(bet_modal)
   await bet_modal.wait()
 #bet create end
