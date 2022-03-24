@@ -9,11 +9,11 @@ import math
 import emoji
 
 
-async def create_match_embedded(match_ambig):
+async def create_match_embedded(match_ambig, title):
   match = ambig_to_obj(match_ambig, "match")
   if match == None:
     return None
-  embed = discord.Embed(title="Match:", color=discord.Color.from_rgb(*hex_to_tuple(match.color)))
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color)))
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
@@ -57,24 +57,12 @@ async def create_match_list_embedded(embed_title, matches_ambig):
   return embed
 
 
-async def create_bet_list_embedded(embed_title, bets_ambig, bot):
-  embed = discord.Embed(title=embed_title, color=discord.Color.blue())
-  if all(isinstance(s, str) for s in bets_ambig):
-    for bet_id in bets_ambig:
-      bet = get_from_list("bet", bet_id)
-      embed.add_field(name="\n" + "Bet: " + bet.code, value=await bet.short_to_string(bot) + "\n", inline=False)
-  else:
-    for bet in bets_ambig:
-      embed.add_field(name="\n" + "Bet: " + bet.code, value=await bet.short_to_string(bot) + "\n", inline=False)
-  return embed
-
-
-async def create_bet_embedded(bet_ambig):
+async def create_bet_embedded(bet_ambig, title):
   bet = ambig_to_obj(bet_ambig, "bet")
   if bet == None:
     return None
 
-  embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
@@ -101,12 +89,24 @@ async def create_bet_embedded(bet_ambig):
   return embed
 
 
+async def create_bet_list_embedded(embed_title, bets_ambig, bot):
+  embed = discord.Embed(title=embed_title, color=discord.Color.blue())
+  if all(isinstance(s, str) for s in bets_ambig):
+    for bet_id in bets_ambig:
+      bet = get_from_list("bet", bet_id)
+      embed.add_field(name="\n" + "Bet: " + bet.code, value=await bet.short_to_string(bot) + "\n", inline=False)
+  else:
+    for bet in bets_ambig:
+      embed.add_field(name="\n" + "Bet: " + bet.code, value=await bet.short_to_string(bot) + "\n", inline=False)
+  return embed
+
+
 async def create_user_embedded(user_ambig):
   user = ambig_to_obj(user_ambig, "user")
   if user == None:
     return None
 
-  embed = discord.Embed(title="User:", color=discord.Color.from_rgb(*hex_to_tuple(user.color)))
+  embed = discord.Embed(title=f"{user.username}'s Balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color)))
   embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
   embed.add_field(name="Account Balance:", value=math.floor(user.balance[-1][1]), inline=True)
   embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
