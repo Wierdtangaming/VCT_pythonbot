@@ -725,7 +725,13 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
   if match.date_closed is not None:
     await ctx.respond("Betting has closed.")
     return
-    
+  
+  for bet_id in match.bet_ids:
+    bet = get_from_list("bet", bet_id)
+    if bet.user_id == user.id:
+      await ctx.respond("You already have a bet on this match.")
+      return
+
   bet_modal = BetCreateModal(match=match, user=user, title="Create Bet")
   await ctx.interaction.response.send_modal(bet_modal)
 #bet create end
@@ -1377,9 +1383,6 @@ class MatchEditModal(Modal):
     match.message_ids.append((msg.id, msg.channel.id))
     replace_in_list("match", match.code, match)
 #match edit modal end
-
-    
-
 
     
 #tournament autocomplete start (unused)
