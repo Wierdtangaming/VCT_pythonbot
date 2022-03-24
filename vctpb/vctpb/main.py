@@ -8,9 +8,6 @@
 
 from io import BytesIO
 import collections
-import re
-from tokenize import Double
-from turtle import title
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
