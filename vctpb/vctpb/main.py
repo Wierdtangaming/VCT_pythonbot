@@ -592,10 +592,10 @@ class BetEditModal(Modal):
                     team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
     
       
-    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', value = bet.get_team(), min_length=1, max_length=100))
+    self.add_item(InputText(label=team_label, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
-    amount_label = "Amount you want to bet."
-    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", value = bet.bet_amount, min_length=1, max_length=20))
+    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance())}"
+    self.add_item(InputText(label=amount_label, placeholder = bet.bet_amount, min_length=1, max_length=20, required=False))
 
   async def callback(self, interaction: discord.Interaction):
     
@@ -604,7 +604,11 @@ class BetEditModal(Modal):
     bet = self.bet
 
     team_num = self.children[0].value
+    if team_num == "":
+      team_num = str(bet.team_num)
     amount = self.children[1].value
+    if amount == "":
+      amount = str(bet.bet_amount)
     error = [None, None]
     
     if not is_digit(amount):
@@ -1293,21 +1297,31 @@ class MatchEditModal(Modal):
     self.match = match
     self.balance_odds = balance_odds
     
-    self.add_item(InputText(label="Enter team one name.", value=match.t1, min_length=1, max_length=100))
-    self.add_item(InputText(label="Enter team two name.", value=match.t2, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter team one name.", placeholder=match.t1, min_length=1, max_length=100, required=False))
+    self.add_item(InputText(label="Enter team two name.", placeholder=match.t2, min_length=1, max_length=100, required=False))
     
-    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=f"{match.t1oo}/{match.t2oo}", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
-    self.add_item(InputText(label="Enter tournament name.", value=match.tournament_name, min_length=1, max_length=300))
+    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder=f"{match.t1oo}/{match.t2oo}", min_length=1, max_length=12, required=False))
+    self.add_item(InputText(label="Enter tournament name.", placeholder=match.tournament_name, min_length=1, max_length=300, required=False))
     
-    self.add_item(InputText(label="Enter odds source.", value=match.odds_source, min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter odds source.", placeholder=match.odds_source, min_length=1, max_length=100, required=False))
 
   
   async def callback(self, interaction: discord.Interaction):
     team_one = self.children[0].value.strip()
+    if team_one == "":
+      team_one = self.match.t1
     team_two = self.children[1].value.strip()
+    if team_two == "":
+      team_two = self.match.t2
     odds_combined = self.children[2].value.strip()
+    if odds_combined == "":
+      odds_combined = f"{self.match.t1oo}/{self.match.t2oo}"
     tournament_name = self.children[3].value.strip()
+    if tournament_name == "":
+      tournament_name = self.match.tournament_name
     betting_site = self.children[4].value.strip()
+    if betting_site == "":
+      betting_site = self.match.odds_source
     
     
     if odds_combined.count(" ") > 1:
@@ -1361,7 +1375,7 @@ class MatchEditModal(Modal):
     msg = await inter.original_message()
     await edit_all_messages(match.message_ids, embedd)
     match.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("match", match)
+    replace_in_list("match", match.code, match)
 #match edit modal end
 
     
