@@ -33,6 +33,18 @@ class Bet:
       return self.t2
     
 
+  def get_payout(self):
+    match = get_from_list("match", self.match_id)
+
+    payout = 0.0
+    if self.team_num == 1:
+      payout = self.bet_amount * match.t1o - self.bet_amount
+    elif self.team_num == 2:
+      payout = self.bet_amount * match.t2o - self.bet_amount
+
+    return payout
+
+    
   def get_team_and_payout(self):
     match = get_from_list("match", self.match_id)
 

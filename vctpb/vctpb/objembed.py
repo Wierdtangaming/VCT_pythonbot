@@ -69,12 +69,12 @@ async def create_bet_list_embedded(embed_title, bets_ambig, bot):
   return embed
 
 
-async def create_bet_embedded(bet_ambig):
+async def create_bet_embedded(bet_ambig, title):
   bet = ambig_to_obj(bet_ambig, "bet")
   if bet == None:
     return None
 
-  embed = discord.Embed(title="Bet:", color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)

@@ -10,6 +10,7 @@ from io import BytesIO
 import collections
 import re
 from tokenize import Double
+from turtle import title
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -546,7 +547,7 @@ class BetCreateModal(Modal):
     match.bet_ids.append(bet.code)
     add_to_active_ids(user.code, bet)
 
-    embedd = await create_bet_embedded(bet)
+    embedd = await create_bet_embedded(bet, f"New bet by {user.username}, {amount} on {bet.get_team()}:")
     
     if (channel := await bot.fetch_channel(get_file("bet_channel_id"))) == interaction.channel:
       inter = await interaction.response.send_message(embed=embedd)
@@ -654,7 +655,7 @@ class BetEditModal(Modal):
 
     match.bet_ids.append(bet.code)
 
-    embedd = await create_bet_embedded(bet)
+    embedd = await create_bet_embedded(bet, f"Edit bet of {user.username}, {amount} on {bet.get_team()}:")
     
     inter = await interaction.response.send_message(embed=embedd)
     msg = await inter.original_message()
@@ -761,8 +762,10 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
   
   await delete_all_messages(bet.message_ids)
   remove_from_active_ids(bet.user_id, bet.code)
-  bet = remove_from_list("bet", bet.code)
-  await gen_msg.edit_original_message(content=f"Canceled {await bet.basic_to_string(bot, match)}.")
+  remove_from_list("bet", bet)
+  user = get_from_list("user", bet.user_id)
+  embedd = await create_bet_embedded(bet, f"Cancelled bet by {user.username} with {bet.bet_amount} on {bet.get_team()}:")
+  await gen_msg.edit_original_message(content="", embed=embedd)
 #bet cancel end
 
 
@@ -790,7 +793,8 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
   if (fbet := await user_from_autocomplete_tuple(None, await current_bets_name_code(bot), bet, "bet")) is None: 
     if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
   bet = fbet
-  embedd = await create_bet_embedded(bet)
+  user = get_from_list("user", bet.user_id)
+  embedd = await create_bet_embedded(bet, f"Bet by {user.username}, {bet.bet_amount} on {bet.get_team()}:")
   inter = await ctx.respond(embed=embedd)
   msg = await inter.original_message()
   bet.message_ids.append((msg.id, msg.channel.id))
@@ -820,7 +824,8 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
   elif type == 1:
     #full
     for i, bet in enumerate(bet_list):
-      embedd = await create_bet_embedded(bet)
+      user = get_from_list("user", bet.user_id)
+      embedd = await create_bet_embedded(bet, f"Bet by {user.username}, {bet.bet_amount} on {bet.get_team()}:")
       if i == 0:
         inter = await ctx.respond(embed=embedd)
         msg = await inter.original_message()
@@ -1512,7 +1517,8 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
   elif type == 1:
     #full
     for i, bet in enumerate(bet_list):
-      embedd = await create_bet_embedded(bet)
+      user = get_from_list("user", bet.user_id)
+      embedd = await create_bet_embedded(bet, f"Bet by {user.username}, {bet.bet_amount} on {bet.get_team()}:")
       if i == 0:
         inter = await ctx.respond(embed=embedd)
         msg = await inter.original_message()
@@ -1685,9 +1691,13 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       user = get_from_list("user", bet.user_id)
       remove_from_active_ids(user, bet.code)
       add_balance_user(user, payout, "id_" + str(bet.code), date)
-
+      
       replace_in_list("bet", bet.code, bet)
-      embedd = await create_bet_embedded(bet)
+      if payout > 0:
+        title = f"{user.username} won {payout} with {bet.bet_amount} on {bet.team_name()}"
+      else:
+        title = f"{user.username} lost {bet.bet_amount} with {bet.bet_amount} on {bet.team_name()}"
+      embedd = await create_bet_embedded(bet, title)
       msg_ids.append((bet.message_ids, embedd))
       users.append(user.code)
     else:
@@ -1775,7 +1785,11 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       add_balance_user(user, payout, "id_" + str(bet.code), date)
 
       replace_in_list("bet", bet.code, bet)
-      embedd = await create_bet_embedded(bet)
+      if payout > 0:
+        title = f"{user.username} won {payout} with {bet.bet_amount} on {bet.team_name()}"
+      else:
+        title = f"{user.username} lost {bet.bet_amount} with {bet.bet_amount} on {bet.team_name()}"
+      embedd = await create_bet_embedded(bet, title)
       msg_ids.append((bet.message_ids, embedd))
       users.append(user.code)
     else:
