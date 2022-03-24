@@ -136,3 +136,15 @@ async def create_leaderboard_embedded():
       embed.add_field(name=rank + f":  {name}", value=str(math.floor(user_rank[1])), inline=False)
     rank_num += 1
   return embed
+
+  
+async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
+  embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(match.color)))
+  for bet, user, payout in bet_user_payouts:
+    if payout > 0:
+      value = f"Won {math.floor(payout)}. Current balance: {math.floor(user.balance[-1][1])}"
+    else:
+      value = f"Lost {math.floor(payout)}. Current balance: {math.floor(user.balance[-1][1])}"
+    embed.add_field(name=f"{user.username} bet {bet.bet_amount} on {bet.get_team()}", value=value, inline=False)
+
+  return embed

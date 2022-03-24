@@ -31,7 +31,7 @@ import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded
 from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
 from savedata import backup_full
@@ -728,7 +728,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
   
   for bet_id in match.bet_ids:
     bet = get_from_list("bet", bet_id)
-    if bet.user_id == user.id:
+    if bet.user_id == user.code:
       await ctx.respond("You already have a bet on this match.")
       return
 
@@ -1677,7 +1677,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     await ctx.respond(f"Winner has been set to {match.t2}.")
 
   msg_ids = []
-  users = []
+  bet_user_payouts = []
   date = get_date()
   for bet_id in match.bet_ids:
     bet = get_from_list("bet", bet_id)
@@ -1692,20 +1692,18 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       add_balance_user(user, payout, "id_" + str(bet.code), date)
       
       replace_in_list("bet", bet.code, bet)
-
+      
       embedd = await create_bet_embedded(bet, "Placeholder")
       msg_ids.append((bet.message_ids, embedd))
-      users.append(user.code)
+      bet_user_payouts.append((bet, user, payout))
     else:
       print(f"where the bet_id from {bet_id}")
   replace_in_list("match", match.code, match)
 
-  no_same_list_user = []
-  [no_same_list_user.append(x) for x in users if x not in no_same_list_user]
-  for user in no_same_list_user:
-    embedd = await create_user_embedded(user)
-    await ctx.send(embed=embedd)
-  
+
+  embedd = await create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
+  await ctx.interaction.followup.send(embed=embedd)
+
   await edit_all_messages(match.message_ids, m_embedd)
   [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
 #match winner end
