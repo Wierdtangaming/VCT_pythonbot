@@ -9,3 +9,7 @@ tmux a -t vctpb
 
 #close
 #ctr-d
+
+
+#cancel changes
+git reset --hard
