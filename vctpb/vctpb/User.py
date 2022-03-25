@@ -1,10 +1,13 @@
-from dbinterface import get_from_list, replace_in_list
+from dbinterface import get_from_list, replace_in_list, get_all_objects
 import discord
 import io
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from PIL import Image
 from decimal import Decimal
 import random
+import math
+import secrets
 
 
 class User:
@@ -40,7 +43,7 @@ class User:
       copy = False
 
       random.seed()
-      code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
+      code = str(secrets.token_hex(4))
       for k in codes:
         if k == code:
           copy = True
@@ -183,7 +186,7 @@ class User:
         embeds[endex].add_field(name="Set To:", value=f"Manually set to {balance[1]}", inline=False)
       elif balance[0].startswith("reset_"):
         #reset
-        embeds[endex].add_field(name="Reset To:", value=f"Balance set to {balance[1]} because of {balance[0][15:]}", inline=False)
+        embeds[endex].add_field(name="Reset:", value=f"Balance set to {round(balance[1])} because of {balance[0][15:]}", inline=False)
       else:
         embeds[endex].add_field(name=f"Invalid Balance Update {balance[0]}:", value=f"Balance set to {balance[1]} and changed by {balance_change}", inline=False)
         print("error condition not found", str(balance))
@@ -199,26 +202,43 @@ class User:
     return embeds
 
   def get_graph_image(self, balance_range_ambig):
+    xlabel = ""
     if type(balance_range_ambig) == list:
       balances = balance_range_ambig
     elif type(balance_range_ambig) == str:
       if balance_range_ambig == "all":
         balances = self.balance
+        xlabel = "All Time"
       elif balance_range_ambig == "current":
         balances = [self.balance[x] for x in self.get_reset_range(-1)]
+        resets = self.get_resets()
+        if len(resets) > 0:
+          xlabel = self.balance[resets[-1]][0][15:]
+        else:
+          users = get_all_objects("user")
+          for user in users:
+            resets = user.get_resets()
+            if len(resets) > 0:
+              xlabel = user.balance[resets[-1]][0][15:]
+              break
       else:
         return f"invalid range of {balance_range_ambig}"
     else:
       balances = [self.balance[x] for x in balance_range_ambig]
-
-    print(len(balances))
       
-    label = []
+    labels = []
+    label_colors = []
     balance = []
     colors = []
     line_colors = []
     before = None
+    min = 0
+    max = 500
     for bet_id, amount, date in balances:
+      if amount < min:
+        min = amount
+      if amount > max:
+        max = amount
       if not before == None:
         if amount > before:
           line_colors.append('g')
@@ -228,50 +248,85 @@ class User:
           line_colors.append('k')
       before = amount
       if bet_id.startswith('id_'):
-        label.append(bet_id[3:])
+        bet = get_from_list("bet", bet_id[3:])
+        labels.append(bet.get_team())
+        label_colors.append(f"#{bet.color}")
         balance.append(amount)
         colors.append('b')
       elif bet_id.startswith('award_'):
-        label.append(bet_id[6:])
+        label = bet_id[15:]
+        if label.lower().endswith("pick'em"):
+          label = "Pick'em"
+        elif len(label) > 15:
+          label = bet_id[6:14]
+        labels.append(label)
+        label_colors.append('xkcd:gold')
         balance.append(amount)
         colors.append('xkcd:gold')
       elif bet_id == 'start':
-        label.append('start')
+        labels.append('start')
+        label_colors.append('k')
         balance.append(amount)
         colors.append('k')
       elif bet_id.startswith('reset_'):
-        label.append('reset')
+        label = bet_id[15:]
+        labels.append(label)
+        label_colors.append('k')
+        if len(line_colors) != 0:
+          line_colors[-1] = None
         balance.append(amount)
         colors.append('k')
       else:
-        label.append(bet_id)
+        labels.append(bet_id)
+        label_colors.append('k')
         balance.append(amount)
         colors.append('k')
     
     #make a 800 x 800 figure
-    fig, ax = plt.subplots(figsize=(8,8))
+    #fig, ax = plt.subplots(figsize=(8,8))
     #plot the balance
-    for i in range(len(line_colors)-1):
-      ax.plot([i, i+1], [balance[i], balance[i+1]], label=[label[i], ""], color=line_colors[i])
-    
-    llc = len(line_colors)
-    ax.plot([llc-1, llc], [balance[llc-1], balance[llc]], label=[label[llc-1], label[llc]], color=line_colors[llc-1], zorder=1)
-    ax.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
-    
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    im = Image.open(buf)
-    return im
+    x_length = len(balance) / 6.5 + 0.8
+    if x_length < 8:
+      x_length = 8
+    plt.clf()
+    with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+      for i in range(len(line_colors)):
+        if line_colors[i] is None:
+          continue
+        plt.plot([i, i+1], [balance[i], balance[i+1]], color=line_colors[i])
+      max = int(math.ceil((max * Decimal("1.05")) / Decimal("100"))) * 100
+      if min != 0:
+        min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
+      
+      plt.ylim([min, max])
+      #plt.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
+      plt.xticks(range(len(balances)), labels, rotation='vertical')
+      plt.xlabel(xlabel)
+
+      for ticklabel, tickcolor in zip(plt.gca().get_xticklabels(), label_colors):
+        ticklabel.set_color(tickcolor)
+
+      plt.margins(x=1/((x_length-0.8)*6))
+
+      plt.tight_layout()
+
+      fig = plt.gcf()
+      fig.set_size_inches(x_length, 8)
+
+      buf = io.BytesIO()
+      plt.savefig(buf, format='png')
+      buf.seek(0)
+      im = Image.open(buf)
+      return im
 
 
     
 def get_multi_graph_image(users, balance_range_ambig):
   all_balances = []
-
-  all_balances = sorted(all_balances, key=lambda x: x[1])
+  xlabel = ""
   if type(balance_range_ambig) == str:
     if balance_range_ambig == "all":
+      xlabel = "All Time"
       for i, user in enumerate(users):
         for balance in user.balance:
           all_balances.append((i, balance))
@@ -279,6 +334,12 @@ def get_multi_graph_image(users, balance_range_ambig):
       for i, user in enumerate(users):
         for balance_index in user.get_reset_range(-1):
           all_balances.append((i, user.balance[balance_index]))
+      users = get_all_objects("user")
+      for user in users:
+        resets = user.get_resets()
+        if len(resets) > 0:
+          xlabel = user.balance[resets[-1]][0][15:]
+          break
     else:
       return f"invalid range of {balance_range_ambig}"
   else:
@@ -286,40 +347,81 @@ def get_multi_graph_image(users, balance_range_ambig):
   
   all_balances = sorted(all_balances, key=lambda x: x[1][2])
   ids = [(bal[0], bal[1][0]) for bal in all_balances]
-    
+  
   x = []
   y = []
-  colors = []
+  labels = []
+  label_colors = []
   user_color = [user.color for user in users]
-  lines_x = [[] for user in users]
-  lines_y = [[] for user in users]
+  lines_x = [[] for _ in users]
+  lines_y = [[] for _ in users]
   xval = -1
   last_id = None
   for user_index, balance in all_balances:
-    bet_id, amount, date = balance
+    bet_id, amount = balance[:2]
     if not last_id == bet_id:
       xval += 1
       last_id = bet_id
+      if bet_id.startswith('id_'):
+        bet = get_from_list("bet", bet_id[3:])
+        labels.append(bet.get_team())
+        label_colors.append(f"#{bet.color}")
+      elif bet_id.startswith('award_'):
+        label = bet_id[15:]
+        if label.lower().endswith("pick'em"):
+          label = "Pick'em"
+        elif len(label) > 15:
+          label = bet_id[6:14]
+        labels.append(label)
+        label_colors.append('xkcd:gold')
+      elif bet_id == 'start':
+        labels.append('start')
+        label_colors.append('k')
+      elif bet_id.startswith('reset_'):
+        label = bet_id[15:]
+        labels.append(label)
+        label_colors.append('k')
+        #todo reset lines have breaks
+      else:
+        labels.append(bet_id)
+        label_colors.append('k')
+
     x.append(xval)
     y.append(amount)
     lines_x[user_index].append(xval)
     lines_y[user_index].append(amount)
   
-  #make a 800 x 800 figure
-  fig, ax = plt.subplots(figsize=(8,8))
+  x_length = len(balance) / 6.5 + 0.8
+  if x_length < 8:
+    x_length = 8
+  plt.clf()
+  with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+    for user_index, line_x in enumerate(lines_x):
+      if len(line_x) <= 1:
+        return f"Not enough data for {users[user_index].username}"
+    #plot the balance
+    for user_index in range(len(users)):
+      plt.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
+    
 
-  for user_index, line_x in enumerate(lines_x):
-    if len(line_x) <= 1:
-      return f"Not enough data for {users[user_index].username}"
-  #plot the balance
-  for user_index in range(len(users)):
-    ax.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
-  
-  buf = io.BytesIO()
-  plt.savefig(buf, format='png')
-  buf.seek(0)
-  im = Image.open(buf)
-  return im
+    plt.xticks(range(xval), labels, rotation='vertical')
+    plt.xlabel(xlabel)
+
+    for ticklabel, tickcolor in zip(plt.gca().get_xticklabels(), label_colors):
+      ticklabel.set_color(tickcolor)
+    plt.margins(x=1/((x_length-0.8)*6))
+
+    plt.tight_layout()
+
+    fig = plt.gcf()
+    fig.set_size_inches(x_length, 8)
+
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    im = Image.open(buf)
+    return im
     
 def all_user_unique_code(prefix, users):
   all_bal = [user.balance for user in users]
@@ -334,7 +436,7 @@ def all_user_unique_code(prefix, users):
     copy = False
 
     random.seed()
-    code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
+    code = str(secrets.token_hex(4))
     for k in codes:
       if k == code:
         copy = True

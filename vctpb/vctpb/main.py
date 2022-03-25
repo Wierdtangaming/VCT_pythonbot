@@ -36,7 +36,7 @@ from savefiles import get_date_string, save_file, get_file, get_all_names, make_
 import time
 from savedata import backup_full
 import matplotlib.colors as mcolors
-
+import secrets
 
 intents = discord.Intents.all()
 
@@ -261,7 +261,7 @@ def get_uniqe_code(prefix):
     copy = False
 
     random.seed()
-    code = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(8)
+    code = str(secrets.token_hex(4))
     for k in codes:
       if k == code:
         copy = True
@@ -270,8 +270,9 @@ def get_uniqe_code(prefix):
 
 def create_user(user_id, username):
   random.seed()
-  color = str(hex(random.randint(0, 2**32 - 1))[2:]).zfill(6)
+  color = secrets.token_hex(3)
   user = User(user_id, username, color, get_date())
+  print(jsonpickle.encode(user))
   add_to_list("user", user)
   return user
 
@@ -430,8 +431,10 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
   print("balance")
   if user == None:
     user = get_from_list("user", ctx.author.id)
+    print(user)
     if user == None:
-      create_user(ctx.author.id, ctx.author.display_name)
+      print("creating_user")
+      user = create_user(ctx.author.id, ctx.author.display_name)
   else:
     user = get_from_list("user", user.id)
     if user == None:
@@ -717,7 +720,7 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
   user = get_from_list("user", ctx.author.id)
   if user == None:
-    create_user(ctx.author.id, ctx.author.display_name)
+    user = create_user(ctx.author.id, ctx.author.display_name)
     
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
   print(match)
