@@ -136,7 +136,6 @@ class User:
 
   
   def get_new_balance_changes_embeds(self, amount):
-
     if amount <= 0:
       return None
     if amount >= len(self.balance):
@@ -154,7 +153,7 @@ class User:
     embed_index = 0
     
     bal_index = 3
-    print(len(embeds))
+    
     for balance in new_balances:
       endex = int(embed_index / 25)
       #a tuple (bet_id, balance after change, date)
@@ -203,9 +202,9 @@ class User:
 
   def get_graph_image(self, balance_range_ambig):
     xlabel = ""
-    if type(balance_range_ambig) == list:
+    if isinstance(balance_range_ambig, list):
       balances = balance_range_ambig
-    elif type(balance_range_ambig) == str:
+    elif isinstance(balance_range_ambig, str):
       if balance_range_ambig == "all":
         balances = self.balance
         xlabel = "All Time"
@@ -221,16 +220,18 @@ class User:
             if len(resets) > 0:
               xlabel = user.balance[resets[-1]][0][15:]
               break
-      else:
-        return f"invalid range of {balance_range_ambig}"
+    elif isinstance(balance_range_ambig, int):
+      balances = self.balance[-balance_range_ambig:]
+      xlabel = f"Last {balance_range_ambig}"
     else:
-      balances = [self.balance[x] for x in balance_range_ambig]
+      return f"Invalid range of {balance_range_ambig}."
       
     labels = []
     label_colors = []
     balance = []
     colors = []
     line_colors = []
+    resets = []
     before = None
     min = 0
     max = 500
@@ -249,7 +250,14 @@ class User:
       before = amount
       if bet_id.startswith('id_'):
         bet = get_from_list("bet", bet_id[3:])
-        labels.append(bet.get_team())
+        t1 = bet.t1
+        t2 = bet.t2
+        if bet.winner == 1:
+          t1 = fr"$\bf{t1}$"
+        elif bet.winner == 2:
+          t2 = fr"$\bf{t2}$"
+        label = f"{t1} vs {t2}"
+        labels.append(label)
         label_colors.append(f"#{bet.color}")
         balance.append(amount)
         colors.append('b')
@@ -273,6 +281,7 @@ class User:
         labels.append(label)
         label_colors.append('k')
         if len(line_colors) != 0:
+          resets.append(len(line_colors))
           line_colors[-1] = None
         balance.append(amount)
         colors.append('k')
@@ -290,28 +299,32 @@ class User:
       x_length = 8
     plt.clf()
     with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+      fig, ax = plt.subplots()
       for i in range(len(line_colors)):
         if line_colors[i] is None:
           continue
-        plt.plot([i, i+1], [balance[i], balance[i+1]], color=line_colors[i])
+        ax.plot([i, i+1], [balance[i], balance[i+1]], color=line_colors[i])
       max = int(math.ceil((max * Decimal("1.05")) / Decimal("100"))) * 100
       if min != 0:
         min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
-      
-      plt.ylim([min, max])
-      #plt.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
-      plt.xticks(range(len(balances)), labels, rotation='vertical')
-      plt.xlabel(xlabel)
 
-      for ticklabel, tickcolor in zip(plt.gca().get_xticklabels(), label_colors):
+      x = [*range(len(balance))]
+      print(x)
+      ax.fill_between(x, 0, 1, where=[((xs in resets) or ((xs+1) in resets)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())
+
+      ax.set_ylim([min, max])
+      #plt.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
+      ax.set_xticks(range(len(balances)), labels, rotation='vertical')
+      ax.set_xlabel(xlabel)
+
+      for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
         ticklabel.set_color(tickcolor)
 
-      plt.margins(x=1/((x_length-0.8)*6))
+      ax.margins(x=1/((x_length-0.8)*6))
 
       plt.tight_layout()
-
-      fig = plt.gcf()
-      fig.set_size_inches(x_length, 8)
+      fig_width, fig_height = fig.get_size_inches()
+      fig.set_size_inches(x_length, fig_height)
 
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
@@ -340,13 +353,30 @@ def get_multi_graph_image(users, balance_range_ambig):
         if len(resets) > 0:
           xlabel = user.balance[resets[-1]][0][15:]
           break
-    else:
-      return f"invalid range of {balance_range_ambig}"
+  elif isinstance(balance_range_ambig, int):
+    for i, user in enumerate(users):
+      for balance in user.balance:
+        all_balances.append((i, balance))
+    xlabel = f"Last {balance_range_ambig}"
   else:
     return f"invalid range of {balance_range_ambig}"
   
   all_balances = sorted(all_balances, key=lambda x: x[1][2])
-  ids = [(bal[0], bal[1][0]) for bal in all_balances]
+  
+  if isinstance(balance_range_ambig, int):
+    unique = 0
+    x = 0
+    last = None
+    #for all_balances reversed
+    for balance in all_balances[::-1]:
+      if balance[1][0] != last:
+        unique += 1
+      last = balance[1][0]
+      if unique > balance_range_ambig:
+        break
+      x += 1
+    all_balances = all_balances[-x:]
+
   
   x = []
   y = []
@@ -364,7 +394,15 @@ def get_multi_graph_image(users, balance_range_ambig):
       last_id = bet_id
       if bet_id.startswith('id_'):
         bet = get_from_list("bet", bet_id[3:])
-        labels.append(bet.get_team())
+        t1 = bet.t1
+        t2 = bet.t2
+        if bet.winner == 1:
+          t1 = fr"$\bf{t1}$"
+        elif bet.winner == 2:
+          t2 = fr"$\bf{t2}$"
+        label = f"{t1} vs {t2}"
+          
+        labels.append(label)
         label_colors.append(f"#{bet.color}")
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
@@ -390,8 +428,7 @@ def get_multi_graph_image(users, balance_range_ambig):
     y.append(amount)
     lines_x[user_index].append(xval)
     lines_y[user_index].append(amount)
-  
-  x_length = len(balance) / 6.5 + 0.8
+  x_length = (xval+1) / 6.5 + 0.8
   if x_length < 8:
     x_length = 8
   plt.clf()
@@ -399,16 +436,17 @@ def get_multi_graph_image(users, balance_range_ambig):
     for user_index, line_x in enumerate(lines_x):
       if len(line_x) <= 1:
         return f"Not enough data for {users[user_index].username}"
-    #plot the balance
+    
     for user_index in range(len(users)):
-      plt.plot(lines_x[user_index], lines_y[user_index], color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
+      plt.plot(lines_x[user_index], lines_y[user_index], "-o", markersize=3, color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
     
 
-    plt.xticks(range(xval), labels, rotation='vertical')
+    plt.xticks(range(xval+1), labels, rotation='vertical')
     plt.xlabel(xlabel)
 
     for ticklabel, tickcolor in zip(plt.gca().get_xticklabels(), label_colors):
       ticklabel.set_color(tickcolor)
+
     plt.margins(x=1/((x_length-0.8)*6))
 
     plt.tight_layout()
@@ -441,3 +479,21 @@ def all_user_unique_code(prefix, users):
       if k == code:
         copy = True
   return code
+
+
+def get_all_unique_balance_ids(users):
+  all_bal = [user.balance for user in users]
+  #combine all_bal into one array
+  prefix_bal = []
+  for bal in all_bal:
+    prefix_bal += [x for x in bal]
+
+  unique_bal_ids = []
+  unique = 0
+  last = None
+  for bal in prefix_bal:
+    if bal[0] != last:
+      unique += 1
+      unique_bal_ids.append(bal[0])
+    last = bal[0]
+  return unique_bal_ids

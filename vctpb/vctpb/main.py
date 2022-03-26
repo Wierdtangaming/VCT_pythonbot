@@ -23,14 +23,14 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image, all_user_unique_code
+from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
 import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username
+from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded
 from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
 import time
@@ -1027,34 +1027,38 @@ async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
 balance_choices = [
   OptionChoice(name="season", value=0),
   OptionChoice(name="all", value=1),
-  OptionChoice(name="last", value=2),
 ]
 
 @graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
 async def graph_balance(ctx,
   type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
-  amount: Option(int, "How many you want to look back. For last only.", default = 20, required = False),
+  amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
-  print("graph balance")
+  
 
   if compare == "":
     if (user := await get_user_from_member(ctx, user)) is None: return
-    if type == 0:
-      graph_type = "current"
-    elif type == 1:
-      graph_type = "all"
-    elif type == 2:
-      graph_type = user.balance[-(amount+1):]
+    if amount is not None:
+      if amount > len(user.balance):
+        amount = len(user.balance)
+      if amount <= 1:
+        await ctx.respond("Amount needs to be higher.")
+      graph_type = amount
     else:
-      await ctx.respond("Not a valid type.")
-      return
+      if type == 0:
+        graph_type = "current"
+      elif type == 1:
+        graph_type = "all"
+      else:
+        await ctx.respond("Not a valid type.")
+        return
 
     with BytesIO() as image_binary:
       gen_msg = await ctx.respond("Generating graph...")
       image = user.get_graph_image(graph_type)
       if isinstance(image, str):
-        await ctx.respond(image)
+        await gen_msg.edit_original_message(content = image)
         return
       image.save(image_binary, 'PNG')
       image_binary.seek(0)
@@ -1064,12 +1068,7 @@ async def graph_balance(ctx,
 
   usernames_split = compare.split(" ")
   
-  users = []
-  dbusers = get_all_objects("user")
-
-  for dbuser in dbusers:
-    if dbuser.username in compare:
-      users.append(dbuser)
+  users = usernames_to_users(compare)
 
   
   if len(users) == 1:
@@ -1085,21 +1084,31 @@ async def graph_balance(ctx,
       return
 
   print(users)
-  if type == 0:
-    graph_type = "current"
-  elif type == 1:
-    graph_type = "all"
-  elif type == 2:
-    graph_type = ("last", amount)
+
+  
+
+  if amount is not None:
+    highest_length = 0
+    highest_length = len(get_all_unique_balance_ids(users))
+    if amount > highest_length:
+      amount = highest_length
+      if amount <= 1:
+        await ctx.respond("Amount needs to be higher.")
+    graph_type = amount
   else:
-    await ctx.respond("Not a valid type.")
-    return
+    if type == 0:
+      graph_type = "current"
+    elif type == 1:
+      graph_type = "all"
+    else:
+      await ctx.respond("Not a valid type.")
+      return
 
   with BytesIO() as image_binary:
     gen_msg = await ctx.respond("Generating graph...")
     image = get_multi_graph_image(users, graph_type)
     if isinstance(image, str):
-      await ctx.respond(image)
+      await gen_msg.edit_original_message(content = image)
       return
     image.save(image_binary, 'PNG')
     image_binary.seek(0)
