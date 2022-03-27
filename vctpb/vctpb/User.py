@@ -519,7 +519,7 @@ def get_multi_graph_image(users, balance_range_ambig):
     for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
       ticklabel.set_color(tickcolor)
 
-    ax.grid()
+    ax.xaxis.grid(linestyle=':')
     ax.margins(x=1/((x_length-0.8)*6))
 
     plt.tight_layout()
