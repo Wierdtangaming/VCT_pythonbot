@@ -444,9 +444,9 @@ def get_multi_graph_image(users, balance_range_ambig):
         return f"Not enough data for {users[user_index].username}"
     
     x = 0
-    print(resets)
+    
     for line_x, line_y in zip(lines_x, lines_y):
-      print("\n\n\n")
+      
       new_line_x = []
       new_line_y = []
       
@@ -461,7 +461,7 @@ def get_multi_graph_image(users, balance_range_ambig):
 
         closest_back_break = 0
         closest_next_break = reset_breaks[1]-1
-        print("\nhi")
+        
         for reset_break in reset_breaks[1:]:
           if reset_break > x_range[0]:
             break
@@ -469,27 +469,23 @@ def get_multi_graph_image(users, balance_range_ambig):
           next_index = reset_breaks.index(reset_break)+1
         
           if len(reset_breaks) == next_index:
-            print("first")
+            
             closest_next_break = len(labels)-2
           else:
-            print("second")
+            
             closest_next_break = reset_breaks[next_index]-1
-          print(closest_back_break, closest_next_break)
-        print(closest_back_break, closest_next_break, "done")
-              
-        print("print:")
-        print(reset[1], line_x[-1])
-        print(closest_back_break, closest_next_break)
+            
+            
         if reset[1] == line_x[-1]:
           line_x.pop(-1)
           line_y.pop(-1)
         
-        print(x_range[0], closest_back_break)
+        
         if x_range[0] != closest_back_break:
           x_range.insert(0, closest_back_break)
           y_range.insert(0, y_range[0])
 
-        print(x_range[-1], closest_next_break)
+
         if x_range[-1] != closest_next_break:
           x_range.append(closest_next_break)
           y_range.append(y_range[-1])
@@ -499,7 +495,7 @@ def get_multi_graph_image(users, balance_range_ambig):
         new_line_y.append(y_range)
         last_reset = reset
       else:
-        print("last is reset")
+        
         new_line_x.append(line_x[last_reset[0]:])
         new_line_y.append(line_y[last_reset[0]:])
 

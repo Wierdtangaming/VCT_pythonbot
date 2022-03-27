@@ -597,7 +597,7 @@ class BetEditModal(Modal):
       
     self.add_item(InputText(label=team_label, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
-    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance())}"
+    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance() + bet.bet_amount)}"
     self.add_item(InputText(label=amount_label, placeholder = bet.bet_amount, min_length=1, max_length=20, required=False))
 
   async def callback(self, interaction: discord.Interaction):
@@ -636,7 +636,7 @@ class BetEditModal(Modal):
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
     if error[0] is None:
-      balance_left = user.get_balance() - int(amount)
+      balance_left = user.get_balance() + bet.bet_amount - int(amount)
       if balance_left < 0:
         print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
         error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
