@@ -522,15 +522,17 @@ def get_multi_graph_image(users, balance_range_ambig):
         new_line_x.append(line_x[last_reset[0]:])
         new_line_y.append(line_y[last_reset[0]:])
 
+      label = f"{users[x].username}"
       for line_x, line_y in zip(new_line_x, new_line_y):
-        ax.plot(line_x, line_y, "-o", markersize=3, color=f"#{user_color[x]}", label=f"{users[x].username}")
+        ax.plot(line_x, line_y, "-o", markersize=3, color=f"#{user_color[x]}", label=label)
+        label = None
       x += 1
     
     ax.axhline(y=0, color='grey', linestyle='--')
 
     #for user_index in range(len(users)):
     #  ax.plot(lines_x[user_index], lines_y[user_index], "-o", markersize=3, color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
-    
+    ax.legend()
     x = [*range(xval+1)]
     reset_breaks.pop(0)
     ax.fill_between(x, 0, 1, where=[((xs in reset_breaks) or ((xs+1) in reset_breaks)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())

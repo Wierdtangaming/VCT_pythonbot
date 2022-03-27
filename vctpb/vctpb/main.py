@@ -1846,9 +1846,9 @@ async def reset_season(ctx, name):
 
   code = all_user_unique_code("reset_", users)
   date = get_date()
+  name = f"reset_{code}_{name}"
   for user in users:
-    name = f"reset_{code}_{name}"
-    user.balance.append((f"reset_{code}_{name}", Decimal(500), date))
+    user.balance.append((name, Decimal(500), date))
     replace_in_list("user", user.code, user)
   await ctx.send(f"Season reset. New season {name} has sarted.")
 
