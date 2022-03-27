@@ -449,6 +449,13 @@ def get_multi_graph_image(users, balance_range_ambig):
   x_length = (xval+1) / 6.5 + 0.8
   if x_length < 8:
     x_length = 8
+  
+  if reset_breaks[:2] == [0, 0]:
+    reset_breaks = [0]
+    
+  for reset in resets:
+    if reset[0] == (0,0):
+      reset.pop(0)
     
   plt.clf()
   with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
@@ -471,23 +478,25 @@ def get_multi_graph_image(users, balance_range_ambig):
           break
         x_range = line_x[last_reset[0]:reset[0]]
         y_range = line_y[last_reset[0]:reset[0]]
-
+        
 
         closest_back_break = 0
-        closest_next_break = reset_breaks[1]-1
         
-        for reset_break in reset_breaks[1:]:
-          if reset_break > x_range[0]:
-            break
-          closest_back_break = reset_break
-          next_index = reset_breaks.index(reset_break)+1
-        
-          if len(reset_breaks) == next_index:
-            
-            closest_next_break = len(labels)-2
-          else:
-            
-            closest_next_break = reset_breaks[next_index]-1
+        if len(reset_breaks) == 1:
+          closest_next_break = len(labels)-2
+        else:
+          closest_next_break = reset_breaks[1]-1
+          for reset_break in reset_breaks[1:]:
+            if reset_break > x_range[0]:
+              break
+            closest_back_break = reset_break
+            next_index = reset_breaks.index(reset_break)+1
+          
+            if len(reset_breaks) == next_index:
+              
+              closest_next_break = len(labels)-2
+            else:
+              closest_next_break = reset_breaks[next_index]-1
             
             
         if reset[1] == line_x[-1]:
