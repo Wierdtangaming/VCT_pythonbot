@@ -339,22 +339,17 @@ async def on_ready():
   
   save_savedata_from_github()
   zip_savedata()
-  
   if (not are_equivalent("backup.zip", "gitbackup.zip")):
     print("savedata not is not synced with github")
-    
-    if test == None:
-      print("test not found")
-      quit()
     
     if get_setting("override_savedata"):
       print("overriding savedata")
     else:
       print("quitting")
       quit()
-  
+      
   auto_backup_timer.start()
-  print("on ready done")
+  print("\n-----------Bot Starting-----------\n")
 
 
 @tasks.loop(minutes=20)
