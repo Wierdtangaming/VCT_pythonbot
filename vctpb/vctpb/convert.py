@@ -78,3 +78,8 @@ def get_user_from_username(username):
     if user.username == username:
       return user
   return None
+
+def usernames_to_users(usernames):
+  users = get_all_objects("user")
+  return [user for user in users if user.username in usernames]
+  

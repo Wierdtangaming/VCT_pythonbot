@@ -10,6 +10,8 @@ def get_date():
 
 
 def get_from_list(prefix, identifier):
+  if prefix == "None":
+    return None
   objects = get_all_objects(prefix)
   if objects == None or objects.count == 0:
     return None
