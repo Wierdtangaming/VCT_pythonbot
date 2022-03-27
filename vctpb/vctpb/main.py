@@ -32,9 +32,9 @@ from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting
+from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting
 import time
-from savedata import backup_full
+from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
 import matplotlib.colors as mcolors
 import secrets
 
@@ -332,16 +332,24 @@ def roundup(x):
   return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
 
 
-
-  
-
 @bot.event
 async def on_ready():
   print("Logged in as {0.user}".format(bot))
   print(bot.guilds)
   
+  save_savedata_from_github()
+  zip_savedata()
+  if (not are_equivalent("backup.zip", "gitbackup.zip")):
+    print("savedata not is not synced with github")
+    
+    if get_setting("override_savedata"):
+      print("overriding savedata")
+    else:
+      print("quitting")
+      quit()
+      
   auto_backup_timer.start()
-  print("on ready done")
+  print("\n-----------Bot Starting-----------\n")
 
 
 @tasks.loop(minutes=20)
