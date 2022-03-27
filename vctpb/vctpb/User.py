@@ -8,6 +8,7 @@ from decimal import Decimal
 import random
 import math
 import secrets
+import sys
 
 
 class User:
@@ -334,6 +335,10 @@ class User:
       plt.savefig(buf, format='png')
       buf.seek(0)
       im = Image.open(buf)
+      print(sys.getsizeof(im.tobytes()))
+      #if sys.getsizeof(im.tobytes()):
+
+
       return im
 
 
@@ -542,6 +547,9 @@ def get_multi_graph_image(users, balance_range_ambig):
     plt.savefig(buf, format='png')
     buf.seek(0)
     im = Image.open(buf)
+    byte = im.tell()
+    print(byte)
+
     return im
     
 def all_user_unique_code(prefix, users):
