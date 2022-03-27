@@ -309,7 +309,6 @@ class User:
         min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
 
       x = [*range(len(balance))]
-      print(x)
       ax.fill_between(x, 0, 1, where=[((xs in resets) or ((xs+1) in resets)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())
 
       ax.set_ylim([min, max])
@@ -385,6 +384,8 @@ def get_multi_graph_image(users, balance_range_ambig):
   user_color = [user.color for user in users]
   lines_x = [[] for _ in users]
   lines_y = [[] for _ in users]
+  resets = [[] for _ in users]
+  reset_breaks = [0]
   xval = -1
   last_id = None
   for user_index, balance in all_balances:
@@ -419,10 +420,13 @@ def get_multi_graph_image(users, balance_range_ambig):
         label = bet_id[15:]
         labels.append(label)
         label_colors.append('k')
-        #todo reset lines have breaks
+        reset_breaks.append(xval)
       else:
         labels.append(bet_id)
         label_colors.append('k')
+    
+    if bet_id.startswith('reset_'):
+      resets[user_index].append((len(lines_x[user_index]), xval))
 
     x.append(xval)
     y.append(amount)
@@ -431,28 +435,98 @@ def get_multi_graph_image(users, balance_range_ambig):
   x_length = (xval+1) / 6.5 + 0.8
   if x_length < 8:
     x_length = 8
+    
   plt.clf()
   with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+    fig, ax = plt.subplots()
     for user_index, line_x in enumerate(lines_x):
       if len(line_x) <= 1:
         return f"Not enough data for {users[user_index].username}"
     
-    for user_index in range(len(users)):
-      plt.plot(lines_x[user_index], lines_y[user_index], "-o", markersize=3, color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
+    x = 0
+    print(resets)
+    for line_x, line_y in zip(lines_x, lines_y):
+      print("\n\n\n")
+      new_line_x = []
+      new_line_y = []
+      
+      
+      last_reset = (0, 0)
+      for reset in resets[x]:
+        if reset[0] == len(line_x):
+          break
+        x_range = line_x[last_reset[0]:reset[0]]
+        y_range = line_y[last_reset[0]:reset[0]]
+
+
+        closest_back_break = 0
+        closest_next_break = reset_breaks[1]-1
+        print("\nhi")
+        for reset_break in reset_breaks[1:]:
+          if reset_break > x_range[0]:
+            break
+          closest_back_break = reset_break
+          next_index = reset_breaks.index(reset_break)+1
+        
+          if len(reset_breaks) == next_index:
+            print("first")
+            closest_next_break = len(labels)-2
+          else:
+            print("second")
+            closest_next_break = reset_breaks[next_index]-1
+          print(closest_back_break, closest_next_break)
+        print(closest_back_break, closest_next_break, "done")
+              
+        print("print:")
+        print(reset[1], line_x[-1])
+        print(closest_back_break, closest_next_break)
+        if reset[1] == line_x[-1]:
+          line_x.pop(-1)
+          line_y.pop(-1)
+        
+        print(x_range[0], closest_back_break)
+        if x_range[0] != closest_back_break:
+          x_range.insert(0, closest_back_break)
+          y_range.insert(0, y_range[0])
+
+        print(x_range[-1], closest_next_break)
+        if x_range[-1] != closest_next_break:
+          x_range.append(closest_next_break)
+          y_range.append(y_range[-1])
+
+
+        new_line_x.append(x_range)
+        new_line_y.append(y_range)
+        last_reset = reset
+      else:
+        print("last is reset")
+        new_line_x.append(line_x[last_reset[0]:])
+        new_line_y.append(line_y[last_reset[0]:])
+
+      for line_x, line_y in zip(new_line_x, new_line_y):
+        ax.plot(line_x, line_y, "-o", markersize=3, color=f"#{user_color[x]}", label=f"{users[x].username}")
+      x += 1
+
+    #for user_index in range(len(users)):
+    #  ax.plot(lines_x[user_index], lines_y[user_index], "-o", markersize=3, color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
     
+    x = [*range(xval+1)]
+    reset_breaks.pop(0)
+    ax.fill_between(x, 0, 1, where=[((xs in reset_breaks) or ((xs+1) in reset_breaks)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())
 
-    plt.xticks(range(xval+1), labels, rotation='vertical')
-    plt.xlabel(xlabel)
 
-    for ticklabel, tickcolor in zip(plt.gca().get_xticklabels(), label_colors):
+    ax.set_xticks(range(xval+1), labels, rotation='vertical')
+    ax.set_xlabel(xlabel)
+
+    for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
       ticklabel.set_color(tickcolor)
 
-    plt.margins(x=1/((x_length-0.8)*6))
+    ax.margins(x=1/((x_length-0.8)*6))
 
     plt.tight_layout()
 
-    fig = plt.gcf()
-    fig.set_size_inches(x_length, 8)
+    fig_width, fig_height = fig.get_size_inches()
+    fig.set_size_inches(x_length, fig_height)
 
 
     buf = io.BytesIO()
