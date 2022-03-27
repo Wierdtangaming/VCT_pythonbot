@@ -356,7 +356,6 @@ def get_multi_graph_image(users, balance_range_ambig):
       for i, user in enumerate(users):
         for balance_index in user.get_reset_range(-1):
           all_balances.append((i, user.balance[balance_index]))
-      users = get_all_objects("user")
       for user in users:
         resets = user.get_resets()
         if len(resets) > 0:
