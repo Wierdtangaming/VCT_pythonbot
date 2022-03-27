@@ -3,12 +3,18 @@ from github import Github
 from zipfile import ZipFile
 import zipfile
 from savefiles import get_setting, create_error_file, backup, get_days, get_all_names, get_date_string
+import atexit
+
+
 
 
 BUFSIZE = 1024
 
 def backup_full():
   save_to_github("backup")
+  
+atexit.register(backup_full)
+
 
 def is_new_day():
   file_names = get_all_names(path="backup/")
@@ -66,6 +72,8 @@ def save_to_github(message):
   if are_equivalent("backup.zip", "gitbackup.zip") and not is_new_day(): 
     print("Local and github are the same.")
     return
+  
+  print("\n-----------Backing Up-----------\n")
 
   
   backup()
