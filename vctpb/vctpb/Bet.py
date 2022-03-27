@@ -32,7 +32,8 @@ class Bet:
     elif self.team_num == 2:
       return self.t2
     
-
+  def get_match(self):
+    return get_from_list("match", self.match_id)
     
   def get_team_and_payout(self):
     match = get_from_list("match", self.match_id)
