@@ -1071,8 +1071,7 @@ async def graph_balance(ctx,
   users = usernames_to_users(compare)
 
   
-  if len(users) == 0:
-    #revert
+  if len(users) == 1:
     await ctx.respond("You need to compare more than one user.")
     return
 
