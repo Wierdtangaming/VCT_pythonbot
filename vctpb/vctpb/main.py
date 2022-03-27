@@ -529,8 +529,8 @@ class BetCreateModal(Modal):
     if error[1] is None:
       balance_left = user.get_balance() - int(amount)
       if balance_left < 0:
-        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
-        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+        print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
     
     if not error == [None, None]:
       errortext = ""
@@ -638,8 +638,8 @@ class BetEditModal(Modal):
     if error[0] is None:
       balance_left = user.get_balance() + bet.bet_amount - int(amount)
       if balance_left < 0:
-        print("You have bet " + str(math.floor(-balance_left)) + " more than you have.")
-        error[1] = "You have bet " + str(math.floor(-balance_left)) + " more than you have."
+        print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
+        error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
 
     if not error == [None, None]:
       errortext = ""
