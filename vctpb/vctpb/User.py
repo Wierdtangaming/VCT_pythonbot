@@ -250,17 +250,19 @@ class User:
       before = amount
       if bet_id.startswith('id_'):
         bet = get_from_list("bet", bet_id[3:])
-        t1 = bet.t1
-        t2 = bet.t2
-        if bet.winner == 1:
+        match = bet.get_match()
+        t1 = match.t1
+        t2 = match.t2
+        if match.winner == 1:
           t1 = fr"$\bf{t1}$"
-        elif bet.winner == 2:
+        elif match.winner == 2:
           t2 = fr"$\bf{t2}$"
         label = f"{t1} vs {t2}"
         labels.append(label)
-        label_colors.append(f"#{bet.color}")
+        label_colors.append(f"#{match.color}")
         balance.append(amount)
         colors.append('b')
+        last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
         if label.lower().endswith("pick'em"):
@@ -304,6 +306,7 @@ class User:
         if line_colors[i] is None:
           continue
         ax.plot([i, i+1], [balance[i], balance[i+1]], color=line_colors[i])
+      ax.axhline(y=0, color='grey', linestyle='--')
       max = int(math.ceil((max * Decimal("1.05")) / Decimal("100"))) * 100
       if min != 0:
         min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
@@ -392,21 +395,26 @@ def get_multi_graph_image(users, balance_range_ambig):
   last_id = None
   for user_index, balance in all_balances:
     bet_id, amount = balance[:2]
+
+    if bet_id.startswith('id_'):
+      bet = get_from_list("bet", bet_id[3:])
+      match = bet.get_match()
+      bet_id = f"id_{match.code}"
+
     if not last_id == bet_id:
       xval += 1
       last_id = bet_id
       if bet_id.startswith('id_'):
-        bet = get_from_list("bet", bet_id[3:])
-        t1 = bet.t1
-        t2 = bet.t2
-        if bet.winner == 1:
+        t1 = match.t1
+        t2 = match.t2
+        if match.winner == 1:
           t1 = fr"$\bf{t1}$"
-        elif bet.winner == 2:
+        elif match.winner == 2:
           t2 = fr"$\bf{t2}$"
         label = f"{t1} vs {t2}"
-          
         labels.append(label)
-        label_colors.append(f"#{bet.color}")
+        label_colors.append(f"#{match.color}")
+        last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
         if label.lower().endswith("pick'em"):
@@ -504,6 +512,8 @@ def get_multi_graph_image(users, balance_range_ambig):
       for line_x, line_y in zip(new_line_x, new_line_y):
         ax.plot(line_x, line_y, "-o", markersize=3, color=f"#{user_color[x]}", label=f"{users[x].username}")
       x += 1
+    
+    ax.axhline(y=0, color='grey', linestyle='--')
 
     #for user_index in range(len(users)):
     #  ax.plot(lines_x[user_index], lines_y[user_index], "-o", markersize=3, color=f"#{user_color[user_index]}", label=f"{users[user_index].username}")
