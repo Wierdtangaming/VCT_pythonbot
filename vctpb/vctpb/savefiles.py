@@ -58,12 +58,24 @@ def set_setting_test():
   
   
 def get_setting(name):
+      
   path_and_file = f"settings/{name}.txt"
+  
+  if not os.path.isfile(path_and_file):
+    print(f"setting {name} not found.\nquitting")
+    quit()
+  
   r = open(path_and_file, "r")
   val = r.read()
   fs = jsonpickle.decode(val)
   return fs
-  
+
+
+def save_setting(name, val):
+  path_and_file = f"settings/{name}.txt"
+  with open(path_and_file, "w") as f:
+    f.write(jsonpickle.encode(val))
+
 
 def save_file(name, obj, path="files/"):
   path_and_file = f"savedata/{path}{name}.txt"

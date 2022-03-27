@@ -60,8 +60,7 @@ def save_to_github(message):
     print("file gitbackup.zip not found")
     
   content = repo.get_contents(all_files[0])
-  with open("gitbackup.zip", "wb") as f:
-    f.write(content.decoded_content)
+  save_savedata_from_github(content)
 
   
   if are_equivalent("backup.zip", "gitbackup.zip") and not is_new_day(): 
@@ -92,8 +91,35 @@ def save_to_github(message):
   print("Backed up to git.")
   return
   
+def zip_savedata():
+  with ZipFile("backup.zip", "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+    for root, _, filenames in os.walk("savedata/"):
+      for name in filenames:
+        name = os.path.join(root, name)
+        name = os.path.normpath(name)
+        zf.write(name, name)
+    zf.close()
 
-
+def save_savedata_from_github(content=None):
+  if content is None:
+    token = get_setting("github_token")
+    g = Github(token)
+    repo_name = get_setting("save_repo")
+    repo = g.get_user().get_repo(repo_name)
+    contents = repo.get_contents("")
+    all_files = []
+    while contents:
+      file_content = contents.pop(0)
+      if file_content.type == "dir":
+        contents.extend(repo.get_contents(file_content.path))
+      else:
+        file = file_content 
+        all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
+    content = repo.get_contents(all_files[0])
+    
+  with open("gitbackup.zip", "wb") as f:
+    f.write(content.decoded_content)
+  
 
 
 def are_equivalent(filename1, filename2):
