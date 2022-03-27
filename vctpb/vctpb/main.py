@@ -850,11 +850,11 @@ colorscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-xkcd_colors = mcolors.XKCD_COLORS.keys()
+xkcd_colors = mcolors.XKCD_COLORS
 #color xkcd autocomplete start
 async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
   val = ctx.value.lower() 
-  colors = [x[5:].lower() for x in xkcd_colors if val in x]
+  colors = [x[5:].lower() for x in xkcd_colors.keys() if val in x]
   
   colors = colors[::-1]
   same = []
