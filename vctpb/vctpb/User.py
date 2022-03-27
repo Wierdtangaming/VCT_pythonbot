@@ -454,8 +454,9 @@ def get_multi_graph_image(users, balance_range_ambig):
     reset_breaks = [0]
     
   for reset in resets:
-    if reset[0] == (0,0):
-      reset.pop(0)
+    if len(reset) > 0:
+      if reset[0] == (0,0):
+        reset.pop(0)
     
   plt.clf()
   with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
