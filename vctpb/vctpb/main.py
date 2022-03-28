@@ -24,7 +24,7 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids
+from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
@@ -32,8 +32,8 @@ import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
+from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting, create_error_file
 import time
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
 import matplotlib.colors as mcolors
@@ -273,7 +273,7 @@ def to_float(str):
   except ValueError:
     return None
 
-def get_uniqe_code(prefix):
+def get_unique_code(prefix):
   all_objs = get_all_objects(prefix)
   codes = [str(k.code) for k in all_objs]
   code = ""
@@ -508,7 +508,7 @@ async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
 #award give start
 @award.command(name = "give", description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""")
 async def award_give(ctx, 
-  amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given."),
+  amount: Option(int, "Amount you want to give or take."), description: Option(str, "Unique description of why the award is given."),
   user: Option(discord.Member, "User you wannt to award. (Can't use with users).", default = None, required = False),  
   users: Option(str, "Users you want to award. (Can't use with user).", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
   
@@ -554,15 +554,61 @@ async def award_give(ctx,
     await ctx.respond(embed=embedd)
 #award give end
 
+#award list start
+@award.command(name = "list", description = "Lists all the awards given to a user.")
+async def award_list(ctx, user: Option(discord.Member, "User you want to list awards for.")):
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  award_labels = get_award_strings(user)
+  
+  embedd = create_award_label_list_embedded(user, award_labels)
+  await ctx.respond(embed=embedd)
+  
+
 #award rename start
 @award.command(name = "rename", description = """Renames an award.""")
-async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Uniqe description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
-  print("hi")
-
-
-
-  #get_users_from_multiuser(compare)
+async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
+  
+  
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  award_labels = get_award_strings(user)
+  
+  if len(award) == 8:
+    if award_label.endswith(award):
+      award = award_label
+  else:
+    for award_label in award_labels:
+      if award_label == award:
+        award = award_label
+        break
+    else:
+      await ctx.respond("Award not found.")
+      return
+    
+  users = get_all_objects("user")
+  
+  num = num_of_bal_with_name(award, users)
+  
+  print(num)
+  
+  if num > 1:
+    await ctx.respond("There are multiple awards with this name.")
+    return
+  
+  if user.change_award_name(award, description) is None:
+    print("change_award_name not found")
+    create_error_file("change_award_name not found", f"{award}\n{num}\n{user.code}.")
+  
+  print(award)
+  award_t = award.split(", ")[:-2]
+  award = ", ".join(award_t)
+  
+  
+  await ctx.respond(f"Award {award} renamed to {description}.")
 #award rename end  
+
+
 
 bot.add_application_command(award)
 #award end
@@ -669,7 +715,7 @@ class BetCreateModal(Modal):
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
-    code = get_uniqe_code("bet")
+    code = get_unique_code("bet")
     if error[1] is None:
       balance_left = user.get_balance() - int(amount)
       if balance_left < 0:
@@ -1407,7 +1453,7 @@ class MatchCreateModal(Modal):
       
     print(team_one_odds, team_two_odds)
     
-    code = get_uniqe_code("match")
+    code = get_unique_code("match")
   
     color = code[:6]
     match = Match(team_one, team_two, team_one_old_odds, team_two_old_odds, team_one_odds, team_two_odds, tournament_name, betting_site, interaction.user.id, get_date(), color, code)

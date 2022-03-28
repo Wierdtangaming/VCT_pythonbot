@@ -135,6 +135,15 @@ class User:
         break
     replace_in_list("user", self.code, self)
 
+  def change_award_name(self, award_label, name):
+    for balance in self.balance:
+      if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
+        balance[0] = balance[:15] + name
+        break
+    else:
+      return None
+    replace_in_list("user", self.code, self)
+  
   
   def get_new_balance_changes_embeds(self, amount):
     if amount <= 0:
@@ -157,11 +166,7 @@ class User:
     
     for balance in new_balances:
       endex = int(embed_index / 25)
-      #a tuple (bet_id, balance after change, date)
-      #bet_id = id_[bet_id]: bet id
-      #bet_id = award_[award_id]: awards
-      #bet_id = start: start balance
-      #bet_id = reset_: changed balance with command
+      
       balance_change = balance[1] - before
       if balance[0].startswith("id_"):
         #bet id
@@ -600,3 +605,26 @@ def get_all_unique_balance_ids(users):
       unique_bal_ids.append(bal[0])
     last = bal[0]
   return unique_bal_ids
+
+def award_label_to_user(award_label):
+  award_t = award_label.split(", ")
+
+  name = ", ".join(award_t[:-2])
+  
+  
+  id = award_t[-1][4:]
+  
+  return f"award_{id}_{name}"
+
+def num_of_bal_with_name(name, users):
+  name = award_label_to_user(name)
+  
+  balance_ids = get_all_unique_balance_ids(users)
+  print(balance_ids)
+  print(name)
+  num = 0
+  for bal in balance_ids:
+    if bal == name:
+      num += 1
+      
+  return num
