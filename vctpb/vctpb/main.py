@@ -490,10 +490,10 @@ def get_award_strings(user):
     
 async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   member = ctx.options["user"]
-  print(member)
+  
   if member == None:
     return []
-  print(member, type(member))
+  
   user = get_user_from_id(member)
   
   award_labels = get_award_strings(user)
