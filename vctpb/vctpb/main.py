@@ -9,7 +9,6 @@
 from email.policy import default
 from io import BytesIO
 import collections
-from sys import last_value
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -470,15 +469,8 @@ award = SlashCommandGroup(
   guild_ids = gid,
 )
 
-
 #user award autocomplete start
-async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
-  member = ctx.options["user"]
-  print(member)
-  if member == None:
-    return []
-  user = get_user_from_id(member)
-  
+def get_award_strings(user):
   last_amount = Decimal(0)
   awards_id_changes = []
   for balance_t in user.balance:
@@ -486,10 +478,29 @@ async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
       awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
     last_amount = balance_t[1]
   
+  award_labels = []
   for awards_id_change in awards_id_changes:
-    #to do
-    pass
-  return [f"{id[0][15:]}" for id in user.balance if id[0].startswith("award")]
+    label = f"{awards_id_change[0][15:]}, {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+    if len(label) >= 99:
+      label = f"{awards_id_change[0][15:80]}..., {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+    award_labels.append(label)
+    
+  return award_labels
+  
+    
+async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
+  member = ctx.options["user"]
+  print(member)
+  if member == None:
+    return []
+  print(member, type(member))
+  user = get_user_from_id(member)
+  
+  award_labels = get_award_strings(user)
+  
+  auto_completes = [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
+  
+  return auto_completes
 #user award autocomplete end  
 
 
