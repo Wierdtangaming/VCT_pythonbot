@@ -18,7 +18,7 @@ class User:
     self.color = color
     
     self.show_on_lb = True
-    #a tuple (bet_id, balance after change, change, date)
+    #a tuple (bet_id, balance after change, date)
     #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
     #bet_id = award_[award_id]: awards
@@ -569,7 +569,8 @@ def all_user_unique_code(prefix, users):
   prefix_bal = []
   for bal in all_bal:
     prefix_bal += [x for x in bal if x[0].startswith(prefix)]
-  codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
+    
+  codes = [bal[0][len(prefix)+1:len(prefix)+9] for bal in prefix_bal]
   code = ""
   copy = True
   while copy:

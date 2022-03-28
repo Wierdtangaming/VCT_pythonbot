@@ -6,8 +6,10 @@
 
 
 
+from email.policy import default
 from io import BytesIO
 import collections
+from sys import last_value
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -142,6 +144,26 @@ async def all_bets_name_code(bot):
     else:
       bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
+
+
+def get_users_from_multiuser(compare):
+  usernames_split = compare.split(" ")
+  
+  users = usernames_to_users(compare)
+
+  
+  if len(users) == 1:
+    return "You need to compare more than one user."
+
+  
+  usernames = " ".join([user.username for user in users])
+
+  for username_word in usernames_split:
+    if username_word not in usernames:
+      return f"User {username_word} not found."
+
+  return users
+
 
 def get_last_tournament_name(amount):
   matches = get_all_objects("match")
@@ -359,10 +381,40 @@ async def auto_backup_timer():
   
   
 #autocomplete start
+
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
   return [x.capitalize() for x in get_all_colors().keys() if ctx.value.lower() in x.lower()]
 #color picker autocomplete end
+
+#multi user autocomplete start
+async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
+  value = ctx.value.strip()
+  users = get_all_objects("user")
+  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
+  clean_usernames = [username_t[0] for username_t in usernames_t]
+  no_break_usernames = [username_t[1] for username_t in usernames_t]
+  for username_t in usernames_t:
+    value = value.replace(username_t[0], username_t[1])
+  combined_values = value
+  values = value.split(" ")
+  if len(values) == 0:
+    return clean_usernames
+  last_value = values[-1]
+  all_but = " ".join(values[:-1]).replace("-_-", " ")
+  all = " ".join(values).replace("-_-", " ")
+  if last_value not in no_break_usernames:
+    auto_completes = []
+    for username_t in usernames_t:
+      if username_t[1] in combined_values:
+        continue
+      if username_t[1].startswith(last_value):
+        auto_completes.append(f"{all_but} {username_t[0]}")
+    return auto_completes
+  auto_completes = [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
+  return auto_completes
+#multi user autocomplete end
+
 #autocomplete end
 
 
@@ -411,15 +463,75 @@ bot.add_application_command(assign)
 #assign end
 
 
-
 #award start
-@bot.slash_command( 
+award = SlashCommandGroup(
   name = "award", 
-  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
+  description = "Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!",
   guild_ids = gid,
 )
-async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
 
+
+#user award autocomplete start
+async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
+  member = ctx.options["user"]
+  print(member)
+  if member == None:
+    return []
+  user = get_user_from_id(member)
+  
+  last_amount = Decimal(0)
+  awards_id_changes = []
+  for balance_t in user.balance:
+    if balance_t[0].startswith("award"):
+      awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
+    last_amount = balance_t[1]
+  
+  for awards_id_change in awards_id_changes:
+    #to do
+    pass
+  return [f"{id[0][15:]}" for id in user.balance if id[0].startswith("award")]
+#user award autocomplete end  
+
+
+
+#award give start
+@award.command(name = "give", description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""")
+async def award_give(ctx, 
+  amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given."),
+  user: Option(discord.Member, "User you wannt to award. (Can't use with users).", default = None, required = False),  
+  users: Option(str, "Users you want to award. (Can't use with user).", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
+  
+  if (user is not None) and (users is not None):
+    await ctx.respond("You can't use compare and user at the same time.")
+  if (user is None) and (users is None):
+    await ctx.respond("You must have either compare or user.")
+    
+  if users is not None:
+    users = get_users_from_multiuser(users)
+    if isinstance(users, str):
+      await ctx.respond(users)
+      return
+    code = all_user_unique_code("award", users)
+    bet_id = f"award_{code}_{description}"
+    
+    print(bet_id)
+    
+    first = True
+    for user in users:
+      abu = add_balance_user(user, amount, bet_id, get_date())
+      if abu == None:
+        if first:
+          await ctx.respond(f"User {user.username} not found.")
+        else:
+          ctx.interaction.followup.send(f"User {user.username} not found.")
+      else:
+        embedd = await create_user_embedded(user)
+        if first:
+          await ctx.respond(embed=embedd)
+        else:
+          ctx.interaction.followup.send(embed=embedd)
+    return
+  
   if (user := await get_user_from_member(ctx, user)) is None: return
   bet_id = "award_" + user.get_unique_code("award_") + "_" + description
   print(bet_id)
@@ -429,6 +541,19 @@ async def award(ctx, user: Option(discord.Member, "User you wannt to award"), am
   else:
     embedd = await create_user_embedded(user)
     await ctx.respond(embed=embedd)
+#award give end
+
+#award rename start
+@award.command(name = "rename", description = """Renames an award.""")
+async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Uniqe description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
+  print("hi")
+
+
+
+  #get_users_from_multiuser(compare)
+#award rename end  
+
+bot.add_application_command(award)
 #award end
 
   
@@ -1000,36 +1125,7 @@ graph = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#graph autocomplete start
-#graph user adds
-async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
-  value = ctx.value.strip()
-  users = get_all_objects("user")
-  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
-  clean_usernames = [username_t[0] for username_t in usernames_t]
-  no_break_usernames = [username_t[1] for username_t in usernames_t]
-  for username_t in usernames_t:
-    value = value.replace(username_t[0], username_t[1])
-  combined_values = value
-  values = value.split(" ")
-  if len(values) == 0:
-    return clean_usernames
-  last_value = values[-1]
-  all_but = " ".join(values[:-1]).replace("-_-", " ")
-  all = " ".join(values).replace("-_-", " ")
-  if last_value not in no_break_usernames:
-    auto_completes = []
-    for username_t in usernames_t:
-      if username_t[1] in combined_values:
-        continue
-      if username_t[1].startswith(last_value):
-        auto_completes.append(f"{all_but} {username_t[0]}")
-    return auto_completes
-  auto_completes = [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
-  return auto_completes
-#graph user adds
-#graph autocomplete end
-  
+
 
 #graph balance start
 balance_choices = [
@@ -1044,7 +1140,11 @@ async def graph_balance(ctx,
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
   
-
+  if (user is not None) and (compare is not None):
+    await ctx.respond("You can't use compare and user at the same time.")
+  if (user is None) and (compare is None):
+    await ctx.respond("You must have either compare or user.")
+    
   if compare == "":
     if (user := await get_user_from_member(ctx, user)) is None: return
     if amount is not None:
