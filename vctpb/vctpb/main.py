@@ -598,7 +598,7 @@ async def award_rename(ctx, user: Option(discord.Member, "User you wannt to awar
   
   if user.change_award_name(award, description) is None:
     print("change_award_name not found")
-    create_error_file("change_award_name not found", f"{award}\n{num}\n{user.code}.")
+    create_error_file("change_award_name not found." + f"{award}\n{num}\n{user.code}.")
   
   print(award)
   award_t = award.split(", ")[:-2]

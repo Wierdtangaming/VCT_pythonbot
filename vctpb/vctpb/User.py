@@ -137,12 +137,15 @@ class User:
 
   def change_award_name(self, award_label, name):
     for balance in self.balance:
+      if balance[0].startswith("award_"):
+        print(balance[0], balance[0][6:14], award_label[-8:])
       if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
         self.balance[self.balance.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
         break
     else:
       return None
     replace_in_list("user", self.code, self)
+    return self
   
   
   def get_new_balance_changes_embeds(self, amount):
