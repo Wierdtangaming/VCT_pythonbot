@@ -137,8 +137,6 @@ class User:
 
   def change_award_name(self, award_label, name):
     for balance in self.balance:
-      if balance[0].startswith("award_"):
-        print(balance[0], balance[0][6:14], award_label[-8:])
       if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
         self.balance[self.balance.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
         break
@@ -431,11 +429,11 @@ def get_multi_graph_image(users, balance_range_ambig):
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
-        if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
-          label = "Pick'em"
-        elif len(label) > 40:
+        if len(label) > 40:
           label = label.split(":")[-1]
-          if len(label) > 40:
+          if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
+            label = "Pick'em"
+          elif len(label) > 40:
             label = bet_id[6:14]
         labels.append(label)
         label_colors.append('xkcd:gold')
@@ -627,8 +625,7 @@ def num_of_bal_with_name(name, users):
   name = award_label_to_user(name)
   
   balance_ids = get_all_unique_balance_ids(users)
-  print(balance_ids)
-  print(name)
+  
   num = 0
   for bal in balance_ids:
     if bal == name:
