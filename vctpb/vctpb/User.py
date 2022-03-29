@@ -277,7 +277,7 @@ class User:
         if len(label) > 40:
           label = label.split[":"][-1]
           if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
-              label = "Pick'em"
+            label = "Pick'em"
           elif len(label) > 40:
             label = bet_id[6:14]
         labels.append(label)
