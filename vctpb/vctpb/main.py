@@ -6,6 +6,7 @@
 
 
 
+from email.errors import NonPrintableDefect
 from email.policy import default
 from io import BytesIO
 import collections
@@ -1193,14 +1194,14 @@ async def graph_balance(ctx,
   type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
-  compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
+  compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = NonPrintableDefect, required = False)):
   
   if (user is not None) and (compare is not None):
     await ctx.respond("You can't use compare and user at the same time.")
   if (user is None) and (compare is None):
     await ctx.respond("You must have either compare or user.")
     
-  if compare == "":
+  if compare is None:
     if (user := await get_user_from_member(ctx, user)) is None: return
     if amount is not None:
       if amount > len(user.balance):
