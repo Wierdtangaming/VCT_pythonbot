@@ -275,7 +275,7 @@ class User:
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
         if len(label) > 40:
-          label = label.split[":"][-1]
+          label = label.split(":")[-1]
           if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
             label = "Pick'em"
           elif len(label) > 40:
@@ -434,7 +434,7 @@ def get_multi_graph_image(users, balance_range_ambig):
         if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
           label = "Pick'em"
         elif len(label) > 40:
-          label = label.split[":"][-1]
+          label = label.split(":")[-1]
           if len(label) > 40:
             label = bet_id[6:14]
         labels.append(label)
