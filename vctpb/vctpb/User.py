@@ -274,7 +274,7 @@ class User:
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
-        if label.lower().endswith("pick'em"):
+        if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
           label = "Pick'em"
         elif len(label) > 15:
           label = bet_id[6:14]
@@ -429,7 +429,7 @@ def get_multi_graph_image(users, balance_range_ambig):
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
-        if label.lower().endswith("pick'em"):
+        if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
           label = "Pick'em"
         elif len(label) > 15:
           label = bet_id[6:14]
