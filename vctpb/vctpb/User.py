@@ -274,11 +274,11 @@ class User:
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
-        if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
-          label = "Pick'em"
-        elif len(label) > 40:
+        if len(label) > 40:
           label = label.split[":"][-1]
-          if len(label) > 40:
+          if label.lower().endswith("pick'em") or label.lower().endswith("pick’em"):
+            label = "Pick'em"
+          elif len(label) > 40:
             label = bet_id[6:14]
         labels.append(label)
         label_colors.append('xkcd:gold')
