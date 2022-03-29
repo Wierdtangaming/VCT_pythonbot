@@ -29,13 +29,8 @@ def get_user_from_at(id):
     return None
 
 def get_user_from_id(id):
-  users = get_all_objects("user")
-  for user in users:
-    if user.code == id:
-      return user
+  return get_from_list("user", id)
   
-  if user == None:
-    return None
 
 def id_to_metion(id):
   return f"<@!{id}>"

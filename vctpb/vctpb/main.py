@@ -6,6 +6,7 @@
 
 
 
+from email.policy import default
 from io import BytesIO
 import collections
 #git clone https://github.com/Pycord-Development/pycord
@@ -23,7 +24,7 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids
+from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
@@ -31,8 +32,8 @@ import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
+from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting, create_error_file
 import time
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
 import matplotlib.colors as mcolors
@@ -143,6 +144,26 @@ async def all_bets_name_code(bot):
       bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
   return bet_list
 
+
+def get_users_from_multiuser(compare):
+  usernames_split = compare.split(" ")
+  
+  users = usernames_to_users(compare)
+
+  
+  if len(users) == 1:
+    return "You need to compare more than one user."
+
+  
+  usernames = " ".join([user.username for user in users])
+
+  for username_word in usernames_split:
+    if username_word not in usernames:
+      return f"User {username_word} not found."
+
+  return users
+
+
 def get_last_tournament_name(amount):
   matches = get_all_objects("match")
   matches.reverse()
@@ -252,7 +273,7 @@ def to_float(str):
   except ValueError:
     return None
 
-def get_uniqe_code(prefix):
+def get_unique_code(prefix):
   all_objs = get_all_objects(prefix)
   codes = [str(k.code) for k in all_objs]
   code = ""
@@ -359,10 +380,40 @@ async def auto_backup_timer():
   
   
 #autocomplete start
+
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
   return [x.capitalize() for x in get_all_colors().keys() if ctx.value.lower() in x.lower()]
 #color picker autocomplete end
+
+#multi user autocomplete start
+async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
+  value = ctx.value.strip()
+  users = get_all_objects("user")
+  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
+  clean_usernames = [username_t[0] for username_t in usernames_t]
+  no_break_usernames = [username_t[1] for username_t in usernames_t]
+  for username_t in usernames_t:
+    value = value.replace(username_t[0], username_t[1])
+  combined_values = value
+  values = value.split(" ")
+  if len(values) == 0:
+    return clean_usernames
+  last_value = values[-1]
+  all_but = " ".join(values[:-1]).replace("-_-", " ")
+  all = " ".join(values).replace("-_-", " ")
+  if last_value not in no_break_usernames:
+    auto_completes = []
+    for username_t in usernames_t:
+      if username_t[1] in combined_values:
+        continue
+      if username_t[1].startswith(last_value):
+        auto_completes.append(f"{all_but} {username_t[0]}")
+    return auto_completes
+  auto_completes = [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
+  return auto_completes
+#multi user autocomplete end
+
 #autocomplete end
 
 
@@ -411,15 +462,87 @@ bot.add_application_command(assign)
 #assign end
 
 
-
 #award start
-@bot.slash_command( 
+award = SlashCommandGroup(
   name = "award", 
-  description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""",
+  description = "Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!",
   guild_ids = gid,
 )
-async def award(ctx, user: Option(discord.Member, "User you wannt to award"), amount: Option(int, "Amount you want to give or take."), description: Option(str, "Uniqe description of why the award is given.")):
 
+#user award autocomplete start
+def get_award_strings(user):
+  last_amount = Decimal(0)
+  awards_id_changes = []
+  for balance_t in user.balance:
+    if balance_t[0].startswith("award"):
+      awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
+    last_amount = balance_t[1]
+  
+  award_labels = []
+  for awards_id_change in awards_id_changes:
+    label = f"{awards_id_change[0][15:]}, {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+    if len(label) >= 99:
+      label = f"{awards_id_change[0][15:80]}..., {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+    award_labels.append(label)
+    
+  return award_labels
+  
+    
+async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
+  member = ctx.options["user"]
+  
+  if member == None:
+    return []
+  
+  user = get_user_from_id(member)
+  
+  award_labels = get_award_strings(user)
+  
+  auto_completes = [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
+  
+  return auto_completes
+#user award autocomplete end  
+
+
+
+#award give start
+@award.command(name = "give", description = """Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!""")
+async def award_give(ctx, 
+  amount: Option(int, "Amount you want to give or take."), description: Option(str, "Unique description of why the award is given."),
+  user: Option(discord.Member, "User you wannt to award. (Can't use with users).", default = None, required = False),  
+  users: Option(str, "Users you want to award. (Can't use with user).", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
+  
+  if (user is not None) and (users is not None):
+    await ctx.respond("You can't use compare and user at the same time.")
+  if (user is None) and (users is None):
+    await ctx.respond("You must have either compare or user.")
+    
+  if users is not None:
+    users = get_users_from_multiuser(users)
+    if isinstance(users, str):
+      await ctx.respond(users)
+      return
+    code = all_user_unique_code("award", users)
+    bet_id = f"award_{code}_{description}"
+    
+    print(bet_id)
+    
+    first = True
+    for user in users:
+      abu = add_balance_user(user, amount, bet_id, get_date())
+      if abu == None:
+        if first:
+          await ctx.respond(f"User {user.username} not found.")
+        else:
+          ctx.interaction.followup.send(f"User {user.username} not found.")
+      else:
+        embedd = await create_user_embedded(user)
+        if first:
+          await ctx.respond(embed=embedd)
+        else:
+          ctx.interaction.followup.send(embed=embedd)
+    return
+  
   if (user := await get_user_from_member(ctx, user)) is None: return
   bet_id = "award_" + user.get_unique_code("award_") + "_" + description
   print(bet_id)
@@ -429,6 +552,65 @@ async def award(ctx, user: Option(discord.Member, "User you wannt to award"), am
   else:
     embedd = await create_user_embedded(user)
     await ctx.respond(embed=embedd)
+#award give end
+
+#award list start
+@award.command(name = "list", description = "Lists all the awards given to a user.")
+async def award_list(ctx, user: Option(discord.Member, "User you want to list awards for.")):
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  award_labels = get_award_strings(user)
+  
+  embedd = create_award_label_list_embedded(user, award_labels)
+  await ctx.respond(embed=embedd)
+  
+
+#award rename start
+@award.command(name = "rename", description = """Renames an award.""")
+async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
+  
+  
+  if (user := await get_user_from_member(ctx, user)) is None: return
+  
+  award_labels = get_award_strings(user)
+  
+  if len(award) == 8:
+    if award_label.endswith(award):
+      award = award_label
+  else:
+    for award_label in award_labels:
+      if award_label == award:
+        award = award_label
+        break
+    else:
+      await ctx.respond("Award not found.")
+      return
+    
+  users = get_all_objects("user")
+  
+  num = num_of_bal_with_name(award, users)
+  
+  print(num)
+  
+  if num > 1:
+    await ctx.respond("There are multiple awards with this name.")
+    return
+  
+  if user.change_award_name(award, description) is None:
+    print("change_award_name not found")
+    create_error_file("change_award_name not found." + f"{award}\n{num}\n{user.code}.")
+  
+  print(award)
+  award_t = award.split(", ")[:-2]
+  award = ", ".join(award_t)
+  
+  
+  await ctx.respond(f"Award {award} renamed to {description}.")
+#award rename end  
+
+
+
+bot.add_application_command(award)
 #award end
 
   
@@ -533,7 +715,7 @@ class BetCreateModal(Modal):
     if not match.date_closed == None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
-    code = get_uniqe_code("bet")
+    code = get_unique_code("bet")
     if error[1] is None:
       balance_left = user.get_balance() - int(amount)
       if balance_left < 0:
@@ -1000,36 +1182,7 @@ graph = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#graph autocomplete start
-#graph user adds
-async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
-  value = ctx.value.strip()
-  users = get_all_objects("user")
-  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
-  clean_usernames = [username_t[0] for username_t in usernames_t]
-  no_break_usernames = [username_t[1] for username_t in usernames_t]
-  for username_t in usernames_t:
-    value = value.replace(username_t[0], username_t[1])
-  combined_values = value
-  values = value.split(" ")
-  if len(values) == 0:
-    return clean_usernames
-  last_value = values[-1]
-  all_but = " ".join(values[:-1]).replace("-_-", " ")
-  all = " ".join(values).replace("-_-", " ")
-  if last_value not in no_break_usernames:
-    auto_completes = []
-    for username_t in usernames_t:
-      if username_t[1] in combined_values:
-        continue
-      if username_t[1].startswith(last_value):
-        auto_completes.append(f"{all_but} {username_t[0]}")
-    return auto_completes
-  auto_completes = [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
-  return auto_completes
-#graph user adds
-#graph autocomplete end
-  
+
 
 #graph balance start
 balance_choices = [
@@ -1044,7 +1197,11 @@ async def graph_balance(ctx,
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = "", required = False)):
   
-
+  if (user is not None) and (compare is not None):
+    await ctx.respond("You can't use compare and user at the same time.")
+  if (user is None) and (compare is None):
+    await ctx.respond("You must have either compare or user.")
+    
   if compare == "":
     if (user := await get_user_from_member(ctx, user)) is None: return
     if amount is not None:
@@ -1296,7 +1453,7 @@ class MatchCreateModal(Modal):
       
     print(team_one_odds, team_two_odds)
     
-    code = get_uniqe_code("match")
+    code = get_unique_code("match")
   
     color = code[:6]
     match = Match(team_one, team_two, team_one_old_odds, team_two_old_odds, team_one_odds, team_two_odds, tournament_name, betting_site, interaction.user.id, get_date(), color, code)

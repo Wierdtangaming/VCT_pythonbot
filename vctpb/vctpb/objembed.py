@@ -148,3 +148,15 @@ async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
     embed.add_field(name=f"{user.username} bet {bet.bet_amount} on {bet.get_team()}", value=value, inline=False)
 
   return embed
+
+
+def create_award_label_list_embedded(user, award_labels):
+  embed = discord.Embed(title=f"{user.username}'s Awards:", color=discord.Color.from_rgb(*hex_to_tuple(user.color)))
+  for award_label in award_labels:
+        
+    award_t = award_label.split(", ")
+
+    name = ", ".join(award_t[:-2])
+
+    embed.add_field(name=name, value=f"Balance changed by {award_t[-2]}, {award_t[-1]}", inline=False)
+  return embed
