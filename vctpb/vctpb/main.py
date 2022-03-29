@@ -590,8 +590,6 @@ async def award_rename(ctx, user: Option(discord.Member, "User you wannt to awar
   
   num = num_of_bal_with_name(award, users)
   
-  print(num)
-  
   if num > 1:
     await ctx.respond("There are multiple awards with this name.")
     return
