@@ -1,4 +1,4 @@
-from dbinterface import get_from_list, replace_in_list, get_all_objects
+from olddbinterface import get_from_list, replace_in_list, get_all_objects
 import discord
 import io
 import matplotlib.pyplot as plt
@@ -9,15 +9,32 @@ import random
 import math
 import secrets
 import sys
+from sqlalchemy import Column, String, BOOLEAN
+from sqlalchemy.orm import relationship
+from sqltypes import JSONLIST
 
+from sqlaobjs import mapper_registry
 
-class User:
+@mapper_registry.mapped
+class User():
+  __tablename__ = "user"
+  
+  code = Column(String(8), primary_key=True)
+  username = Column(String(32), nullable=False)
+  color = Column(String(6), nullable=False)
+  hidden = Column(BOOLEAN, nullable=False)
+  balances = Column(JSONLIST, nullable=False) #array of Tuple(bet_id, balance after change, date)
+  active_bet_ids = Column(JSONLIST, nullable=False) #array of strings code of active bets
+  loans = Column(JSONLIST, nullable=False) #array of Tuple(balance, date created, date paid)
+  bets = relationship("Bet", back_populates="user", cascade="all, delete")
+  matches = relationship("Match", back_populates="creator", cascade="all, delete")
+  
   def __init__(self, code, username, color, date_created):
     self.code = code
     self.username = username
     self.color = color
     
-    self.show_on_lb = True
+    self.hidden = True
     #a tuple (bet_id, balance after change, date)
     #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
@@ -25,7 +42,7 @@ class User:
     #bet_id = start: start balance
     #bet_id = reset_[reset_name]: changed balance with command
     
-    self.balance = [("start", Decimal(500), date_created)]
+    self.balances = [("start", Decimal(500), date_created)]
     
     self.active_bet_ids = []
 
@@ -33,10 +50,21 @@ class User:
     
     self.loans = []
 
+  def __init__(self, code, username, color, hidden, balances, active_bet_ids, loans):
+    self.code = code
+    self.username = username
+    self.color = color
+    self.hidden = hidden
+    self.balances = balances
+    self.active_bet_ids = active_bet_ids
+    self.loans = loans
+  
+  def __repr__(self):
+    return f"<User {self.code}>"
 
   def get_unique_code(self, prefix):
     #combine all_bal into one array
-    prefix_bal = [x for x in self.balance if x[0].startswith(prefix)]
+    prefix_bal = [x for x in self.balances if x[0].startswith(prefix)]
     codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
     code = ""
     copy = True
@@ -85,28 +113,28 @@ class User:
           self.active_bet_ids.remove(id)
         replace_in_list("user", self.code, self)
         continue
-      used += temp_bet.bet_amount
+      used += temp_bet.amount_bet
 
     return used
 
   def get_balance(self):
-    bal = self.balance[-1][1]
+    bal = self.balances[-1][1]
     bal -= self.unavailable()
     bal += self.loan_bal()
     return bal
 
   def get_clean_bal_loan(self):
-    return self.balance[-1][1] + self.loan_bal()
+    return self.balances[-1][1] + self.loan_bal()
 
   def avaliable_nonloan_bal(self):
-    return self.balance[-1][1] - self.unavailable()
+    return self.balances[-1][1] - self.unavailable()
 
   def get_resets(self):
-    return [i for i, x in enumerate(self.balance) if x[0].startswith("reset_")]
+    return [i for i, x in enumerate(self.balances) if x[0].startswith("reset_")]
     
   def get_sets(self):
-    set_list = [i for i, x in enumerate(self.balance) if (x[0].startswith("reset_") or x[0] == "start")]
-    set_list.append(len(self.balance))
+    set_list = [i for i, x in enumerate(self.balances) if (x[0].startswith("reset_") or x[0] == "start")]
+    set_list.append(len(self.balances))
     return set_list
     
   def get_reset_range(self, index):
@@ -116,7 +144,7 @@ class User:
       
     for reset in resets:
       rrange = range(reset, resets[1 + resets.index(reset)])
-      if reset == len(self.balance)-1:
+      if reset == len(self.balances)-1:
         return None
       if index in rrange:
         return rrange
@@ -126,19 +154,19 @@ class User:
     return range(index, self.get_reset_range(index).stop)
 
   def to_string(self):
-    return "Balance: " + str(self.balance)
+    return "Balance: " + str(self.balances)
 
   def remove_balance_id(self, id):
-    for balance in self.balance:
+    for balance in self.balances:
       if balance[0] == id:
-        self.balance.remove(balance)
+        self.balances.remove(balance)
         break
     replace_in_list("user", self.code, self)
 
   def change_award_name(self, award_label, name):
-    for balance in self.balance:
+    for balance in self.balances:
       if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
-        self.balance[self.balance.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
+        self.balances[self.balances.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
         break
     else:
       return None
@@ -149,15 +177,15 @@ class User:
   def get_new_balance_changes_embeds(self, amount):
     if amount <= 0:
       return None
-    if amount >= len(self.balance):
-      amount = len(self.balance)
+    if amount >= len(self.balances):
+      amount = len(self.balances)
       before = 0
       
-    sorted_balances = sorted(self.balance, key=lambda x: x[2])
-    new_balances = self.balance[-amount:]
+    sorted_balances = sorted(self.balances, key=lambda x: x[2])
+    new_balances = self.balances[-amount:]
     new_balances = sorted(new_balances, key=lambda x: x[2])
     new_balances.reverse()
-    before = self.balance[-2][1]
+    before = self.balances[-2][1]
     embed_amount = int((amount - 1) / 25) + 1
     
     embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
@@ -213,22 +241,22 @@ class User:
       balances = balance_range_ambig
     elif isinstance(balance_range_ambig, str):
       if balance_range_ambig == "all":
-        balances = self.balance
+        balances = self.balances
         xlabel = "All Time"
       elif balance_range_ambig == "current":
-        balances = [self.balance[x] for x in self.get_reset_range(-1)]
+        balances = [self.balances[x] for x in self.get_reset_range(-1)]
         resets = self.get_resets()
         if len(resets) > 0:
-          xlabel = self.balance[resets[-1]][0][15:]
+          xlabel = self.balances[resets[-1]][0][15:]
         else:
           users = get_all_objects("user")
           for user in users:
             resets = user.get_resets()
             if len(resets) > 0:
-              xlabel = user.balance[resets[-1]][0][15:]
+              xlabel = user.balances[resets[-1]][0][15:]
               break
     elif isinstance(balance_range_ambig, int):
-      balances = self.balance[-balance_range_ambig:]
+      balances = self.balances[-balance_range_ambig:]
       xlabel = f"Last {balance_range_ambig}"
     else:
       return f"Invalid range of {balance_range_ambig}."
@@ -349,7 +377,7 @@ class User:
 
 
       return im
-
+  
 
     
 def get_multi_graph_image(users, balance_range_ambig):
@@ -359,20 +387,20 @@ def get_multi_graph_image(users, balance_range_ambig):
     if balance_range_ambig == "all":
       xlabel = "All Time"
       for i, user in enumerate(users):
-        for balance in user.balance:
+        for balance in user.balances:
           all_balances.append((i, balance))
     elif balance_range_ambig == "current":
       for i, user in enumerate(users):
         for balance_index in user.get_reset_range(-1):
-          all_balances.append((i, user.balance[balance_index]))
+          all_balances.append((i, user.balances[balance_index]))
       for user in users:
         resets = user.get_resets()
         if len(resets) > 0:
-          xlabel = user.balance[resets[-1]][0][15:]
+          xlabel = user.balances[resets[-1]][0][15:]
           break
   elif isinstance(balance_range_ambig, int):
     for i, user in enumerate(users):
-      for balance in user.balance:
+      for balance in user.balances:
         all_balances.append((i, balance))
     xlabel = f"Last {balance_range_ambig}"
   else:
@@ -577,7 +605,7 @@ def get_multi_graph_image(users, balance_range_ambig):
     return im
     
 def all_user_unique_code(prefix, users):
-  all_bal = [user.balance for user in users]
+  all_bal = [user.balances for user in users]
   #combine all_bal into one array
   prefix_bal = []
   for bal in all_bal:
@@ -598,7 +626,7 @@ def all_user_unique_code(prefix, users):
 
 
 def get_all_unique_balance_ids(users):
-  all_bal = [user.balance for user in users]
+  all_bal = [user.balances for user in users]
   #combine all_bal into one array
   prefix_bal = []
   for bal in all_bal:
@@ -635,3 +663,23 @@ def num_of_bal_with_name(name, users):
       num += 1
       
   return num
+
+
+def is_valid_user(code, username, color, hidden, balances, active_bet_ids, loans):
+  errors = [False for _ in range(7)]
+  if isinstance(code, int) == False or len(str(code)) > 20:
+    errors[0] = True
+  if isinstance(username, str) == False or len(username) > 32:
+    errors[1] = True
+  if isinstance(color, str) == False or len(color) > 6:
+    errors[2] = True
+  if isinstance(hidden, bool) == False:
+    errors[3] = True
+  if isinstance(balances, list) == False:
+    errors[4] = True
+  if isinstance(active_bet_ids, list) == False:
+    errors[5] = True
+  if isinstance(loans, list) == False:
+    errors[6] = True
+  return errors
+

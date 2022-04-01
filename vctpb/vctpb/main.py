@@ -40,6 +40,12 @@ from savedata import backup_full, save_savedata_from_github, are_equivalent, zip
 import matplotlib.colors as mcolors
 import secrets
 
+if not os.path.isfile("savedata.db"):
+  print("savedata.db does not exist.\nquitting")
+  quit()
+  
+
+
 intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
