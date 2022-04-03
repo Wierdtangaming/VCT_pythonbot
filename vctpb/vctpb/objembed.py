@@ -3,14 +3,14 @@ from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from
 from Match import Match
 from Bet import Bet
 from User import User
-from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, id_to_metion
+from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, id_to_metion
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
 import emoji
 
 
 async def create_match_embedded(match_ambig, title):
-  match = ambig_to_obj(match_ambig, "match")
+  match = ambig_to_obj(match_ambig, "Match")
   if match == None:
     return None
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color)))
@@ -58,7 +58,7 @@ async def create_match_list_embedded(embed_title, matches_ambig):
 
 
 async def create_bet_embedded(bet_ambig, title):
-  bet = ambig_to_obj(bet_ambig, "bet")
+  bet = ambig_to_obj(bet_ambig, "Bet")
   if bet == None:
     return None
 
@@ -102,7 +102,7 @@ async def create_bet_list_embedded(embed_title, bets_ambig, bot):
 
 
 async def create_user_embedded(user_ambig):
-  user = ambig_to_obj(user_ambig, "user")
+  user = ambig_to_obj(user_ambig, "User")
   if user == None:
     return None
 

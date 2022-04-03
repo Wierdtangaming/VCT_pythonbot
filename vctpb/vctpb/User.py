@@ -1,4 +1,3 @@
-from olddbinterface import get_from_list, replace_in_list, get_all_objects
 import discord
 import io
 import matplotlib.pyplot as plt

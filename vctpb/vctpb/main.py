@@ -22,14 +22,14 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
-from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
+from dbinterface import  get_date, get_setting
+from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
-from savefiles import get_date_string, save_file, get_file, get_all_names, make_folder, backup, get_setting, save_setting, create_error_file
+from savefiles import  get_all_names, backup
 import time
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
 import matplotlib.colors as mcolors
@@ -190,7 +190,7 @@ def get_last_odds_source(amount):
 
       
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
-  user = ambig_to_obj(user_ambig, "user")
+  user = ambig_to_obj(user_ambig, "User")
   if user == None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
@@ -206,7 +206,7 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
 
 def delete_balance_id(user_ambig, balance_id):
   print(balance_id)
-  user = ambig_to_obj(user_ambig, "user")
+  user = ambig_to_obj(user_ambig, "User")
   if user == None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
@@ -232,7 +232,7 @@ def delete_balance_id(user_ambig, balance_id):
 
 
 def print_all_balance(user_ambig):
-  user = ambig_to_obj(user_ambig, "user")
+  user = ambig_to_obj(user_ambig, "User")
   if user == None:
     return None
 
@@ -303,15 +303,15 @@ def create_user(user_id, username):
 
 
 def add_to_active_ids(user_ambig, bet_ambig):
-  if (user := ambig_to_obj(user_ambig, "user")) is None: return None
-  if (bet := ambig_to_obj(bet_ambig, "bet")) is None: return None
+  if (user := ambig_to_obj(user_ambig, "User")) is None: return None
+  if (bet := ambig_to_obj(bet_ambig, "Bet")) is None: return None
 
   user.active_bet_ids.append((bet.code, bet.match_id))
   replace_in_list("user", user.code, user)
 
 
 def remove_from_active_ids(user_ambig, bet_id):
-  if (user := ambig_to_obj(user_ambig, "user")) is None: return None
+  if (user := ambig_to_obj(user_ambig, "User")) is None: return None
   
   if (t := next((t for t in user.active_bet_ids if bet_id == t[0]), None)) is None:
     print("Bet_id Not Found")
@@ -321,7 +321,7 @@ def remove_from_active_ids(user_ambig, bet_id):
 
 
 def add_balance_user(user_ambig, change, description, date):
-  user = ambig_to_obj(user_ambig, "user")
+  user = ambig_to_obj(user_ambig, "User")
   if user == None:
     return None
   user.balance.append((description, Decimal(str(round(user.balance[-1][1] + Decimal(str(change)), 5))), date))
@@ -914,7 +914,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
   if user == None:
     user = create_user(ctx.author.id, ctx.author.display_name)
     
-  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
   print(match)
     
   if match.date_closed is not None:
@@ -937,7 +937,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
   
   gen_msg = await ctx.respond("Cancelling bet...")
-  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "Bet")) is None: return
   
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
@@ -966,7 +966,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
 async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_bet_list_autocomplete)):
-  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "bet")) is None: return
+  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "Bet")) is None: return
   
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
@@ -984,8 +984,8 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
 @betscg.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   #list some old matches
-  if (fbet := await user_from_autocomplete_tuple(None, await current_bets_name_code(bot), bet, "bet")) is None: 
-    if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "bet")) is None: return
+  if (fbet := await user_from_autocomplete_tuple(None, await current_bets_name_code(bot), bet, "Bet")) is None: 
+    if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "Bet")) is None: return
   bet = fbet
   user = get_from_list("user", bet.user_id)
   embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.bet_amount} on {bet.get_team()}.")
@@ -1648,7 +1648,7 @@ async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
   match = ctx.options["match"]
   if match is None: return []
-  if (match := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "match")) is None: return []
+  if (match := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "Match")) is None: return []
   auto_completes = [match.t1, match.t2]
   return auto_completes
 #match match team autocomplete end
@@ -1658,7 +1658,7 @@ async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_winner_list_autocomplete(ctx: discord.AutocompleteContext):
   match = ctx.options["match"]
   if match is None: return []
-  if (match := await user_from_autocomplete_tuple(None, all_matches_name_code(), match, "match")) is None: return []
+  if (match := await user_from_autocomplete_tuple(None, all_matches_name_code(), match, "Match")) is None: return []
   
   strin = "None"
   if match.t1 == "None" or match.t2 == "None":
@@ -1674,8 +1674,8 @@ async def match_winner_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomplete=match_list_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
   #to do list some old ones
   
-  if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "match")) is None:
-    if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "Match")) is None:
+    if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "Match")) is None: return
   match = fmatch
 
   
@@ -1713,7 +1713,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
 @matchscg.command(name = "betting", description = "Open and close betting.")
 async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
 
-  if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_code(), match, "Match")) is None: return
 
   #if already on dont do anything complex
     
@@ -1742,7 +1742,7 @@ async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt
 @matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
 async def match_delete(ctx, match: Option(str, "Match you want to delete.", autocomplete=match_available_list_autocomplete)):
   
-  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
   if match.winner != 0:
     await ctx.respond(f"Match winner has already been decided, you cannot delete the match.")
     return
@@ -1766,8 +1766,8 @@ async def match_delete(ctx, match: Option(str, "Match you want to delete.", auto
 @matchscg.command(name = "find", description = "Sends the embed of the match.")
 async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
   #to do list some old ones
-  if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "match")) is None:
-    if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "Match")) is None:
+    if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "Match")) is None: return
   match = fmatch
   embedd = await create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
   inter = await ctx.respond(embed=embedd)
@@ -1781,7 +1781,7 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
 async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
-  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
   if match.bet_ids != []:
     await ctx.respond(f"Match must have no bets. You must delete the bets before editing the match. (To delete other users bets type in their bet code).")
     return
@@ -1825,7 +1825,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 @matchscg.command(name = "winner", description = "Set winner of match.")
 async def match_winner(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_current_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_team_list_autocomplete)):
   
-  if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_code(), match, "Match")) is None: return
   team.strip()
   if (team == "1") or (team == match.t1):
     team = 1
@@ -1893,7 +1893,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
 #match reset start
 @matchscg.command(name = "reset", description = "Change winner or go back to no winner.")
 async def match_winner(ctx, match: Option(str, "Match you want to reset winner of.", autocomplete=match_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_winner_list_autocomplete), new_date: Option(int, "Do you want to reset the winner set date?", choices = yes_no_choices)):
-  if (match := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "match")) is None: return
+  if (match := await user_from_autocomplete_tuple(ctx, all_matches_name_code(), match, "Match")) is None: return
   if new_date == 0:
     new_date = True
   else:

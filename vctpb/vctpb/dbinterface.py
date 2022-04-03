@@ -4,9 +4,9 @@ from pytz import timezone
 from sqlaobjs import Session
 from sqlalchemy import select, func
 
-from DBMatch import Match
-from DBUser import User
-from DBBet import Bet
+from Match import Match
+from User import User
+from Bet import Bet
 from Color import Color
 from Channels import Channels
 
@@ -16,7 +16,8 @@ def get_date():
   central = timezone('US/Central')
   return datetime.now(central)
 
-
+def get_date_string():
+  return get_date().strftime("%Y-%m-%d-%H-%M-%S")
 
 def get_all_db(table_name, session=None):
   if session is None:
@@ -25,6 +26,12 @@ def get_all_db(table_name, session=None):
   else:
     return session.scalars(select(eval(table_name))).all()
 
+def get_all_with_db(table_name, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return session.scalars(select(eval(table_name))).all()
+  else:
+    return session.scalars(select(eval(table_name))).all()
 
 def get_from_db(table_name, code, session=None):
   if session is None:
