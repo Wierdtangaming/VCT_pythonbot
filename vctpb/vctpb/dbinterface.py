@@ -1,5 +1,6 @@
 from datetime import datetime
 from pytz import timezone
+import jsonpickle
 
 from sqlaobjs import Session
 from sqlalchemy import select, func
@@ -11,6 +12,7 @@ from Color import Color
 from Channels import Channels
 
 from configparser import ConfigParser
+
 
 def get_date():
   central = timezone('US/Central')
@@ -94,10 +96,23 @@ def get_channel_from_db(channel_name, session=None):
     return channels.match_channel_id
   else:
     return None
+  
+def set_channel_in_db(channel_name, channel_value, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return set_channel_in_db(channel_name, channel_value, session)
+  channels = session.scalars(select(Channels)).one()
+  if channel_name == "bet":
+    channels.bet_channel_id = channel_value
+  elif channel_name == "match":
+    channels.match_channel_id = channel_value
                            
                           
 def get_setting(setting_name):
   #setting_names: "discord_token", "github_token", "guild_ids", "override_savedata", "save_repo"
   configur = ConfigParser()
   configur.read('settings.ini')
+  val = configur.get('settings', setting_name)
+  if setting_name == "guild_ids" or setting_name == "override_savedata":
+    return jsonpickle.decode(val)
   return configur.get("settings", setting_name)

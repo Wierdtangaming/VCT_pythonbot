@@ -45,7 +45,8 @@ intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
 
-gid = get_setting("guild_ids")
+gid = jsonpickle.decode(get_setting("guild_ids"))
+print(gid, type(gid))
 
 
 # matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
