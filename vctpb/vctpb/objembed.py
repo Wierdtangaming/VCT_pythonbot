@@ -145,6 +145,7 @@ async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
 
 def create_award_label_list_embedded(user, award_labels):
   embed = discord.Embed(title=f"{user.username}'s Awards:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
+  award_labels = award_labels[-24:]
   for award_label in award_labels:
         
     award_t = award_label.split(", ")

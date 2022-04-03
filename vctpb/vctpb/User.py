@@ -12,7 +12,7 @@ from sqlalchemy import Column, String, BOOLEAN, ForeignKey
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
-from sqlaobjs import mapper_registry
+from sqlaobjs import mapper_registry, Session
 
 @mapper_registry.mapped
 class User():
@@ -173,16 +173,35 @@ class User():
         break
     replace_in_list("User", self.code, self)
 
-  def change_award_name(self, award_label, name):
+  def change_award_name(self, award_label, name, session=None):
+    if session is None:
+      with Session.begin() as session:
+        self.change_award_name(award_label, name, session=session)
     for balance in self.balances:
       if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
         self.balances[self.balances.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
         break
     else:
       return None
-    replace_in_list("User", self.code, self)
     return self
   
+  
+  def get_award_strings(self):
+    last_amount = Decimal(0)
+    awards_id_changes = []
+    for balance_t in self.balances:
+      if balance_t[0].startswith("award"):
+        awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
+      last_amount = balance_t[1]
+    
+    award_labels = []
+    for awards_id_change in awards_id_changes:
+      label = f"{awards_id_change[0][15:]}, {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+      if len(label) >= 99:
+        label = f"{awards_id_change[0][15:80]}..., {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
+      award_labels.append(label)
+      
+    return award_labels
   
   def get_new_balance_changes_embeds(self, amount):
     if amount <= 0:

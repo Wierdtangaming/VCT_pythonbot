@@ -48,7 +48,6 @@ intents = discord.Intents.all()
 bot = commands.Bot(intents=intents, command_prefix="$")
 
 gid = get_setting("guild_ids")
-print(gid, type(gid))
 
 
 # matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
@@ -488,24 +487,6 @@ award = SlashCommandGroup(
 )
 
 #user award autocomplete start
-def get_award_strings(user):
-  last_amount = Decimal(0)
-  awards_id_changes = []
-  for balance_t in user.balances:
-    if balance_t[0].startswith("award"):
-      awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
-    last_amount = balance_t[1]
-  
-  award_labels = []
-  for awards_id_change in awards_id_changes:
-    label = f"{awards_id_change[0][15:]}, {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
-    if len(label) >= 99:
-      label = f"{awards_id_change[0][15:80]}..., {math.floor(awards_id_change[1])}, ID: {awards_id_change[0][6:14]}"
-    award_labels.append(label)
-    
-  return award_labels
-  
-    
 async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   member = ctx.options["user"]
   
@@ -514,7 +495,7 @@ async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   
   user = get_user_from_id(member)
   
-  award_labels = get_award_strings(user)
+  award_labels = user.get_award_strings()
   
   auto_completes = [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
   
@@ -556,32 +537,26 @@ async def award_give(ctx,
           await ctx.respond(embed=embedd)
           first = False
         else:
-          ctx.interaction.followup.send(embed=embedd)
+          await ctx.interaction.followup.send(embed=embedd)
       return
-    ouser = user
+    
     if (user := await get_user_from_member(ctx, user, session)) is None: return
     bet_id = "award_" + user.get_unique_code("award_") + "_" + description
     print(bet_id)
     abu = add_balance_user(user, amount, bet_id, get_date(), session)
-    print(2)
     if abu is None:
       await ctx.respond("User not found.", ephemeral = True)
     else:
       embedd = await create_user_embedded(user)
       await ctx.respond(embed=embedd)
-    print(3)
-    print(user.balances, user.get_balance())
-    userer = await get_user_from_member(ctx, ouser, session)
-    print(userer.balances, userer.get_balance())
 #award give end
-#/award give amount:10 description:test user:@pig3253#2053
 
 #award list start
 @award.command(name = "list", description = "Lists all the awards given to a user.")
 async def award_list(ctx, user: Option(discord.Member, "User you want to list awards for.")):
   if (user := await get_user_from_member(ctx, user)) is None: return
   
-  award_labels = get_award_strings(user)
+  award_labels = user.get_award_strings()
   
   embedd = create_award_label_list_embedded(user, award_labels)
   await ctx.respond(embed=embedd)
@@ -591,41 +566,41 @@ async def award_list(ctx, user: Option(discord.Member, "User you want to list aw
 @award.command(name = "rename", description = """Renames an award.""")
 async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
   
-  
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  award_labels = get_award_strings(user)
-  
-  if len(award) == 8:
-    if award_label.endswith(award):
-      award = award_label
-  else:
-    for award_label in award_labels:
-      if award_label == award:
+  with Session.begin() as session:
+    if (user := await get_user_from_member(ctx, user, session)) is None: return
+    
+    award_labels = user.get_award_strings()
+    
+    if len(award) == 8:
+      if award_label.endswith(award):
         award = award_label
-        break
     else:
-      await ctx.respond("Award not found.")
+      for award_label in award_labels:
+        if award_label == award:
+          award = award_label
+          break
+      else:
+        await ctx.respond("Award not found.", ephemeral = True)
+        return
+      
+    users = get_all_db("User")
+    
+    num = num_of_bal_with_name(award, users)
+    
+    if num > 1:
+      await ctx.respond("There are multiple awards with this name.", ephemeral = True)
       return
     
-  users = get_all_objects("user")
-  
-  num = num_of_bal_with_name(award, users)
-  
-  if num > 1:
-    await ctx.respond("There are multiple awards with this name.")
-    return
-  
-  if user.change_award_name(award, description) is None:
-    print("change_award_name not found")
-    create_error_file("change_award_name not found." + f"{award}\n{num}\n{user.code}.")
-  
-  print(award)
-  award_t = award.split(", ")[:-2]
-  award = ", ".join(award_t)
-  
-  
-  await ctx.respond(f"Award {award} renamed to {description}.")
+    if user.change_award_name(award, description, session) is None:
+      print(f"change_award_name not found. {award}\n{num}\n{user.code}.")
+      await ctx.respond(f"Award not working {description}, {award}\n{num}\n{user.code}.", ephemeral = True)
+    
+    print(award)
+    award_t = award.split(", ")[:-2]
+    award = ", ".join(award_t)
+    
+    
+    await ctx.respond(f"Award {award} renamed to {description}.")
 #award rename end  
 
 
@@ -645,10 +620,7 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
       print("creating_user")
       user = create_user(ctx.author.id, ctx.author.display_name)
   else:
-    user = get_from_db("User", ctx.author.id)
-    if user is None:
-      await ctx.respond("User does not have an account yet. To create an acccount they must do /balance.", ephemeral = True)
-      return
+    if (user := await get_user_from_member(ctx, user)) is None: return
     
   embedd = await create_user_embedded(user)
   if embedd is None:

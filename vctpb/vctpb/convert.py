@@ -5,7 +5,7 @@ from User import User
 import discord
 from dbinterface import get_from_db
 from sqlaobjs import Session
-from sqlalchemy import select
+from sqlalchemy import select, literal
 
 
 def ambig_to_obj(ambig, prefix, session=None):
@@ -80,4 +80,4 @@ def usernames_to_users(usernames, session=None):
   if session is None:
     with Session.begin() as session:
       return usernames_to_users(usernames, session)
-  return session.scalars(select(User).where(User.username.in_(usernames))).all()
+  return session.scalars(select(User).where(literal(usernames).contains(User.username))).all()
