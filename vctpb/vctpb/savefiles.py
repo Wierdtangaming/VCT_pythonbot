@@ -1,9 +1,6 @@
 import os
 from datetime import datetime
-from pytz import timezone
-import sys
 import shutil
-import time
 from dbinterface import get_date_string
 
 
@@ -20,8 +17,8 @@ def get_days(date_string):
   day_of_year = datetime(int(year), int(month), int(day))
   return(day_of_year - datetime(1970,1,1)).days
 
-def get_all_names(path="files/", ext=False):
-  names = os.listdir(f"savedata/{path}")
+def get_all_names(path, ext=False):
+  names = os.listdir(f"{path}")
   if ext:
     return names
   return [os.path.splitext(name)[0] for name in names]
@@ -31,12 +28,12 @@ def copy_db_to(path):
   
 
 def make_folder(name, path):
-  os.mkdir(f"savedata/{path}{name}/")
+  os.mkdir(f"{path}{name}/")
 
 
 
 def delete_folder(name, path):
-  path_and_file = f"savedata/{path}{name}"
+  path_and_file = f"{path}{name}"
   try:
     shutil.rmtree(path_and_file)
     print(f"deleted folder {path_and_file}")
@@ -51,6 +48,7 @@ def backup():
   make_folder(date_string, f"backup/")
   date_path = f"backup/{date_string}/"
   copy_db_to(date_path)
+  print("coppy done")
   delete_old_backup()
 
 
@@ -66,12 +64,16 @@ def equate(x):
 
 def delete_old_backup():
   file_names = get_all_names(path="backup/")
+  
   date_string = get_date_string()
   old_file_names = []
   for file_name in file_names:
     if not file_name.startswith(date_string[:10]):
       old_file_names.append(file_name)
-      
+  
+  if len(old_file_names) == 0:
+    print("no old backup files found")
+    return
   #all files from the day deleted
   file_days_dict = {}
   for old_file_name in old_file_names:

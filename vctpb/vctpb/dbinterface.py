@@ -16,6 +16,9 @@ def get_date():
   central = timezone('US/Central')
   return datetime.now(central)
 
+def get_date_string():
+  return get_date().strftime("%Y-%m-%d-%H-%M-%S")
+
 
 
 def get_all_db(table_name, session=None):

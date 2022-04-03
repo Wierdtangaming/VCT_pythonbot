@@ -2,7 +2,8 @@ import os
 from github import Github
 from zipfile import ZipFile
 import zipfile
-from savefiles import get_setting, create_error_file, backup, get_days, get_all_names, get_date_string
+from savefiles import backup, get_days, get_all_names, get_date_string
+from dbinterface import get_setting
 import atexit
 
 
@@ -78,7 +79,8 @@ def save_to_github(message):
   
   backup()
   
-    
+  print("\n-----------Uploading-----------\n")
+  
   try:
     os.remove("backup.zip")
   except:

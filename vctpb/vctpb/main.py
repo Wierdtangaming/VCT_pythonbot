@@ -377,6 +377,10 @@ async def on_ready():
 
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
+  from test import f
+  if f:
+    quit()
+  f = True
   print("timer")
   backup_full()
   
@@ -2016,65 +2020,7 @@ async def reset_season(ctx, name):
 #debug
 @bot.command()
 async def debug(ctx, *args):
-  if len(args) == 1:
-    if args[0] == "help":
-      await ctx.send(
-        """IF YOU ARE NOT PIG DONT MESS WITH DEBUG, WHAT YOU NEED IS SOMEWHERE ELSE PLEASE DON'T BREAK MY DATABASE
-$debug list [match, user, bet]: gives all info on all of object
-$debug keys: gives all keys
-$debug key "[key]": prints key as is (quotes only needed if there is a space)
-$debug reassign "[original key]" "[new key]": replaces the original key with the new key (quotes only needed if there is a space)
-$debug delete key "[key]": deletes key for database (quotes only needed if there is a space)
-$debug balance print [user @]: prints balance to console
-$debug balance delete [user @] "balance id: delete balance with that ID
-$debug balance rename [user @] "old balance id" "new balance id": replaces balance ID with new ID
-$debug user_dump: prints json dump"""
-      )
-
-    elif args[0] == "keys":
-      await ctx.send(str(get_all_names())[1:-1])
-
-    elif args[0] == "user_dump":
-      user = get_from_list("user", ctx.author.id)
-      print(jsonpickle.encode(user))
-
-    else:
-      await ctx.send("Not valid command. Use $debug help to get list of commands")
-
-  elif len(args) == 2:
-
-    if args[0] == "list" and (args[1] == "match" or args[1] == "user" or args[1] == "bet"):
-      objects = get_all_objects(args[1])
-      output = ""
-      for obj in objects:
-        output += obj.to_string() + "\n"
-      if not output == "":
-        print(output)
-      else:
-        await ctx.send("No keys of type " + args[1])
-
-    elif args[0] == "key":
-      print(str(get_file(args[1])))
-
-    else:
-      await ctx.send("Not valid command. Use $debug help to get list of commands")
-
-  elif len(args) == 3:
-    uid = get_user_from_at(args[2])
-    if args[0] == "balance" and args[1] == "print" and not uid == None:
-      print_all_balance(uid)
-    else:
-      await ctx.send("Not valid command. Use $debug help to get list of commands")
-  elif len(args) == 4:
-    uid = get_user_from_at(args[2])
-    if args[0] == "balance" and args[1] == "delete" and not uid == None:
-      print(delete_balance_id(uid, args[3]))
-  elif len(args) == 5:
-    uid = get_user_from_at(args[2])
-    if args[0] == "balance" and args[1] == "rename" and not uid == None:
-      print(rename_balance_id(uid, args[3], args[4]))
-  else:
-    await ctx.send("Not valid command. Use $debug help to get list of commands")
+  await ctx.send("Not valid command.")
 
 @bot.command()
 async def clean_match_bet_ids_without_bet(ctx):
