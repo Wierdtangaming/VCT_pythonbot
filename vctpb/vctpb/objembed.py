@@ -62,7 +62,7 @@ async def create_bet_embedded(bet_ambig, title, session=None):
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
-  embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
+  embed.add_field(name="Amount Bet:", value=bet.amount_bet, inline=True)
   (team, payout) = bet.get_team_and_payout()
 
   embed.add_field(name="Bet on:", value=team, inline=True)
@@ -138,7 +138,7 @@ async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
       value = f"Won {math.floor(payout)}. Current balance: {math.floor(user.balances[-1][1])}"
     else:
       value = f"Lost {math.floor(payout)}. Current balance: {math.floor(user.balances[-1][1])}"
-    embed.add_field(name=f"{user.username} bet {bet.bet_amount} on {bet.get_team()}", value=value, inline=False)
+    embed.add_field(name=f"{user.username} bet {bet.amount_bet} on {bet.get_team()}", value=value, inline=False)
 
   return embed
 

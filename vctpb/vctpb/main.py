@@ -114,7 +114,7 @@ async def available_bets_name_code(bot):
         else: 
           name = get_from_list("user", bet.user_id).username
           id_dict[bet.user_id] = name
-        bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+        bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
   return bet_list
 
 async def current_bets_name_code(bot):
@@ -128,7 +128,7 @@ async def current_bets_name_code(bot):
       else: 
         name = get_from_list("user", bet.user_id).username
         id_dict[bet.user_id] = name
-      bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+      bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
   return bet_list
 
 async def all_bets_name_code(bot):
@@ -143,9 +143,9 @@ async def all_bets_name_code(bot):
         name = get_from_list("user", bet.user_id).username
         id_dict[bet.user_id] = name
         
-      bet_list.append((f"Paid out: {name}: {bet.bet_amount} on {bet.get_team()}", bet))
+      bet_list.append((f"Paid out: {name}: {bet.amount_bet} on {bet.get_team()}", bet))
     else:
-      bet_list.append((f"{name}: {bet.bet_amount} on {bet.get_team()}", bet))
+      bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
   return bet_list
 
 
@@ -251,6 +251,7 @@ async def edit_all_messages(ids, embedd):
       await msg.edit(embed=embedd)
     except Exception:
       print(id, "no msg found")
+      
 
 async def delete_all_messages(ids):
   for id in ids:
@@ -277,8 +278,11 @@ def to_float(str):
   except ValueError:
     return None
 
-def get_unique_code(prefix):
-  all_objs = get_all_objects(prefix)
+def get_unique_code(prefix, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_unique_code(prefix, session)
+  all_objs = get_all_db(prefix, session)
   codes = [str(k.code) for k in all_objs]
   code = ""
   copy = True
@@ -547,7 +551,7 @@ async def award_give(ctx,
     if abu is None:
       await ctx.respond("User not found.", ephemeral = True)
     else:
-      embedd = await create_user_embedded(user)
+      embedd = await create_user_embedded(user, session)
       await ctx.respond(embed=embedd)
 #award give end
 
@@ -678,72 +682,72 @@ class BetCreateModal(Modal):
       amount_label = error[1]
     self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
 
+
   async def callback(self, interaction: discord.Interaction):
-    
-    match = self.match
-    user = self.user
-    team_num = self.children[0].value
-    amount = self.children[1].value
-    error = [None, None]
-    
-    if not is_digit(amount):
-      print("Amount has to be a positive whole integer.")
-      error[1] = "Amount must be a positive whole number."
-    else:
-      if int(amount) <= 0:
-        print("Cant bet negatives.")
+    with Session.begin() as session:
+      match = self.match
+      user = self.user
+      team_num = self.children[0].value
+      amount = self.children[1].value
+      error = [None, None]
+      
+      if not is_digit(amount):
+        print("Amount has to be a positive whole integer.")
         error[1] = "Amount must be a positive whole number."
-    
-    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
-      print("Team num has to either be 1 or 2.")
-      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
-    else:
-      if team_num.lower() == match.t1.lower():
-        team_num = "1"
-      elif team_num.lower() == match.t2.lower():
-        team_num = "2"
+      else:
+        if int(amount) <= 0:
+          print("Cant bet negatives.")
+          error[1] = "Amount must be a positive whole number."
+      
+      if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+        print("Team num has to either be 1 or 2.")
+        error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+      else:
+        if team_num.lower() == match.t1.lower():
+          team_num = "1"
+        elif team_num.lower() == match.t2.lower():
+          team_num = "2"
 
-    if not match.date_closed is None:
-      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+      if not match.date_closed is None:
+        await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
-    code = get_unique_code("bet")
-    if error[1] is None:
-      balance_left = user.get_balance() - int(amount)
-      if balance_left < 0:
-        print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
-        error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
-    
-    if not error == [None, None]:
-      errortext = ""
-      if error[0] is not None:
-        errortext += error[0]
+      code = get_unique_code("Bet", session)
+      if error[1] is None:
+        balance_left = user.get_balance() - int(amount)
+        if balance_left < 0:
+          print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
+          error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
+      
+      if not error == [None, None]:
+        errortext = ""
+        if error[0] is not None:
+          errortext += error[0]
+          if error[1] is not None:
+            errortext += "\n"
         if error[1] is not None:
-          errortext += "\n"
-      if error[1] is not None:
-        errortext += error[1]
-      await interaction.response.send_message(errortext, ephemeral = True)
-      return
+          errortext += error[1]
+        await interaction.response.send_message(errortext, ephemeral = True)
+        return
 
-    color = code[:6]
-    bet = Bet(code, match.code, user.code, int(amount), int(team_num), get_date(), match.t1, match.t2, match.tournament_name, color)
+      color = code[:6]
+      
+      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date())
 
-    match.bet_ids.append(bet.code)
-    add_to_active_ids(user.code, bet)
+      add_to_active_ids(user.code, bet, session)
 
-    embedd = await create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.")
-    
-    if (channel := await bot.fetch_channel(get_file("bet_channel_id"))) == interaction.channel:
-      inter = await interaction.response.send_message(embed=embedd)
-      msg = await inter.original_message()
-    else:
-      await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
-      msg = await channel.send(embed=embedd)
+      embedd = await create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.")
+      
+      if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
+        inter = await interaction.response.send_message(embed=embedd)
+        msg = await inter.original_message()
+      else:
+        await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
+        msg = await channel.send(embed=embedd)
 
-    bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("match", match.code, match)
-    add_to_list("bet", bet)
-    embedd = await create_match_embedded(match, "Placeholder")
-    await edit_all_messages(match.message_ids, embedd)
+      bet.message_ids.append((msg.id, msg.channel.id))
+      add_to_db(bet, session)
+      embedd = await create_match_embedded(match, "Placeholder", session)
+      await edit_all_messages(match.message_ids, embedd)
 #bet create modal end
 
 #bet edit modal start
@@ -778,75 +782,72 @@ class BetEditModal(Modal):
       
     self.add_item(InputText(label=team_label, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
-    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance() + bet.bet_amount)}"
-    self.add_item(InputText(label=amount_label, placeholder = bet.bet_amount, min_length=1, max_length=20, required=False))
+    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance() + bet.amount_bet)}"
+    self.add_item(InputText(label=amount_label, placeholder = bet.amount_bet, min_length=1, max_length=20, required=False))
 
   async def callback(self, interaction: discord.Interaction):
-    
-    match = self.match
-    user = self.user
-    bet = self.bet
+    with Session.begin() as session:
+      match = self.match
+      user = self.user
+      bet = self.bet
 
-    team_num = self.children[0].value
-    if team_num == "":
-      team_num = str(bet.team_num)
-    amount = self.children[1].value
-    if amount == "":
-      amount = str(bet.bet_amount)
-    error = [None, None]
-    
-    if not is_digit(amount):
-      print("Amount has to be a positive whole integer.")
-      error[1] = "Amount must be a positive whole number."
-    else:
-      if int(amount) <= 0:
-        print("Cant bet negatives.")
+      team_num = self.children[0].value
+      if team_num == "":
+        team_num = str(bet.team_num)
+      amount = self.children[1].value
+      if amount == "":
+        amount = str(bet.amount_bet)
+      error = [None, None]
+      
+      if not is_digit(amount):
+        print("Amount has to be a positive whole integer.")
         error[1] = "Amount must be a positive whole number."
+      else:
+        if int(amount) <= 0:
+          print("Cant bet negatives.")
+          error[1] = "Amount must be a positive whole number."
 
-    if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
-      print("Team num has to either be 1 or 2.")
-      error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
-    else:
-      if team_num.lower() == match.t1.lower():
-        team_num = "1"
-      elif team_num.lower() == match.t2.lower():
-        team_num = "2"
-    
+      if not (team_num == "1" or team_num == "2" or team_num.lower() == match.t1.lower() or team_num.lower() == match.t2.lower()):
+        print("Team num has to either be 1 or 2.")
+        error[0] = f'Team number has to be "1", "2", "{match.t1}", or "{match.t2}".'
+      else:
+        if team_num.lower() == match.t1.lower():
+          team_num = "1"
+        elif team_num.lower() == match.t2.lower():
+          team_num = "2"
+      
 
-    if not match.date_closed is None:
-      await interaction.response.send_message("Betting has closed you cannot make a bet.")
+      if not match.date_closed is None:
+        await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
-    if error[0] is None:
-      balance_left = user.get_balance() + bet.bet_amount - int(amount)
-      if balance_left < 0:
-        print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
-        error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
+      if error[0] is None:
+        balance_left = user.get_balance() + bet.amount_bet - int(amount)
+        if balance_left < 0:
+          print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
+          error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
 
-    if not error == [None, None]:
-      errortext = ""
-      if error[0] is not None:
-        errortext += error[0]
+      if not error == [None, None]:
+        errortext = ""
+        if error[0] is not None:
+          errortext += error[0]
+          if error[1] is not None:
+            errortext += "\n"
         if error[1] is not None:
-          errortext += "\n"
-      if error[1] is not None:
-        errortext += error[1]
-      await interaction.response.send_message(errortext)
-      return
-    
-    bet.bet_amount = int(amount)
-    bet.team_num = int(team_num)
+          errortext += error[1]
+        await interaction.response.send_message(errortext)
+        return
+      
+      bet.amount_bet = int(amount)
+      bet.team_num = int(team_num)
 
-    match.bet_ids.append(bet.code)
 
-    embedd = await create_bet_embedded(bet, f"Edit Bet: {user.username}, {amount} on {bet.get_team()}.")
-    
-    inter = await interaction.response.send_message(embed=embedd)
-    msg = await inter.original_message()
+      embedd = await create_bet_embedded(bet, f"Edit Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+      
+      inter = await interaction.response.send_message(embed=embedd)
+      msg = await inter.original_message()
 
-    await edit_all_messages(bet.message_ids, embedd)
-    bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("bet", bet.code, bet)
-
+      await edit_all_messages(bet.message_ids, embedd)
+      bet.message_ids.append((msg.id, msg.channel.id))
 #bet edit modal end
 
   
@@ -947,7 +948,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
   remove_from_active_ids(bet.user_id, bet.code)
   remove_from_list("bet", bet)
   user = get_from_list("user", bet.user_id)
-  embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.bet_amount} on {bet.get_team()}.")
+  embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.")
   await gen_msg.edit_original_message(content="", embed=embedd)
 #bet cancel end
 
@@ -977,7 +978,7 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
     if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "Bet")) is None: return
   bet = fbet
   user = get_from_list("user", bet.user_id)
-  embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.bet_amount} on {bet.get_team()}.")
+  embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
   inter = await ctx.respond(embed=embedd)
   msg = await inter.original_message()
   bet.message_ids.append((msg.id, msg.channel.id))
@@ -1008,7 +1009,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     #full
     for i, bet in enumerate(bet_list):
       user = get_from_list("user", bet.user_id)
-      embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.bet_amount} on {bet.get_team()}.")
+      embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
       if i == 0:
         inter = await ctx.respond(embed=embedd)
         msg = await inter.original_message()
@@ -1446,7 +1447,7 @@ class MatchCreateModal(Modal):
       
     print(team_one_odds, team_two_odds)
     
-    code = get_unique_code("match")
+    code = get_unique_code("Match")
   
     color = code[:6]
     match = Match(team_one, team_two, team_one_old_odds, team_two_old_odds, team_one_odds, team_two_odds, tournament_name, betting_site, interaction.user.id, get_date(), color, code)
@@ -1687,7 +1688,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     #full
     for i, bet in enumerate(bet_list):
       user = get_from_list("user", bet.user_id)
-      embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.bet_amount} on {bet.get_team()}.")
+      embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
       if i == 0:
         inter = await ctx.respond(embed=embedd)
         msg = await inter.original_message()
@@ -1854,9 +1855,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     if not bet is None:
       #to do print out embedds of bets
       bet.winner = int(match.winner)
-      payout = -bet.bet_amount
+      payout = -bet.amount_bet
       if bet.team_num == team:
-        payout += bet.bet_amount * odds
+        payout += bet.amount_bet * odds
       user = get_from_list("user", bet.user_id)
       remove_from_active_ids(user, bet.code)
       add_balance_user(user, payout, "id_" + str(bet.code), date)
@@ -1941,9 +1942,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
     if not bet is None:
       #to do print out embedds of bets
       bet.winner = int(match.winner)
-      payout = -bet.bet_amount
+      payout = -bet.amount_bet
       if bet.team_num == team:
-        payout += bet.bet_amount * odds
+        payout += bet.amount_bet * odds
       user = get_from_list("user", bet.user_id)
       remove_from_active_ids(user, bet.code)
       add_balance_user(user, payout, "id_" + str(bet.code), date)
