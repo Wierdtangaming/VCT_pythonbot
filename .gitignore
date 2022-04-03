@@ -1,8 +1,9 @@
-.replit
-savedata/
-settings/
 poetry.lock
 pyproject.toml
-gitbackup.zip
-backup.zip
+*.zip
 .DS_Store
+*.db
+*.db-journal
+*.ini
+*/savedata
+*/settings

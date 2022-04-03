@@ -14,5 +14,6 @@
                 "command": "cd vctpb\npoetry run python vctpb/main.py", // This is executed in the terminal.
             }
         ]
-    }
+    },
+    "editor.tabSize": 2
 }

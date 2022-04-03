@@ -21,8 +21,10 @@ class Match():
   tournament_name = Column(String(100), nullable=False)
   odds_source = Column(String(50), nullable=False)
   winner = Column(Integer, nullable=False)
-  color = Column(String(6), nullable=False)
-  creator_id = Column(Integer, ForeignKey("user.code"), nullable=False)
+  color_name = Column(String(32), ForeignKey("color.name"))
+  color = relationship("Color", back_populates="matches")
+  color_hex = Column(String(6), nullable=False)
+  creator_id = Column(Integer, ForeignKey("user.code"))
   creator = relationship("User", back_populates="matches")
   date_created = Column(DateTime(timezone = True), nullable=False)
   date_winner = Column(DateTime(timezone = True), nullable=False)
@@ -47,7 +49,7 @@ class Match():
     
     self.winner = 0
 
-    self.color = color
+    self.set_color(color)
     
     #id of user that created match
     self.creator_id = creator_id
@@ -72,13 +74,22 @@ class Match():
     self.tournament_name = tournament_name
     self.winner = winner
     self.odds_source = odds_source
-    self.color = color
+    self.set_color(color)
     self.creator_id = creator_id
     self.date_created = date_created
     self.date_winner = date_winner
     self.date_closed = date_closed
     self.bet_ids = bet_ids
     self.message_ids = message_ids
+  
+  def set_color(self, color):
+    if isinstance(color, str):
+      self.color_name = None
+      self.color_hex = color
+      return
+    
+    self.color_name = color.name
+    self.color_hex = color.hex
   
   def __repr__(self):
     return f"<Match {self.code}>"

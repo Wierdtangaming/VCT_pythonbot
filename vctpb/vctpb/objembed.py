@@ -1,5 +1,5 @@
 import discord
-from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user
+from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects
 from Match import Match
 from Bet import Bet
 from User import User

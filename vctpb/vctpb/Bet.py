@@ -19,7 +19,9 @@ class Bet():
   winner = Column(Integer, nullable=False)
   amount_bet = Column(Integer, nullable=False)
   team_num = Column(Integer, nullable=False)
-  color = Column(String(6), nullable=False)
+  color_name = Column(String(32), ForeignKey("color.name"))
+  color = relationship("Color", back_populates="bets")
+  color_hex = Column(String(6), nullable=False)
   match_id = Column(String(8), ForeignKey("match.code"), nullable=False)
   match = relationship("Match", back_populates="bets")
   user_id = Column(Integer, ForeignKey("user.code"), nullable=False)
@@ -41,7 +43,7 @@ class Bet():
     self.amount_bet = amount_bet
     self.team_num = team_num
     
-    self.color = color
+    self.set_color(color)
     
     self.match_id = match_id
     self.user_id = user_id
@@ -51,18 +53,27 @@ class Bet():
     self.message_ids = []
 
   def __init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
-      self.code = code
-      self.t1 = t1
-      self.t2 = t2
-      self.tournament_name = tournament_name
-      self.winner = winner
-      self.amount_bet = amount_bet
-      self.team_num = team_num
-      self.color = color
-      self.match_id = match_id
-      self.user_id = user_id
-      self.date_created = date_created
-      self.message_ids = message_ids
+    self.code = code
+    self.t1 = t1
+    self.t2 = t2
+    self.tournament_name = tournament_name
+    self.winner = winner
+    self.amount_bet = amount_bet
+    self.team_num = team_num
+    self.set_color(color)
+    self.match_id = match_id
+    self.user_id = user_id
+    self.date_created = date_created
+    self.message_ids = message_ids
+  
+  def set_color(self, color):
+    if isinstance(color, str):
+      self.color_name = None
+      self.color_hex = color
+      return
+    
+    self.color_name = color.name
+    self.color_hex = color.hex
   
   def __repr__(self):
     return f"<Bet {self.code}>"
@@ -80,10 +91,10 @@ class Bet():
       return self.t2
     
   def get_match(self):
-    return get_from_list("match", self.match_id)
+    return get_from_list("Match", self.match_id)
     
   def get_team_and_payout(self):
-    match = get_from_list("match", self.match_id)
+    match = get_from_list("Match", self.match_id)
 
     team = ""
     payout = 0.0
@@ -124,13 +135,13 @@ class Bet():
 
   async def basic_to_string(self, bot, match=None):
     if match is None:
-      match = get_from_list("match", self.match_id)
+      match = get_from_list("Match", self.match_id)
 
     return f"Bet: {self.code}, User: <@!{self.user_id}>, Team: {self.get_team()}, Amount: {self.amount_bet}, Match ID: {match.code}"
   
   def balance_to_string(self, balance):
     
-    match = get_from_list("match", self.match_id)
+    match = get_from_list("Match", self.match_id)
     (team, winner) = self.get_team_and_winner()
 
     return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.amount_bet)}, Balance change: {math.floor(balance)}"

@@ -1,7 +1,8 @@
+from hashlib import new
+from dbinterface import get_all_db, get_from_db, is_key_in_db, add_to_db, delete_from_db
+from sqlaobjs import Session
+from Color import Color
 
-from savefiles import get_file, save_file
-
-#color start
 def valid_hex(hex):
   if len(hex) != 6 and len(hex) != 7:
     return None
@@ -10,23 +11,12 @@ def valid_hex(hex):
     return None
   else:
     
-    hex = hex[-6:]
+    hex = hex[-6:].lower()
   try:
     int(hex, 16)
     return hex
   except ValueError:
     return None
-
-def get_all_colors():
-  colors = dict(get_file("colors"))
-  return colors
-
-def get_all_colors_key_hex():
-  colors = dict(get_file("colors"))
-  return list(colors.items())
-
-def save_colors(colors):
-  save_file("colors", colors)
 
 def hex_to_tuple(hex):
   if len(hex) != 6:
@@ -36,51 +26,49 @@ def hex_to_tuple(hex):
   
 def get_color(name):
   name = name.lower()
-  colors = get_all_colors()
-  return colors.get(name)
+  color = get_from_db("Color", name)
+  return color
   
 def add_color(name, hex):
-  name = name.lower()
-  cap_name = name.capitalize()
+  name = name.capitalize()
   hex = hex.lower()
-  colors = get_all_colors()
-  if (old_color := colors.get(name)) is not None:
-    return f"{cap_name} is already a color {old_color}."
+  if is_key_in_db("Color", name):
+    return f"{name} is already a color."
 
   old_hex = hex
   if (hex := valid_hex(hex)) is None:
     return f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters."
 
-  colors[name] = hex
-  save_colors(colors)
-  return f"{cap_name} has been added to the color list."
+  color = Color(name, hex)
+  add_to_db("Color", color)
+  return f"{name} has been added to the color list."
   
 def remove_color(name):
-  name = name.lower()
-  colors = get_all_colors()
-  cap_name = name.capitalize()
-  if (color := colors.pop(name, None)) is None:
-    return (f"{cap_name} was not found in color list.", color)
-  save_colors(colors)
-  return (f"Removed {cap_name} from color list", color)
+  name = name.capitalize()
+  with Session.begin() as session:
+    if not is_key_in_db("Color", name, session):
+      return f"{name} was not found in color list."
+    delete_from_db("Color", name, session)
+  return f"Removed {name} from color list"
 
 def rename_color(old_name, new_name):
-  if (old_hex := remove_color(old_name)[1]) is None:
-    return f"Could not find {old_name}."
-  add_color(new_name, old_hex)
-  return f"{old_name.capitalize()} is now {new_name.capitalize()}"
+  old_name = old_name.capitalize()
+  new_name = new_name.capitalize()
+  with Session.begin() as session:
+    color = get_from_db("Color", old_name, session)
+    if color is None:
+      return f"{old_name} was not found in color list."
+    color.name = new_name
+  return f"{old_name} has been renamed to {new_name}"
+    
   
 def recolor_color(name, hex):
-  name = name.lower()
-  cap_name = name.capitalize()
-  hex = hex.lower()
-  colors = get_all_colors()
-  if colors.get(name) is None:
-    return f"{cap_name} is not a color."
-  old_hex = hex
+  name = name.capitalize()
   if (hex := valid_hex(hex)) is None:
-    return f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters."
-
-  colors[name] = hex
-  save_colors(colors)
-  return f"{cap_name} now has the color {hex}"
+    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
+  with Session.begin() as session:
+    color = get_from_db("Color", name, session)
+    if color is None:
+      return f"{hex} was not found in color list."
+    color.hex = hex
+  return f"{name} now has the color {hex}"

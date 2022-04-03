@@ -4,10 +4,6 @@
 # have it replace by code not by value
 # test prefix unique with 1 long in test code
 
-
-
-from email.errors import NonPrintableDefect
-from email.policy import default
 from io import BytesIO
 import collections
 #git clone https://github.com/Pycord-Development/pycord
@@ -29,7 +25,6 @@ from User import User, get_multi_graph_image, all_user_unique_code, get_all_uniq
 from dbinterface import get_from_list, add_to_list, replace_in_list, remove_from_list, get_all_objects, smart_get_user, get_date
 from colorinterface import get_all_colors, hex_to_tuple, save_colors, get_color, add_color, remove_color, rename_color, recolor_color, get_all_colors_key_hex
 import math
-import emoji
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users

@@ -9,7 +9,7 @@ import random
 import math
 import secrets
 import sys
-from sqlalchemy import Column, String, BOOLEAN
+from sqlalchemy import Column, String, BOOLEAN, ForeignKey
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 
@@ -21,18 +21,20 @@ class User():
   
   code = Column(String(8), primary_key=True)
   username = Column(String(32), nullable=False)
-  color = Column(String(6), nullable=False)
+  color_name = Column(String(32), ForeignKey("color.name"))
+  color = relationship("Color", back_populates="users")
+  color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
   balances = Column(JSONLIST, nullable=False) #array of Tuple(bet_id, balance after change, date)
   active_bet_ids = Column(JSONLIST, nullable=False) #array of strings code of active bets
   loans = Column(JSONLIST, nullable=False) #array of Tuple(balance, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete")
-  matches = relationship("Match", back_populates="creator", cascade="all, delete")
+  matches = relationship("Match", back_populates="creator")
   
   def __init__(self, code, username, color, date_created):
     self.code = code
     self.username = username
-    self.color = color
+    self.set_color(color)
     
     self.hidden = True
     #a tuple (bet_id, balance after change, date)
@@ -53,11 +55,20 @@ class User():
   def __init__(self, code, username, color, hidden, balances, active_bet_ids, loans):
     self.code = code
     self.username = username
-    self.color = color
+    self.set_color(color)
     self.hidden = hidden
     self.balances = balances
     self.active_bet_ids = active_bet_ids
     self.loans = loans
+  
+  def set_color(self, color):
+    if isinstance(color, str):
+      self.color_name = None
+      self.color_hex = color
+      return
+    
+    self.color_name = color.name
+    self.color_hex = color.hex
   
   def __repr__(self):
     return f"<User {self.code}>"
@@ -106,12 +117,12 @@ class User():
     used = 0
     active_bet_ids_bets = self.active_bet_ids_bets()
     for bet_id in active_bet_ids_bets:
-      temp_bet = get_from_list("bet", bet_id)
+      temp_bet = get_from_list("Bet", bet_id)
       if temp_bet == None:
         ids = [t for t in self.active_bet_ids if bet_id == t[0]]
         for id in ids:
           self.active_bet_ids.remove(id)
-        replace_in_list("user", self.code, self)
+        replace_in_list("User", self.code, self)
         continue
       used += temp_bet.amount_bet
 
@@ -161,7 +172,7 @@ class User():
       if balance[0] == id:
         self.balances.remove(balance)
         break
-    replace_in_list("user", self.code, self)
+    replace_in_list("User", self.code, self)
 
   def change_award_name(self, award_label, name):
     for balance in self.balances:
@@ -170,7 +181,7 @@ class User():
         break
     else:
       return None
-    replace_in_list("user", self.code, self)
+    replace_in_list("User", self.code, self)
     return self
   
   
@@ -199,7 +210,7 @@ class User():
       balance_change = balance[1] - before
       if balance[0].startswith("id_"):
         #bet id
-        bet = get_from_list("bet", balance[0][3:])
+        bet = get_from_list("Bet", balance[0][3:])
 
         embeds[endex].add_field(name=f"Bet: {bet.code}", value=bet.balance_to_string(balance_change), inline=False)
         
@@ -284,7 +295,7 @@ class User():
           line_colors.append('k')
       before = amount
       if bet_id.startswith('id_'):
-        bet = get_from_list("bet", bet_id[3:])
+        bet = get_from_list("Bet", bet_id[3:])
         match = bet.get_match()
         t1 = match.t1
         t2 = match.t2
@@ -438,7 +449,7 @@ def get_multi_graph_image(users, balance_range_ambig):
     bet_id, amount = balance[:2]
 
     if bet_id.startswith('id_'):
-      bet = get_from_list("bet", bet_id[3:])
+      bet = get_from_list("Bet", bet_id[3:])
       match = bet.get_match()
       bet_id = f"id_{match.code}"
 
