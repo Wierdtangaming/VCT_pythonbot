@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
+from dbinterface import get_from_db, get_mult_from_db
 
 @mapper_registry.mapped
 class User():
@@ -25,6 +26,7 @@ class User():
   color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balances after change, date)
+  have under connected
   active_bet_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of strings code of active bets
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balances, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete")
@@ -102,7 +104,6 @@ class User():
     return open_loans
 
   def loan_bal(self):
-
     loan_amount = 0
     loans = self.get_open_loans()
     if loans == 0:
@@ -112,24 +113,27 @@ class User():
     
     return loan_amount
 
-  def unavailable(self):
+  def unavailable(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.unavailable(session)
     used = 0
-    active_bet_ids_bets = self.active_bet_ids_bets()
-    for bet_id in active_bet_ids_bets:
-      temp_bet = get_from_list("Bet", bet_id)
-      if temp_bet is None:
-        ids = [t for t in self.active_bet_ids if bet_id == t[0]]
-        for id in ids:
-          self.active_bet_ids.remove(id)
-        replace_in_list("User", self.code, self)
+    bets = get_mult_from_db("Bet", self.active_bet_ids_bets(), session)
+    
+    for bet in bets:
+      if bet is None:
+        self.active_bet_ids.remove(bet.code)
         continue
-      used += temp_bet.amount_bet
+      used += bet.amount_bet
 
     return used
 
-  def get_balance(self):
+  def get_balance(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.unavailable(session)
     bal = self.balances[-1][1]
-    bal -= self.unavailable()
+    bal -= self.unavailable(session)
     bal += self.loan_bal()
     return bal
 

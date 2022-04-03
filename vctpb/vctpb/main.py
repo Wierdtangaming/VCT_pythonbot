@@ -646,7 +646,7 @@ betscg = SlashCommandGroup(
 #bet create modal start
 class BetCreateModal(Modal):
   
-  def __init__(self, match: Match, user: User, error=[None, None], *args, **kwargs) -> None:
+  def __init__(self, match: Match, user: User, error=[None, None], session=None, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
@@ -680,7 +680,7 @@ class BetCreateModal(Modal):
       amount_label = "Amount you want to bet."
     else:
       amount_label = error[1]
-    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance())}", min_length=1, max_length=20))
+    self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance(session))}", min_length=1, max_length=20))
 
 
   async def callback(self, interaction: discord.Interaction):
@@ -713,7 +713,7 @@ class BetCreateModal(Modal):
 
       code = get_unique_code("Bet", session)
       if error[1] is None:
-        balance_left = user.get_balance() - int(amount)
+        balance_left = user.get_balance(session) - int(amount)
         if balance_left < 0:
           print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
           error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
@@ -753,7 +753,7 @@ class BetCreateModal(Modal):
 #bet edit modal start
 class BetEditModal(Modal):
   
-  def __init__(self, match: Match, user: User, bet = Bet, *args, **kwargs) -> None:
+  def __init__(self, match: Match, user: User, bet: Bet, session=None, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
@@ -782,7 +782,7 @@ class BetEditModal(Modal):
       
     self.add_item(InputText(label=team_label, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
-    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance() + bet.amount_bet)}"
+    amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance(session) + bet.amount_bet)}"
     self.add_item(InputText(label=amount_label, placeholder = bet.amount_bet, min_length=1, max_length=20, required=False))
 
   async def callback(self, interaction: discord.Interaction):
@@ -854,7 +854,7 @@ class BetEditModal(Modal):
 #new match list autocomplete start
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
   match_t_list = available_matches_name_code()
-  if (user := get_from_list("user", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
+  if (user := get_from_db("User", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
   active_bet_ids_matches = user.active_bet_ids_matches()
   auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
   return auto_completes
