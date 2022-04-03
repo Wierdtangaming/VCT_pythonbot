@@ -16,41 +16,31 @@ def get_date():
   central = timezone('US/Central')
   return datetime.now(central)
 
-def get_date_string():
-  return get_date().strftime("%Y-%m-%d-%H-%M-%S")
+
 
 def get_all_db(table_name, session=None):
   if session is None:
     with Session.begin() as session:
       return session.scalars(select(eval(table_name))).all()
-  else:
-    return session.scalars(select(eval(table_name))).all()
-
-def get_all_with_db(table_name, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return session.scalars(select(eval(table_name))).all()
-  else:
-    return session.scalars(select(eval(table_name))).all()
-
+  return session.scalars(select(eval(table_name))).all()
+  
+  
 def get_from_db(table_name, code, session=None):
   if session is None:
     with Session.begin() as session:
       return session.get(eval(table_name), code, populate_existing=True)
-  else:
-    return session.get(eval(table_name), code, populate_existing=True)
+  return session.get(eval(table_name), code, populate_existing=True)
     
     
 def get_mult_from_db(table_name, codes, session=None):
   if session is None:
     with Session.begin() as session:
       return get_mult_from_db(table_name, codes, session)
+  if table_name == "Color":
+    return session.scalars(select(Color).where(Color.name.in_(codes))).all()
   else:
-    if table_name == "Color":
-      return session.scalars(select(Color).where(Color.name.in_(codes))).all()
-    else:
-      obj = eval(table_name)
-      return session.scalars(select(obj).where(obj.code.in_(codes))).all()
+    obj = eval(table_name)
+    return session.scalars(select(obj).where(obj.code.in_(codes))).all()
 
 
 def delete_from_db(ambig, table_name=None, session=None):
@@ -73,9 +63,8 @@ def delete_from_db(ambig, table_name=None, session=None):
 def add_to_db(obj, session=None):
   if session is None:
     with Session.begin() as session:
-      session.add(obj)
-  else:
-    session.add(obj)
+      return add_to_db(obj, session)
+  session.add(obj)
   session.expire_all()
 
 
@@ -83,26 +72,25 @@ def is_key_in_db(table_name, key, session=None):
   if session is None:
     with Session.begin() as session:
       return is_key_in_db(table_name, key, session)
+  if table_name == "Color":
+    return session.scalars(select(Color).where(Color.name == key)).one_or_none() is not None
   else:
-    if table_name == "Color":
-      return session.scalars(select(Color).where(Color.name == key)).one_or_none() is not None
-    else:
-      obj = eval(table_name)
-      return session.scalars(select(obj).where(obj.code == key)).one_or_none() is not None
+    obj = eval(table_name)
+    return session.scalars(select(obj).where(obj.code == key)).one_or_none() is not None
       
       
 def get_channel_from_db(channel_name, session=None):
   if session is None:
     with Session.begin() as session:
       return get_channel_from_db(channel_name, session)
+    
+  channels = session.scalars(select(Channels)).one()
+  if channel_name == "bet":
+    return channels.bet_channel_id
+  elif channel_name == "match":
+    return channels.match_channel_id
   else:
-    channels = session.scalars(select(Channels)).one()
-    if channel_name == "bet":
-      return channels.bet_channel_id
-    elif channel_name == "match":
-      return channels.match_channel_id
-    else:
-      return None
+    return None
                            
                           
 def get_setting(setting_name):
@@ -110,4 +98,3 @@ def get_setting(setting_name):
   configur = ConfigParser()
   configur.read('settings.ini')
   return configur.get("settings", setting_name)
-  

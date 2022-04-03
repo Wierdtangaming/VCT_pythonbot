@@ -4,13 +4,15 @@ from Bet import Bet
 from User import User
 import discord
 from dbinterface import get_from_db
+from sqlaobjs import Session
+from sqlalchemy import select
 
 
-def ambig_to_obj(ambig, prefix):
+def ambig_to_obj(ambig, prefix, session=None):
   if isinstance(ambig, int) or isinstance(ambig, str):
-    obj = get_from_db(prefix, ambig)
+    obj = get_from_db(prefix, ambig, session=session)
   elif isinstance(ambig, discord.Member):
-    obj = get_from_db(prefix, ambig.id)
+    obj = get_from_db(prefix, ambig.id, session=session)
   elif isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
     obj = ambig
   else:
@@ -18,18 +20,18 @@ def ambig_to_obj(ambig, prefix):
     print(ambig, type(ambig))
   return obj
 
-def get_user_from_at(id):
+def get_user_from_at(id, session=None):
   uid = id.replace("<", "")
   uid = uid.replace(">", "")
   uid = uid.replace("@", "")
   uid = uid.replace("!", "")
   if uid.isdigit():
-    return get_user_from_id(int(uid))
+    return get_user_from_id(int(uid), session=session)
   else:
     return None
 
-def get_user_from_id(id):
-  return get_from_db("User", id)
+def get_user_from_id(id, session=None):
+  return get_from_db("User", id, session=session)
   
 
 def id_to_metion(id):
@@ -37,16 +39,16 @@ def id_to_metion(id):
 
 
   
-async def get_user_from_member(ctx, user):
+async def get_user_from_member(ctx, user, session=None):
   if user == None:
     user = ctx.author
-  user = get_from_db("User", user.id)
+  user = get_from_db("User", user.id, session=session)
   if user == None:
     await ctx.respond("User not found. To create an account do $balance")
   return user
 
 
-async def user_from_autocomplete_tuple(ctx, t_list, text, prefix):
+async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
   
   objs = [t[1] for t in t_list if text == t[0]]
   
@@ -56,7 +58,7 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix):
       await ctx.respond(f"Error please @pig. Try typing in code instead.")
     return None
   if len(objs) == 0:
-    obj = get_from_db(prefix, text)
+    obj = get_from_db(prefix, text, session=session)
   else:
     obj = objs[0]
     
@@ -67,14 +69,15 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix):
   return obj
 
 
-def get_user_from_username(username):
-  users = get_all_objects("user")
-  for user in users:
-    if user.username == username:
-      return user
-  return None
+def get_user_from_username(username, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_user_from_username(username, session)
+  return session.scalars(select(User).where(User.username == username)).first()
 
-def usernames_to_users(usernames):
-  users = get_all_objects("user")
-  return [user for user in users if user.username in usernames]
-  
+
+def usernames_to_users(usernames, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return usernames_to_users(usernames, session)
+  return session.scalars(select(User).where(User.username.in_(usernames))).all()
