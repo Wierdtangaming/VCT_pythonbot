@@ -10,9 +10,9 @@ from sqlalchemy import select
 
 def ambig_to_obj(ambig, prefix, session=None):
   if isinstance(ambig, int) or isinstance(ambig, str):
-    obj = get_from_db(prefix, ambig, session=session)
+    obj = get_from_db(prefix, ambig, session)
   elif isinstance(ambig, discord.Member):
-    obj = get_from_db(prefix, ambig.id, session=session)
+    obj = get_from_db(prefix, ambig.id, session)
   elif isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
     obj = ambig
   else:
@@ -26,12 +26,12 @@ def get_user_from_at(id, session=None):
   uid = uid.replace("@", "")
   uid = uid.replace("!", "")
   if uid.isdigit():
-    return get_user_from_id(int(uid), session=session)
+    return get_user_from_id(int(uid), session)
   else:
     return None
 
 def get_user_from_id(id, session=None):
-  return get_from_db("User", id, session=session)
+  return get_from_db("User", id, session)
   
 
 def id_to_metion(id):
@@ -40,11 +40,11 @@ def id_to_metion(id):
 
   
 async def get_user_from_member(ctx, user, session=None):
-  if user == None:
+  if user is None:
     user = ctx.author
-  user = get_from_db("User", user.id, session=session)
-  if user == None:
-    await ctx.respond("User not found. To create an account do $balance")
+  user = get_from_db("User", user.id, session)
+  if user is None:
+    await ctx.respond("User not found. To create an account do /balance", ephemeral = True)
   return user
 
 
@@ -58,7 +58,7 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
       await ctx.respond(f"Error please @pig. Try typing in code instead.")
     return None
   if len(objs) == 0:
-    obj = get_from_db(prefix, text, session=session)
+    obj = get_from_db(prefix, text, session)
   else:
     obj = objs[0]
     

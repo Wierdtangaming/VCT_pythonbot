@@ -22,7 +22,7 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
@@ -35,6 +35,8 @@ from savedata import backup_full, save_savedata_from_github, are_equivalent, zip
 import matplotlib.colors as mcolors
 import secrets
 
+from sqlaobjs import Session
+
 if not os.path.isfile("savedata.db"):
   print("savedata.db does not exist.\nquitting")
   quit()
@@ -45,7 +47,7 @@ intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents, command_prefix="$")
 
-gid = jsonpickle.decode(get_setting("guild_ids"))
+gid = get_setting("guild_ids")
 print(gid, type(gid))
 
 
@@ -148,10 +150,10 @@ async def all_bets_name_code(bot):
   return bet_list
 
 
-def get_users_from_multiuser(compare):
+def get_users_from_multiuser(compare, session=None):
   usernames_split = compare.split(" ")
   
-  users = usernames_to_users(compare)
+  users = usernames_to_users(compare, session)
 
   
   if len(users) == 1:
@@ -192,52 +194,52 @@ def get_last_odds_source(amount):
       
 def rename_balance_id(user_ambig, balance_id, new_balance_id):
   user = ambig_to_obj(user_ambig, "User")
-  if user == None:
+  if user is None:
     return "User not found"
-  indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
+  indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
   if len(indices) > 1:
     return "More than one balance_id found"
   elif len(indices) == 0:
     return "No balance_id found"
   else:
-    balat = user.balance[indices[0]]
-    user.balance[indices[0]] = (new_balance_id, balat[1], balat[2])
+    balat = user.balances[indices[0]]
+    user.balances[indices[0]] = (new_balance_id, balat[1], balat[2])
     replace_in_list("user", user.code, user)
 
 
 def delete_balance_id(user_ambig, balance_id):
   print(balance_id)
   user = ambig_to_obj(user_ambig, "User")
-  if user == None:
+  if user is None:
     return "User not found"
-  indices = [i for i, x in enumerate(user.balance) if x[0] == balance_id]
+  indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
   if len(indices) > 1:
     print("More than one balance_id found")
   elif len(indices) == 0:
-    return "No balancen id found"
+    return "No balancesn id found"
   reset_range = user.get_to_reset_range(indices[0])
   
   index = indices[0]
-  diff = user.balance[index][1] - user.balance[index-1][1]
+  diff = user.balances[index][1] - user.balances[index-1][1]
   print(diff)
   for i in reset_range:
-    bal_list = list(user.balance[i])
+    bal_list = list(user.balances[i])
     bal_list[1] = bal_list[1] - diff
-    user.balance[i] = tuple(bal_list)
-  balat = user.balance[indices[0]]
+    user.balances[i] = tuple(bal_list)
+  balat = user.balances[indices[0]]
   
-  user.balance.remove(balat)
+  user.balances.remove(balat)
   replace_in_list("user", user.code, user)
   print(f"removed {balance_id}")
   return "Removed"
 
 
-def print_all_balance(user_ambig):
+def print_all_balances(user_ambig):
   user = ambig_to_obj(user_ambig, "User")
-  if user == None:
+  if user is None:
     return None
 
-  [print(bal[0], bal[1]) for bal in user.balance]
+  [print(bal[0], bal[1]) for bal in user.balances]
 
 
 async def edit_all_messages(ids, embedd):
@@ -297,55 +299,63 @@ def create_user(user_id, username):
   color = secrets.token_hex(3)
   user = User(user_id, username, color, get_date())
   print(jsonpickle.encode(user))
-  add_to_list("user", user)
+  add_to_db("User", user)
   return user
 
 
 
 
-def add_to_active_ids(user_ambig, bet_ambig):
-  if (user := ambig_to_obj(user_ambig, "User")) is None: return None
-  if (bet := ambig_to_obj(bet_ambig, "Bet")) is None: return None
+def add_to_active_ids(user_ambig, bet_ambig, session=None):
+  if session is None:
+    with Session.begin() as session:
+      add_to_active_ids(user_ambig, bet_ambig, session)
+  if (user := ambig_to_obj(user_ambig, "User", session)) is None: return None
+  if (bet := ambig_to_obj(bet_ambig, "Bet", session)) is None: return None
 
   user.active_bet_ids.append((bet.code, bet.match_id))
-  replace_in_list("user", user.code, user)
 
 
-def remove_from_active_ids(user_ambig, bet_id):
-  if (user := ambig_to_obj(user_ambig, "User")) is None: return None
+def remove_from_active_ids(user_ambig, bet_id, session=None):
+  if session is None:
+    with Session.begin() as session:
+      remove_from_active_ids(user_ambig, bet_id, session)
+  
+  if (user := ambig_to_obj(user_ambig, "User", session)) is None: return None
   
   if (t := next((t for t in user.active_bet_ids if bet_id == t[0]), None)) is None:
     print("Bet_id Not Found")
     return
   user.active_bet_ids.remove(t)
-  replace_in_list("user", user.code, user)
 
 
-def add_balance_user(user_ambig, change, description, date):
+def add_balance_user(user_ambig, change, description, date, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return add_balance_user(user_ambig, change, description, date, session=session)
+      
   user = ambig_to_obj(user_ambig, "User")
-  if user == None:
+  if user is None:
     return None
-  user.balance.append((description, Decimal(str(round(user.balance[-1][1] + Decimal(str(change)), 5))), date))
-  user.balance.sort(key=lambda x: x[2])
-  replace_in_list("user", user.code, user)
+  user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
+  user.balances.sort(key=lambda x: x[2])
   return user
 
-#returns user with new balance
-def change_prev_balance(user, balance_id, new_amount):
-  index = [x for x, y in enumerate(user.balance) if y[0] == str(balance_id)]
+#returns user with new balances
+def change_prev_balances(user, balance_id, new_amount):
+  index = [x for x, y in enumerate(user.balances) if y[0] == str(balance_id)]
   if not len(index) == 1:
     print(str(len(index)) + " copy of id")
     return None
     
   index = index[0]
 
-  difference = user.balance[index][1] - new_amount
+  difference = user.balances[index][1] - new_amount
 
-  for i in range(index, len(user.balance)):
-    if i+1 < len(user.balance):
-      difference = user.balance[i+1][1] - user.balance[i][1]
-    user.balance[i] = (user.balance[i][0], new_amount, user.balance[i][2])
-    new_amount = user.balance[i][1] + difference
+  for i in range(index, len(user.balances)):
+    if i+1 < len(user.balances):
+      difference = user.balances[i+1][1] - user.balances[i][1]
+    user.balances[i] = (user.balances[i][0], new_amount, user.balances[i][2])
+    new_amount = user.balances[i][1] + difference
   return user
 
 
@@ -396,8 +406,8 @@ async def color_picker_autocomplete(ctx: discord.AutocompleteContext):
 #multi user autocomplete start
 async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
   value = ctx.value.strip()
-  users = get_all_objects("user")
-  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.show_on_lb]
+  users = get_all_db("User")
+  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users if user.hidden]
   clean_usernames = [username_t[0] for username_t in usernames_t]
   no_break_usernames = [username_t[1] for username_t in usernames_t]
   for username_t in usernames_t:
@@ -454,15 +464,16 @@ assign = SlashCommandGroup(
 #assign matches start
 @assign.command(name = "matches", description = "Where the end matches show up.")
 async def assign_matches(ctx):
-  save_file("match_channel_id", ctx.channel.id)
-  await ctx.respond("This channel is now the match list channel.")
+  set_channel_in_db("match", ctx.channel.id)
+  
+  await ctx.respond(f"<#{ctx.channel.id}> is now the match list channel.")
 #assign matches end
 
 #assign bets start
 @assign.command(name = "bets", description = "Where the end bets show up.")
 async def assign_bets(ctx):
-  save_file("bet_channel_id", ctx.channel.id)
-  await ctx.respond("This channel is now the bet list channel.")
+  set_channel_in_db("bet", ctx.channel.id)
+  await ctx.respond(f"<#{ctx.channel.id}> is now the bet list channel.")
 #assign bets end
 
 bot.add_application_command(assign)
@@ -480,7 +491,7 @@ award = SlashCommandGroup(
 def get_award_strings(user):
   last_amount = Decimal(0)
   awards_id_changes = []
-  for balance_t in user.balance:
+  for balance_t in user.balances:
     if balance_t[0].startswith("award"):
       awards_id_changes.append((balance_t[0], balance_t[1]-last_amount))
     last_amount = balance_t[1]
@@ -498,7 +509,7 @@ def get_award_strings(user):
 async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   member = ctx.options["user"]
   
-  if member == None:
+  if member is None:
     return []
   
   user = get_user_from_id(member)
@@ -520,48 +531,50 @@ async def award_give(ctx,
   users: Option(str, "Users you want to award. (Can't use with user).", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
   
   if (user is not None) and (users is not None):
-    await ctx.respond("You can't use compare and user at the same time.")
+    await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
   if (user is None) and (users is None):
-    await ctx.respond("You must have either compare or user.")
-    return
-    
-  if users is not None:
-    users = get_users_from_multiuser(users)
-    if isinstance(users, str):
-      await ctx.respond(users)
-      return
-    code = all_user_unique_code("award", users)
-    bet_id = f"award_{code}_{description}"
-    
-    print(bet_id)
-    
-    first = True
-    for user in users:
-      abu = add_balance_user(user, amount, bet_id, get_date())
-      if abu == None:
-        if first:
-          await ctx.respond(f"User {user.username} not found.")
-        else:
-          ctx.interaction.followup.send(f"User {user.username} not found.")
-      else:
-        embedd = await create_user_embedded(user)
-        if first:
-          await ctx.respond(embed=embedd)
-        else:
-          ctx.interaction.followup.send(embed=embedd)
+    await ctx.respond("You must have either compare or user.", ephemeral = True)
     return
   
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  bet_id = "award_" + user.get_unique_code("award_") + "_" + description
-  print(bet_id)
-  abu = add_balance_user(user, amount, bet_id, get_date())
-  if abu == None:
-    await ctx.respond("User not found.")
-  else:
-    embedd = await create_user_embedded(user)
-    await ctx.respond(embed=embedd)
+  with Session.begin() as session:
+    if users is not None:
+      users = get_users_from_multiuser(users, session)
+      if isinstance(users, str):
+        await ctx.respond(users, ephemeral = True)
+        return
+      code = all_user_unique_code("award", users)
+      bet_id = f"award_{code}_{description}"
+      
+      print(bet_id)
+      
+      first = True
+      for user in users:
+        abu = add_balance_user(user, amount, bet_id, get_date(), session)
+        embedd = await create_user_embedded(abu)
+        if first:
+          await ctx.respond(embed=embedd)
+          first = False
+        else:
+          ctx.interaction.followup.send(embed=embedd)
+      return
+    ouser = user
+    if (user := await get_user_from_member(ctx, user, session)) is None: return
+    bet_id = "award_" + user.get_unique_code("award_") + "_" + description
+    print(bet_id)
+    abu = add_balance_user(user, amount, bet_id, get_date(), session)
+    print(2)
+    if abu is None:
+      await ctx.respond("User not found.", ephemeral = True)
+    else:
+      embedd = await create_user_embedded(user)
+      await ctx.respond(embed=embedd)
+    print(3)
+    print(user.balances, user.get_balance())
+    userer = await get_user_from_member(ctx, ouser, session)
+    print(userer.balances, userer.get_balance())
 #award give end
+#/award give amount:10 description:test user:@pig3253#2053
 
 #award list start
 @award.command(name = "list", description = "Lists all the awards given to a user.")
@@ -625,21 +638,20 @@ bot.add_application_command(award)
 #balance start
 @bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
 async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
-  print("balance")
-  if user == None:
-    user = get_from_list("user", ctx.author.id)
+  if user is None:
+    user = get_from_db("User", ctx.author.id)
     print(user)
-    if user == None:
+    if user is None:
       print("creating_user")
       user = create_user(ctx.author.id, ctx.author.display_name)
   else:
-    user = get_from_list("user", user.id)
-    if user == None:
-      await ctx.respond("User does not have an account yet. To create an acccount they must do $balance.")
+    user = get_from_db("User", ctx.author.id)
+    if user is None:
+      await ctx.respond("User does not have an account yet. To create an acccount they must do /balance.", ephemeral = True)
       return
     
   embedd = await create_user_embedded(user)
-  if embedd == None:
+  if embedd is None:
     await ctx.respond("User not found.")
     return
   await ctx.respond(embed=embedd)
@@ -719,7 +731,7 @@ class BetCreateModal(Modal):
       elif team_num.lower() == match.t2.lower():
         team_num = "2"
 
-    if not match.date_closed == None:
+    if not match.date_closed is None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
     code = get_unique_code("bet")
@@ -829,7 +841,7 @@ class BetEditModal(Modal):
         team_num = "2"
     
 
-    if not match.date_closed == None:
+    if not match.date_closed is None:
       await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
     if error[0] is None:
@@ -916,7 +928,7 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 @betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
   user = get_from_list("user", ctx.author.id)
-  if user == None:
+  if user is None:
     user = create_user(ctx.author.id, ctx.author.display_name)
     
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
@@ -1169,11 +1181,11 @@ profile = SlashCommandGroup(
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
-  if (color_code := get_color(color_name)) is None:
+  if (color_hex := get_color(color_name)) is None:
     await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
     return
   if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-  user.color = color_code
+  user.color = color_hex
   replace_in_list("user", user.code, user)
   await ctx.respond(f"Profile color is now {color_name}.")
 #profile color end
@@ -1198,8 +1210,8 @@ balance_choices = [
 ]
 
 @graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
-async def graph_balance(ctx,
-  type: Option(int, "User you want to get balance of.", choices = balance_choices, default = 0, required = False), 
+async def graph_balances(ctx,
+  type: Option(int, "What type of graph you wany to make.", choices = balance_choices, default = 0, required = False), 
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
@@ -1214,8 +1226,8 @@ async def graph_balance(ctx,
   if compare is None:
     if (user := await get_user_from_member(ctx, user)) is None: return
     if amount is not None:
-      if amount > len(user.balance):
-        amount = len(user.balance)
+      if amount > len(user.balances):
+        amount = len(user.balances)
       if amount <= 1:
         await ctx.respond("Amount needs to be higher.")
       graph_type = amount
@@ -1307,7 +1319,7 @@ async def leaderboard(ctx):
   
 #log start
 @bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)", guild_ids = gid)
-async def log(ctx, amount: Option(int, "How many balance changed you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
+async def log(ctx, amount: Option(int, "How many balance changes you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
 
   if (user := await get_user_from_member(ctx, user)) is None: return
   
@@ -1318,7 +1330,7 @@ async def log(ctx, amount: Option(int, "How many balance changed you want to see
   gen_msg = await ctx.respond("Generating log...")
   
   embedds = user.get_new_balance_changes_embeds(amount)
-  if embedds == None:
+  if embedds is None:
     await gen_msg.edit_original_message(content = "No log generated.")
     return
 
@@ -1736,7 +1748,7 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
   
 #match create start
 @matchscg.command(name = "create", description = "Create a match.")
-async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+async def match_create(ctx, balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
     
   match_modal = MatchCreateModal(balance_odds=balance_odds, title="Create Match")
   await ctx.interaction.response.send_modal(match_modal)
@@ -1785,7 +1797,7 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
-async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
   if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
   if match.bet_ids != []:
     await ctx.respond(f"Match must have no bets. You must delete the bets before editing the match. (To delete other users bets type in their bet code).")
@@ -1867,7 +1879,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
   date = get_date()
   for bet_id in match.bet_ids:
     bet = get_from_list("bet", bet_id)
-    if not bet == None:
+    if not bet is None:
       #to do print out embedds of bets
       bet.winner = int(match.winner)
       payout = -bet.bet_amount
@@ -1954,7 +1966,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
   date = match.date_winner
   for bet_id in match.bet_ids:
     bet = get_from_list("bet", bet_id)
-    if not bet == None:
+    if not bet is None:
       #to do print out embedds of bets
       bet.winner = int(match.winner)
       payout = -bet.bet_amount
@@ -1997,9 +2009,9 @@ async def backup_db(ctx):
 @bot.command()
 async def hide_from_leaderboard(ctx):
   if (user := await get_user_from_member(None, ctx.author)) is None: return
-  user.show_on_lb = not user.show_on_lb
+  user.hidden = not user.hidden
   replace_in_list("user", user.code, user)
-  print(user.show_on_lb)
+  print(user.hidden)
 
 
 
@@ -2014,7 +2026,7 @@ async def reset_season(ctx, name):
   date = get_date()
   name = f"reset_{code}_{name}"
   for user in users:
-    user.balance.append((name, Decimal(500), date))
+    user.balances.append((name, Decimal(500), date))
     replace_in_list("user", user.code, user)
   await ctx.send(f"Season reset. New season {name} has sarted.")
 
@@ -2056,12 +2068,12 @@ async def add_team_names(ctx):
 # debug command
 @bot.command()
 async def check_balance_order(ctx):
-  #check if the order of user balance and the order of timer in balance[2] are the same
+  #check if the order of user balance and the order of timer in balances[2] are the same
   users = get_all_objects("user")
   for user in users:
-    sorted = user.balance.copy()
+    sorted = user.balances.copy()
     sorted.sort(key=lambda x: x[2])
-    if sorted != user.balance:
+    if sorted != user.balances:
       print(f"{user.code} balance order is wrong")
   print("check order done")
 
@@ -2084,9 +2096,9 @@ async def round_all_user_balances(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    for bal in user.balance:
+    for bal in user.balances:
 
-      user.balance[user.balance.index(bal)] = (user.balance[user.balance.index(bal)][0], round(user.balance[user.balance.index(bal)][1], 5), user.balance[user.balance.index(bal)][2])
+      user.balances[user.balances.index(bal)] = (user.balances[user.balances.index(bal)][0], round(user.balances[user.balances.index(bal)][1], 5), user.balances[user.balances.index(bal)][2])
 
     replace_in_list("user", user.code, user)
 
@@ -2097,10 +2109,10 @@ async def delete_last_bal(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    print(user.balance)
-    if type(user.balance[-1][1]) == tuple:
-      user.balance.pop()
-      print(user.balance)
+    print(user.balances)
+    if type(user.balances[-1][1]) == tuple:
+      user.balances.pop()
+      print(user.balances)
       replace_in_list("user", user.code, user)
 
       
@@ -2111,14 +2123,14 @@ async def add_var(ctx):
   users = get_all_objects("user")
   reset_dict = {}
   for user in users:
-    for i, bal in enumerate(user.balance):
+    for i, bal in enumerate(user.balances):
       bet_id, amount, time = bal
       bet_id = bet_id.split("_")[0] + "_" + bet_id.split("_")[-1]
       if bet_id.startswith("award_"):
         code = user.get_unique_code("award_")
         bet_id = bet_id[:bet_id.index("award_")+6] + code + "_" + bet_id[bet_id.index("award_")+6:]
         print(bet_id)
-        user.balance[i] = (bet_id, amount, time)
+        user.balances[i] = (bet_id, amount, time)
         
       elif bet_id.startswith("reset_"):
         if bet_id in reset_dict:
@@ -2130,7 +2142,7 @@ async def add_var(ctx):
           bet_id = bet_id[:bet_id.index("reset_")+6] + code + "_" + bet_id[bet_id.index("reset_")+6:]
           reset_dict[old_bet_id] = bet_id
         print(bet_id)
-        user.balance[i] = (bet_id, amount, time)
+        user.balances[i] = (bet_id, amount, time)
     replace_in_list("user", user.code, user)
   print("done add var")
 
@@ -2142,32 +2154,32 @@ async def add_diff(ctx):
   users = get_all_objects("user")
   for user in users:
     last = None
-    for i, bal in enumerate(user.balance):
+    for i, bal in enumerate(user.balances):
       if len(bal) == 3:
         diff = None
         if last is None or bal[0] == "start" or bal[0].startswith("reset_"):
           diff = None
-          user.balance[i] = (bal[0], round(bal[1], 5), None, bal[2])
+          user.balances[i] = (bal[0], round(bal[1], 5), None, bal[2])
         else:
           diff = bal[1] - last
-          user.balance[i] = (bal[0], round(bal[1], 5), round(diff, 5), bal[2])
+          user.balances[i] = (bal[0], round(bal[1], 5), round(diff, 5), bal[2])
         last = bal[1]
     
     x = Decimal(0)
     good = True
-    for bal in user.balance:
+    for bal in user.balances:
       if bal[2] is None:
         x = Decimal(bal[1])
         continue 
       x += bal[2]
       if x != bal[1]:
-        print(f"{user.username} balance order is wrong. {bal}: {x} != {bal[1]}")
+        print(f"{user.username} balanceorder is wrong. {bal}: {x} != {bal[1]}")
         good = False
     if good:
-      print(f"{user.username} balance order is good")
+      print(f"{user.username} balanceorder is good")
     else:
-      print(f"{user.username} balance order is wrong")
-    print([(bal[0], bal[1], bal[2]) for bal in user.balance])
+      print(f"{user.username} balanceorder is wrong")
+    print([(bal[0], bal[1], bal[2]) for bal in user.balances])
     #replace_in_list("user", user.code, user)
 
   print("done")
@@ -2198,9 +2210,9 @@ async def update_bet_ids(ctx):
   return
   users = get_all_objects("user")
   for user in users:
-    for bal in user.balance:
-      if user.balance[user.balance.index(bal)][0] == "reset 1":
-        user.balance[user.balance.index(bal)] = ("reset_2022 Stage 1" , user.balance[user.balance.index(bal)][1], user.balance[user.balance.index(bal)][2])
+    for bal in user.balances:
+      if user.balances[user.balances.index(bal)][0] == "reset 1":
+        user.balances[user.balances.index(bal)] = ("reset_2022 Stage 1" , user.balances[user.balances.index(bal)][1], user.balances[user.balances.index(bal)][2])
 
     replace_in_list("user", user.code, user)
 

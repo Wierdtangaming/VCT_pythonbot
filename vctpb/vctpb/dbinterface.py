@@ -102,9 +102,9 @@ def set_channel_in_db(channel_name, channel_value, session=None):
     with Session.begin() as session:
       return set_channel_in_db(channel_name, channel_value, session)
   channels = session.scalars(select(Channels)).one()
-  if channel_name == "bet":
+  if channel_name == "bet" or channel_name == "bet_channel_id":
     channels.bet_channel_id = channel_value
-  elif channel_name == "match":
+  elif channel_name == "match" or channel_name == "match_channel_id":
     channels.match_channel_id = channel_value
                            
                           

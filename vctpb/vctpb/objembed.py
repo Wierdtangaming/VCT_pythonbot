@@ -11,9 +11,9 @@ import emoji
 
 async def create_match_embedded(match_ambig, title, session=None):
   match = ambig_to_obj(match_ambig, "Match", session=session)
-  if match == None:
+  if match is None:
     return None
-  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_code)))
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
@@ -25,7 +25,7 @@ async def create_match_embedded(match_ambig, title, session=None):
   embed.add_field(name="Bet IDs:", value=bet_str, inline=True)
   date_formatted = match.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   embed.add_field(name="Created On:", value=date_formatted, inline=True)
-  if match.date_closed == None:
+  if match.date_closed is None:
     embed.add_field(name="Betting Open:", value="Yes", inline=True)
   else:
     embed.add_field(name="Betting Open:", value="No", inline=True)
@@ -56,10 +56,10 @@ async def create_match_list_embedded(embed_title, matches_ambig, session=None):
 
 async def create_bet_embedded(bet_ambig, title, session=None):
   bet = ambig_to_obj(bet_ambig, "Bet", session=session)
-  if bet == None:
+  if bet is None:
     return None
 
-  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_code)))
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.bet_amount, inline=True)
@@ -96,20 +96,20 @@ async def create_bet_list_embedded(embed_title, bets_ambig, bot, session=None):
 
 async def create_user_embedded(user_ambig, session=None):
   user = ambig_to_obj(user_ambig, "User", session=session)
-  if user == None:
+  if user is None:
     return None
 
-  embed = discord.Embed(title=f"{user.username}'s Balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_code)))
+  embed = discord.Embed(title=f"{user.username}'s balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
   embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
-  embed.add_field(name="Account Balance:", value=math.floor(user.balance[-1][1]), inline=True)
+  embed.add_field(name="Account balance:", value=math.floor(user.balances[-1][1]), inline=True)
   embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
-  embed.add_field(name="Loan Balance:", value=math.floor(user.loan_bal()), inline=True)
+  embed.add_field(name="Loan balance:", value=math.floor(user.loan_bal()), inline=True)
   return embed
 
 
 async def create_leaderboard_embedded(session=None):
   users = get_all_db("User", session=session)
-  user_rankings = [(user, user.balance[-1][1]) for user in users]
+  user_rankings = [(user, user.balances[-1][1]) for user in users]
   user_rankings.sort(key=lambda x: x[1])
   user_rankings.reverse()
   embed = discord.Embed(title="Leaderboard:", color=discord.Color.gold())
@@ -117,7 +117,7 @@ async def create_leaderboard_embedded(session=None):
   rank_num = 1
   for user_rank in user_rankings:
     rank = ""
-    if not user_rank[0].show_on_lb:
+    if not user_rank[0].hidden:
       continue
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
@@ -132,19 +132,19 @@ async def create_leaderboard_embedded(session=None):
 
   
 async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
-  embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_code)))
+  embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
   for bet, user, payout in bet_user_payouts:
     if payout > 0:
-      value = f"Won {math.floor(payout)}. Current balance: {math.floor(user.balance[-1][1])}"
+      value = f"Won {math.floor(payout)}. Current balance: {math.floor(user.balances[-1][1])}"
     else:
-      value = f"Lost {math.floor(payout)}. Current balance: {math.floor(user.balance[-1][1])}"
+      value = f"Lost {math.floor(payout)}. Current balance: {math.floor(user.balances[-1][1])}"
     embed.add_field(name=f"{user.username} bet {bet.bet_amount} on {bet.get_team()}", value=value, inline=False)
 
   return embed
 
 
 def create_award_label_list_embedded(user, award_labels):
-  embed = discord.Embed(title=f"{user.username}'s Awards:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_code)))
+  embed = discord.Embed(title=f"{user.username}'s Awards:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
   for award_label in award_labels:
         
     award_t = award_label.split(", ")

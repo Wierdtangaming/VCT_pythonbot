@@ -11,7 +11,7 @@ import sys
 from sqlalchemy import Column, String, BOOLEAN, ForeignKey
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
-
+from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry
 
 @mapper_registry.mapped
@@ -24,9 +24,9 @@ class User():
   color = relationship("Color", back_populates="users")
   color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
-  balances = Column(JSONLIST, nullable=False) #array of Tuple(bet_id, balance after change, date)
-  active_bet_ids = Column(JSONLIST, nullable=False) #array of strings code of active bets
-  loans = Column(JSONLIST, nullable=False) #array of Tuple(balance, date created, date paid)
+  balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balances after change, date)
+  active_bet_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of strings code of active bets
+  loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balances, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
   
@@ -36,18 +36,18 @@ class User():
     self.set_color(color)
     
     self.hidden = True
-    #a tuple (bet_id, balance after change, date)
+    #a tuple (bet_id, balances after change, date)
     #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
     #bet_id = award_[award_id]: awards
-    #bet_id = start: start balance
-    #bet_id = reset_[reset_name]: changed balance with command
+    #bet_id = start: start balances
+    #bet_id = reset_[reset_name]: changed balances with command
     
     self.balances = [("start", Decimal(500), date_created)]
     
     self.active_bet_ids = []
 
-    #a tuple (balance, date created, date paid)
+    #a tuple (balances, date created, date paid)
     
     self.loans = []
 
@@ -97,7 +97,7 @@ class User():
   def get_open_loans(self):
     open_loans = []
     for loan in self.loans:
-      if loan[2] == None:
+      if loan[2] is None:
         open_loans.append(loan)
     return open_loans
 
@@ -117,7 +117,7 @@ class User():
     active_bet_ids_bets = self.active_bet_ids_bets()
     for bet_id in active_bet_ids_bets:
       temp_bet = get_from_list("Bet", bet_id)
-      if temp_bet == None:
+      if temp_bet is None:
         ids = [t for t in self.active_bet_ids if bet_id == t[0]]
         for id in ids:
           self.active_bet_ids.remove(id)
@@ -222,7 +222,7 @@ class User():
         embeds[endex].add_field(name="Award:", value=text, inline=False)
         #award
       elif balance[0] == "start":
-        embeds[endex].add_field(name="Start Balance:", value=str(balance_change), inline=False)
+        embeds[endex].add_field(name="Start balance:", value=str(balance_change), inline=False)
         #start
       elif balance[0].startswith("manual"):
         #should not be here
@@ -248,13 +248,13 @@ class User():
   def get_graph_image(self, balance_range_ambig):
     xlabel = ""
     if isinstance(balance_range_ambig, list):
-      balances = balance_range_ambig
+      balance = balance_range_ambig
     elif isinstance(balance_range_ambig, str):
       if balance_range_ambig == "all":
-        balances = self.balances
+        balance = self.balances
         xlabel = "All Time"
       elif balance_range_ambig == "current":
-        balances = [self.balances[x] for x in self.get_reset_range(-1)]
+        balance = [self.balances[x] for x in self.get_reset_range(-1)]
         resets = self.get_resets()
         if len(resets) > 0:
           xlabel = self.balances[resets[-1]][0][15:]
@@ -263,29 +263,29 @@ class User():
           for user in users:
             resets = user.get_resets()
             if len(resets) > 0:
-              xlabel = user.balances[resets[-1]][0][15:]
+              xlabel = user.balance[resets[-1]][0][15:]
               break
     elif isinstance(balance_range_ambig, int):
-      balances = self.balances[-balance_range_ambig:]
+      balance = self.balances[-balance_range_ambig:]
       xlabel = f"Last {balance_range_ambig}"
     else:
       return f"Invalid range of {balance_range_ambig}."
       
     labels = []
     label_colors = []
-    balance = []
+    balances = []
     colors = []
     line_colors = []
     resets = []
     before = None
     min = 0
     max = 500
-    for bet_id, amount, date in balances:
+    for bet_id, amount, date in balance:
       if amount < min:
         min = amount
       if amount > max:
         max = amount
-      if not before == None:
+      if not before is None:
         if amount > before:
           line_colors.append('g')
         elif amount < before:
@@ -305,7 +305,7 @@ class User():
         label = f"{t1} vs {t2}"
         labels.append(label)
         label_colors.append(f"#{match.color}")
-        balance.append(amount)
+        balances.append(amount)
         colors.append('b')
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
@@ -319,12 +319,12 @@ class User():
               label = bet_id[6:14]
         labels.append(label)
         label_colors.append('xkcd:gold')
-        balance.append(amount)
+        balances.append(amount)
         colors.append('xkcd:gold')
       elif bet_id == 'start':
         labels.append('start')
         label_colors.append('k')
-        balance.append(amount)
+        balances.append(amount)
         colors.append('k')
       elif bet_id.startswith('reset_'):
         label = bet_id[15:]
@@ -333,18 +333,18 @@ class User():
         if len(line_colors) != 0:
           resets.append(len(line_colors))
           line_colors[-1] = None
-        balance.append(amount)
+        balances.append(amount)
         colors.append('k')
       else:
         labels.append(bet_id)
         label_colors.append('k')
-        balance.append(amount)
+        balances.append(amount)
         colors.append('k')
     
     #make a 800 x 800 figure
     #fig, ax = plt.subplots(figsize=(8,8))
-    #plot the balance
-    x_length = len(balance) / 6.5 + 0.8
+    #plot the balances
+    x_length = len(balances) / 6.5 + 0.8
     if x_length < 8:
       x_length = 8
     plt.clf()
@@ -353,17 +353,17 @@ class User():
       for i in range(len(line_colors)):
         if line_colors[i] is None:
           continue
-        ax.plot([i, i+1], [balance[i], balance[i+1]], color=line_colors[i])
+        ax.plot([i, i+1], [balances[i], balances[i+1]], color=line_colors[i])
       ax.axhline(y=0, color='grey', linestyle='--')
       max = int(math.ceil((max * Decimal("1.05")) / Decimal("100"))) * 100
       if min != 0:
         min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
 
-      x = [*range(len(balance))]
+      x = [*range(len(balances))]
       ax.fill_between(x, 0, 1, where=[((xs in resets) or ((xs+1) in resets)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())
 
       ax.set_ylim([min, max])
-      #plt.scatter(range(len(balances)), balance, s=30, color = colors, zorder=10)
+      #plt.scatter(range(len(balances)), balances, s=30, color = colors, zorder=10)
       ax.set_xticks(range(len(balances)), labels, rotation='vertical')
       ax.set_xlabel(xlabel)
 

@@ -3,7 +3,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
-
+from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry
 
 @mapper_registry.mapped
@@ -30,7 +30,7 @@ class Match():
   date_winner = Column(DateTime(timezone = True), nullable=False)
   date_closed = Column(DateTime(timezone = True), nullable=False)
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
-  message_ids = Column(JSONLIST, nullable=False) #array of int
+  message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of int
   
   def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color, creator_id, date_created):
 
