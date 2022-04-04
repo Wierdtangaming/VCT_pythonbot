@@ -112,6 +112,8 @@ class User():
     return loan_amount
 
   def unavailable(self, session=None):
+    from dbinterface import get_mult_from_db
+    
     if session is None:
       with Session.begin() as session:
         return self.unavailable(session)
@@ -713,9 +715,3 @@ def is_valid_user(code, username, color, hidden, balances, active_bet_ids, loans
   if isinstance(loans, list) == False:
     errors[6] = True
   return errors
-
-def get_mult_from_db(table_name, codes, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return get_mult_from_db(table_name, codes, session)
-  return session.scalars(select(User).where(User.code.in_(codes))).all()
