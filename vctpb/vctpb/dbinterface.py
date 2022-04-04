@@ -49,6 +49,7 @@ def get_mult_from_db(table_name, codes, session=None):
 
 
 def delete_from_db(ambig, table_name=None, session=None):
+  #wont update relationships
   if isinstance(ambig, str) or isinstance(ambig, int):
     code = ambig
     if session is None:
@@ -62,10 +63,11 @@ def delete_from_db(ambig, table_name=None, session=None):
         session.delete(ambig)
     else:
       session.delete(ambig)
-  session.expire_all()
+  #session.expire_all()
     
     
 def add_to_db(obj, session=None):
+  #will update relationships
   if session is None:
     with Session.begin() as session:
       return add_to_db(obj, session)
