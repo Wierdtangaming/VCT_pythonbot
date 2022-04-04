@@ -27,8 +27,8 @@ class Match():
   creator_id = Column(Integer, ForeignKey("user.code"))
   creator = relationship("User", back_populates="matches")
   date_created = Column(DateTime(timezone = True), nullable=False)
-  date_winner = Column(DateTime(timezone = True), nullable=False)
-  date_closed = Column(DateTime(timezone = True), nullable=False)
+  date_winner = Column(DateTime(timezone = True))
+  date_closed = Column(DateTime(timezone = True))
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
   message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of int
   

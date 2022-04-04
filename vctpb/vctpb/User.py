@@ -8,12 +8,11 @@ import random
 import math
 import secrets
 import sys
-from sqlalchemy import Column, String, BOOLEAN, ForeignKey
+from sqlalchemy import Column, String, BOOLEAN, ForeignKey, select
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
-from dbinterface import get_from_db, get_mult_from_db
 
 @mapper_registry.mapped
 class User():
@@ -26,7 +25,6 @@ class User():
   color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balances after change, date)
-  have under connected
   active_bet_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of strings code of active bets
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balances, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete")
@@ -716,3 +714,8 @@ def is_valid_user(code, username, color, hidden, balances, active_bet_ids, loans
     errors[6] = True
   return errors
 
+def get_mult_from_db(table_name, codes, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_mult_from_db(table_name, codes, session)
+  return session.scalars(select(User).where(User.code.in_(codes))).all()
