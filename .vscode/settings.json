@@ -1,18 +1,21 @@
 {
     "actionButtons": {
-    
-    
-    
         "defaultColor": "#ff0034", // Can also use string color names.
         "loadNpmCommands":false, // Disables automatic generation of actions for npm commands.
         "reloadButton":"♻️", // Custom reload button text or icon (default ↻). null value enables automatic reload on configuration change
         "commands": [
             {
-                "name": "Run Bot",
-                "color": "red",
+                "name": "Run main python3",
                 "singleInstance": true,
-                "command": "cd vctpb\npoetry run python vctpb/main.py", // This is executed in the terminal.
-            }
+                "color": "orange",
+                "command": "cd vst\npython3 -m poetry run python3 vst/main.py"
+            },
+            {
+                "name": "Run main poetry",
+                "singleInstance": true,
+                "color": "orange",
+                "command": "cd vst\npoetry run python vst/main.py",
+            },
         ]
     },
     "editor.tabSize": 2
