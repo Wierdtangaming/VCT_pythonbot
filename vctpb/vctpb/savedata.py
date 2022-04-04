@@ -38,7 +38,7 @@ def save_to_github(message):
   all_files = []
   contents = repo.get_contents("")
   #shutil.make_archive("backup", 'zip', "savedata/")
-  d = "backup"
+  d = "savedata/backup"
   
   try:
     os.remove("backup.zip")
