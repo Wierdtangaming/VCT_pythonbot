@@ -132,10 +132,10 @@ def current_bets_name_code(session=None):
   return bet_list
 
 
-def all_bets_name_code(bot, session=None):
+def all_bets_name_code(session=None):
   if session is None:
     with Session() as session:
-      return all_bets_name_code(bot, session)
+      return all_bets_name_code(session)
   
   bets = get_all_db("bet", session)
   bet_list = []
@@ -872,7 +872,7 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
       text.replace(",", "")
       text.replace(":", "")
       text_keywords = text.split(" ")
-      all_bet_t_list = await all_bets_name_code(bot, session)
+      all_bet_t_list = all_bets_name_code(bot, session)
       all_bet_t_list.reverse()
       if len(text_keywords) == 0:
         return []
@@ -950,33 +950,34 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
 async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_bet_list_autocomplete)):
-  if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_code(), bet, "Bet")) is None: return
-  
-  match = get_from_list("match", bet.match_id)
-  if (match is None) or (match.date_closed is not None):
-    await ctx.respond("Match betting has closed, you cannot edit the bet.")
-    return
-  
-  user = get_from_list("user", bet.user_id)
+  with Session.begin() as session:
+    if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_code(session), bet, "Bet", session)) is None: return
+    
+    match = bet.match
+    if (match is None) or (match.date_closed is not None):
+      await ctx.respond("Match betting has closed, you cannot edit the bet.", ephemeral=True)
+      return
+    
+    user = bet.user
 
-  bet_modal = BetEditModal(bet=bet, match=match, user=user, title="Edit Bet")
-  await ctx.interaction.response.send_modal(bet_modal)
+    bet_modal = BetEditModal(bet=bet, match=match, user=user, title="Edit Bet", session=session)
+    await ctx.interaction.response.send_modal(bet_modal)
 #bet edit end
 
 
 #bet find start
 @betscg.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
-  #list some old matches
-  if (fbet := await user_from_autocomplete_tuple(None, current_bets_name_code(), bet, "Bet")) is None: 
-    if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "Bet")) is None: return
-  bet = fbet
-  user = get_from_list("user", bet.user_id)
-  embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
-  inter = await ctx.respond(embed=embedd)
-  msg = await inter.original_message()
-  bet.message_ids.append((msg.id, msg.channel.id))
-  replace_in_list("bet", bet.code, bet)
+  with Session.begin() as session:
+    if (fbet := await user_from_autocomplete_tuple(None, current_bets_name_code(session), bet, "Bet", session)) is None: 
+      if (fbet := await user_from_autocomplete_tuple(ctx, all_bets_name_code(session), bet, "Bet", session)) is None: return
+    bet = fbet
+    user = bet.user
+    embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.") embedds need session
+    inter = await ctx.respond(embed=embedd)
+    msg = await inter.original_message()
+    bet.message_ids.append((msg.id, msg.channel.id))
+    replace_in_list("bet", bet.code, bet)
 #bet find end
 
 
