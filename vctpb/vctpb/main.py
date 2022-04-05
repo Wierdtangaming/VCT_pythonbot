@@ -141,15 +141,19 @@ def get_users_from_multiuser(compare, session=None):
   
   usernames = " ".join([user.username for user in users])
 
+  unknown_words = []
   for username_word in usernames_split:
     if username_word not in usernames:
-      return f"User {username_word} not found."
-
+      unknown_words.append(username_word)
+  
+  if len(unknown_words) > 0:
+    return f"Unknown user(s): {', '.join(unknown_words)}"
+      
   return users
 
 
-def get_last_tournament_name(amount):
-  matches = get_all_objects("match")
+def get_last_tournament_name(amount, session=None):
+  matches = get_all_db("Match", session)
   matches.reverse()
   name_set = set()
   for match in matches:
@@ -159,8 +163,8 @@ def get_last_tournament_name(amount):
         return list(name_set)[0]
       return list(name_set)
 
-def get_last_odds_source(amount):
-  matches = get_all_objects("match")
+def get_last_odds_source(amount, session=None):
+  matches = get_all_db("Match", session)
   matches.reverse()
   name_set = set()
   for match in matches:
@@ -171,8 +175,12 @@ def get_last_odds_source(amount):
       return list(name_set)
 
       
-def rename_balance_id(user_ambig, balance_id, new_balance_id):
-  user = ambig_to_obj(user_ambig, "User")
+def rename_balance_id(user_ambig, balance_id, new_balance_id, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return rename_balance_id(user_ambig, balance_id, new_balance_id, session)
+  
+  user = ambig_to_obj(user_ambig, "User", session)
   if user is None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
@@ -183,19 +191,21 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id):
   else:
     balat = user.balances[indices[0]]
     user.balances[indices[0]] = (new_balance_id, balat[1], balat[2])
-    replace_in_list("user", user.code, user)
 
 
-def delete_balance_id(user_ambig, balance_id):
-  print(balance_id)
-  user = ambig_to_obj(user_ambig, "User")
+def delete_balance_id(user_ambig, balance_id, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return delete_balance_id(user_ambig, balance_id, session)
+    
+  user = ambig_to_obj(user_ambig, "User", session)
   if user is None:
     return "User not found"
   indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
   if len(indices) > 1:
     print("More than one balance_id found")
   elif len(indices) == 0:
-    return "No balancesn id found"
+    return "No balance id found"
   reset_range = user.get_to_reset_range(indices[0])
   
   index = indices[0]
@@ -208,13 +218,12 @@ def delete_balance_id(user_ambig, balance_id):
   balat = user.balances[indices[0]]
   
   user.balances.remove(balat)
-  replace_in_list("user", user.code, user)
   print(f"removed {balance_id}")
   return "Removed"
 
 
-def print_all_balances(user_ambig):
-  user = ambig_to_obj(user_ambig, "User")
+def print_all_balances(user_ambig, session=None):
+  user = ambig_to_obj(user_ambig, "User", session)
   if user is None:
     return None
 
@@ -323,24 +332,6 @@ def add_balance_user(user_ambig, change, description, date, session=None):
   user.balances.sort(key=lambda x: x[2])
   return user
 
-#returns user with new balances
-def change_prev_balances(user, balance_id, new_amount):
-  index = [x for x, y in enumerate(user.balances) if y[0] == str(balance_id)]
-  if not len(index) == 1:
-    print(str(len(index)) + " copy of id")
-    return None
-    
-  index = index[0]
-
-  difference = user.balances[index][1] - new_amount
-
-  for i in range(index, len(user.balances)):
-    if i+1 < len(user.balances):
-      difference = user.balances[i+1][1] - user.balances[i][1]
-    user.balances[i] = (user.balances[i][0], new_amount, user.balances[i][2])
-    new_amount = user.balances[i][1] + difference
-  return user
-
 
   
 
@@ -379,7 +370,7 @@ async def auto_backup_timer():
 
 #color picker autocomplete start
 async def color_picker_autocomplete(ctx: discord.AutocompleteContext):  
-  return [x.capitalize() for x in get_all_colors().keys() if ctx.value.lower() in x.lower()]
+  return [color.name.capitalize() for color in get_all_db("Color") if ctx.value.lower() in color.name.lower()]
 #color picker autocomplete end
 
 #multi user autocomplete start
