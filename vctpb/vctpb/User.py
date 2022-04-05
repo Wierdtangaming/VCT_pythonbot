@@ -113,10 +113,6 @@ class User():
 
   def unavailable(self, session=None):
     from dbinterface import get_mult_from_db
-    
-    if session is None:
-      with Session.begin() as session:
-        return self.unavailable(session)
     used = 0
     bets = get_mult_from_db("Bet", self.active_bet_ids_bets(), session)
     
@@ -129,9 +125,6 @@ class User():
     return used
 
   def get_balance(self, session=None):
-    if session is None:
-      with Session.begin() as session:
-        return self.unavailable(session)
     bal = self.balances[-1][1]
     bal -= self.unavailable(session)
     bal += self.loan_bal()
@@ -140,8 +133,8 @@ class User():
   def get_clean_bal_loan(self):
     return self.balances[-1][1] + self.loan_bal()
 
-  def avaliable_nonloan_bal(self):
-    return self.balances[-1][1] - self.unavailable()
+  def avaliable_nonloan_bal(self, session=None):
+    return self.balances[-1][1] - self.unavailable(session=session)
 
   def get_resets(self):
     return [i for i, x in enumerate(self.balances) if x[0].startswith("reset_")]

@@ -18,22 +18,22 @@ def get_days(date_string):
   return(day_of_year - datetime(1970,1,1)).days
 
 def get_all_names(path, ext=False):
-  names = os.listdir(f"{path}")
+  names = os.listdir(f"savedata/{path}")
   if ext:
     return names
   return [os.path.splitext(name)[0] for name in names]
 
 def copy_db_to(path):
-  shutil.copy("savedata.db", path)
+  shutil.copy("savedata/savedata.db", path)
   
 
 def make_folder(name, path):
-  os.mkdir(f"{path}{name}/")
+  os.mkdir(f"savedata/{path}{name}/")
 
 
 
 def delete_folder(name, path):
-  path_and_file = f"{path}{name}"
+  path_and_file = f"savedata/{path}{name}"
   try:
     shutil.rmtree(path_and_file)
     print(f"deleted folder {path_and_file}")
@@ -46,7 +46,7 @@ def delete_folder(name, path):
 def backup():
   date_string = get_date_string()
   make_folder(date_string, f"backup/")
-  date_path = f"backup/{date_string}/"
+  date_path = f"savedata/backup/{date_string}/"
   copy_db_to(date_path)
   print("coppy done")
   delete_old_backup()

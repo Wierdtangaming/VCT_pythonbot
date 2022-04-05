@@ -38,7 +38,7 @@ def save_to_github(message):
   all_files = []
   contents = repo.get_contents("")
   #shutil.make_archive("backup", 'zip', "savedata/")
-  d = "savedata"
+  d = "backup"
   
   try:
     os.remove("backup.zip")
@@ -138,7 +138,7 @@ def are_equivalent(filename1, filename2):
     """
   
     if (not zipfile.is_zipfile(filename1)) or (not zipfile.is_zipfile(filename2)):
-      create_error_file("not valid zip", f"{zipfile.is_zipfile(filename1)}, {zipfile.is_zipfile(filename2)}")
+      print("not valid zip", f"{zipfile.is_zipfile(filename1)}, {zipfile.is_zipfile(filename2)}")
       return False
     
     with ZipFile(filename1, 'r') as zip1, ZipFile(filename2, 'r') as zip2:

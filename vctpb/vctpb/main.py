@@ -22,7 +22,7 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
@@ -37,7 +37,7 @@ import secrets
 
 from sqlaobjs import Session
 
-if not os.path.isfile("savedata.db"):
+if not os.path.isfile("savedata/savedata.db"):
   print("savedata.db does not exist.\nquitting")
   quit()
   
@@ -66,8 +66,8 @@ def get_all_available_matches():
       match_list.append(match)
   return match_list
 
-def available_matches_name_code():
-  matches = get_all_objects("match")
+def available_matches_name_code(session=None):
+  matches = get_all_db("Match", session)
   match_t_list = []
   for match in matches:
     if match.date_closed is None:
@@ -101,7 +101,7 @@ def all_matches_name_code():
       match_t_list.append((f"{match.t1} vs {match.t2}, {match.tournament_name}", match))
   return match_t_list
 
-async def available_bets_name_code(bot):
+async def available_bets_name_code():
   matches = get_all_objects("match")
   bet_list = []
   id_dict = {}
@@ -117,8 +117,8 @@ async def available_bets_name_code(bot):
         bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
   return bet_list
 
-async def current_bets_name_code(bot):
-  bets = get_all_objects("bet")
+def current_bets_name_code(session=None):
+  bets = get_all_db("Bet", session)
   bet_list = []
   id_dict = {}
   for bet in bets:
@@ -126,13 +126,18 @@ async def current_bets_name_code(bot):
       if bet.user_id in id_dict:
         name = id_dict[bet.user_id]
       else: 
-        name = get_from_list("user", bet.user_id).username
+        name = bet.user.username
         id_dict[bet.user_id] = name
       bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
   return bet_list
 
-async def all_bets_name_code(bot):
-  bets = get_all_objects("bet")
+
+def all_bets_name_code(bot, session=None):
+  if session is None:
+    with Session() as session:
+      return all_bets_name_code(bot, session)
+  
+  bets = get_all_db("bet", session)
   bet_list = []
   id_dict = {}
   for bet in bets:
@@ -140,7 +145,7 @@ async def all_bets_name_code(bot):
       if bet.user_id in id_dict:
         name = id_dict[bet.user_id]
       else: 
-        name = get_from_list("user", bet.user_id).username
+        name = bet.user.username
         id_dict[bet.user_id] = name
         
       bet_list.append((f"Paid out: {name}: {bet.amount_bet} on {bet.get_team()}", bet))
@@ -391,10 +396,6 @@ async def on_ready():
 
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
-  from test import f
-  if f:
-    quit()
-  f = True
   print("timer")
   backup_full()
   
@@ -821,7 +822,7 @@ class BetEditModal(Modal):
         await interaction.response.send_message("Betting has closed you cannot make a bet.")
 
       if error[0] is None:
-        balance_left = user.get_balance() + bet.amount_bet - int(amount)
+        balance_left = user.get_balance(session) + bet.amount_bet - int(amount)
         if balance_left < 0:
           print("You have bet " + str(math.ceil(-balance_left)) + " more than you have.")
           error[1] = "You have bet " + str(math.ceil(-balance_left)) + " more than you have."
@@ -853,45 +854,47 @@ class BetEditModal(Modal):
   
 #new match list autocomplete start
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
-  match_t_list = available_matches_name_code()
-  if (user := get_from_db("User", ctx.interaction.user.id)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
-  active_bet_ids_matches = user.active_bet_ids_matches()
-  auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
-  return auto_completes
+  with Session.begin() as session:
+    match_t_list = available_matches_name_code(session)
+    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
+    active_bet_ids_matches = user.active_bet_ids_matches()
+    auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
+    return auto_completes
 #new match list autocomplete end
 
 #bet list autocomplete start
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  text = ctx.value.lower()
-  bet_t_list = await current_bets_name_code(bot)
-  auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
-  if auto_completes == []:
-    text.replace(",", "")
-    text.replace(":", "")
-    text_keywords = text.split(" ")
-    all_bet_t_list = await all_bets_name_code(bot)
-    all_bet_t_list.reverse()
-    if len(text_keywords) == 0:
-      return []
-    for bet_t in all_bet_t_list:
-      bet_detail = bet_t[0].lower()
-      all_in = True
-      for text_keyword in text_keywords:
-        if text_keyword not in bet_detail:
-          all_in = False
-          break
-      if all_in:
-        auto_completes.append(bet_t[0])
-        if len(auto_completes) == 25:
-          break
-        
-  return auto_completes
+  with Session.begin() as session:
+    text = ctx.value.lower()
+    bet_t_list = current_bets_name_code(session)
+    auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
+    if auto_completes == []:
+      text.replace(",", "")
+      text.replace(":", "")
+      text_keywords = text.split(" ")
+      all_bet_t_list = await all_bets_name_code(bot, session)
+      all_bet_t_list.reverse()
+      if len(text_keywords) == 0:
+        return []
+      for bet_t in all_bet_t_list:
+        bet_detail = bet_t[0].lower()
+        all_in = True
+        for text_keyword in text_keywords:
+          if text_keyword not in bet_detail:
+            all_in = False
+            break
+        if all_in:
+          auto_completes.append(bet_t[0])
+          if len(auto_completes) == 25:
+            break
+          
+    return auto_completes
 #bet list autocomplete end
-
+ 
   
 #user bet list autocomplete start
 async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  bet_t_list = await current_bets_name_code(bot)
+  bet_t_list = current_bets_name_code()
   auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
   return auto_completes
 #user bet list autocomplete end
@@ -900,63 +903,54 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
-  user = get_from_list("user", ctx.author.id)
-  if user is None:
-    user = create_user(ctx.author.id, ctx.author.display_name)
-    
-  if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(), match, "Match")) is None: return
-  print(match)
-    
-  if match.date_closed is not None:
-    await ctx.respond("Betting has closed.")
-    return
-  
-  for bet_id in match.bet_ids:
-    bet = get_from_list("bet", bet_id)
-    if bet.user_id == user.code:
-      await ctx.respond("You already have a bet on this match.")
+  with Session.begin() as session:
+    user = get_user_from_id(ctx.author.id, session)
+    if user is None:
+      user = create_user(ctx.author.id, ctx.author.display_name)
+      
+    if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(session), match, "Match", session)) is None: return
+    print(match)
+      
+    if match.date_closed is not None:
+      await ctx.respond("Betting has closed.")
       return
+    
+    for bet in match.bets:
+      if bet.user_id == user.code:
+        await ctx.respond("You already have a bet on this match.", ephemeral=True)
+        return
 
-  bet_modal = BetCreateModal(match=match, user=user, title="Create Bet")
-  await ctx.interaction.response.send_modal(bet_modal)
+    bet_modal = BetCreateModal(match=match, user=user, title="Create Bet", session=session)
+    await ctx.interaction.response.send_modal(bet_modal)
 #bet create end
 
 
 #bet cancel start
 @betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
-  
-  gen_msg = await ctx.respond("Cancelling bet...")
-  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "Bet")) is None: return
-  
-  match = get_from_list("match", bet.match_id)
-  if (match is None) or (match.date_closed is not None):
-    await gen_msg.edit_original_message(content="Match betting has closed, you cannot cancel the bet.")
-    return
+  with Session.begin() as session:
+    gen_msg = await ctx.respond("Cancelling bet...")
+    if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_code(session), bet, "Bet", session)) is None: return
     
+    match = bet.match
+    if (match is None) or (match.date_closed is not None):
+      await gen_msg.edit_original_message(content="Match betting has closed, you cannot cancel the bet.")
+      return
+      
     
-  try:
-    match.bet_ids.remove(bet.code)
-    replace_in_list("match", match.code, match)
-    embedd = await create_match_embedded(match, "Placeholder")
-    await edit_all_messages(match.message_ids, embedd)
-  except:
-    print(f"{bet.code} is not in match {match.code} bet ids {match.bet_ids}")
-    
-  
-  await delete_all_messages(bet.message_ids)
-  remove_from_active_ids(bet.user_id, bet.code)
-  remove_from_list("bet", bet)
-  user = get_from_list("user", bet.user_id)
-  embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.")
-  await gen_msg.edit_original_message(content="", embed=embedd)
+    await delete_all_messages(bet.message_ids)
+    remove_from_active_ids(bet.user_id, bet.code)
+    user = bet.user
+    delete_from_db(bet, session=session)
+    embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.")
+    await gen_msg.edit_original_message(content="", embed=embedd)
 #bet cancel end
 
 
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
 async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_bet_list_autocomplete)):
-  if (bet := await user_from_autocomplete_tuple(ctx, await current_bets_name_code(bot), bet, "Bet")) is None: return
+  if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_code(), bet, "Bet")) is None: return
   
   match = get_from_list("match", bet.match_id)
   if (match is None) or (match.date_closed is not None):
@@ -974,7 +968,7 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
 @betscg.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   #list some old matches
-  if (fbet := await user_from_autocomplete_tuple(None, await current_bets_name_code(bot), bet, "Bet")) is None: 
+  if (fbet := await user_from_autocomplete_tuple(None, current_bets_name_code(), bet, "Bet")) is None: 
     if (fbet := await user_from_autocomplete_tuple(ctx, await all_bets_name_code(bot), bet, "Bet")) is None: return
   bet = fbet
   user = get_from_list("user", bet.user_id)
