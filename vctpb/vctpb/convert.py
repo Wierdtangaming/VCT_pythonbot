@@ -3,7 +3,7 @@ from Match import Match
 from Bet import Bet
 from User import User
 import discord
-from dbinterface import get_from_db
+from dbinterface import get_from_db, get_condition_db
 from sqlaobjs import Session
 from sqlalchemy import select, literal
 
@@ -70,14 +70,8 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
 
 
 def get_user_from_username(username, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return get_user_from_username(username, session)
-  return session.scalars(select(User).where(User.username == username)).first()
+  return get_condition_db("User", User.username == username, session)
 
 
 def usernames_to_users(usernames, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return usernames_to_users(usernames, session)
-  return session.scalars(select(User).where(literal(usernames).contains(User.username))).all()
+  return get_condition_db("User", literal(usernames).contains(User.username), session)

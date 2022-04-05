@@ -22,7 +22,7 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
@@ -57,101 +57,76 @@ gid = get_setting("guild_ids")
 
 
 
+#current is no winner
+#avalible is betting open
+def get_all_available_matches(session=None):
+  return get_condition_db("Match", Match.date_closed is None, session)
 
-def get_all_available_matches():
-  matches = get_all_objects("match")
-  match_list = []
-  for match in matches:
-    if int(match.winner) == 0:
-      match_list.append(match)
-  return match_list
+def get_all_current_matches(session=None):
+  return get_condition_db("Match", Match.winner == 0, session)
+
+
+def shorten_match_name(match):
+  if match.winner != 0:
+    prefix = "Concluded: "
+    shortened_prefix = "Con: "
+  else:
+    prefix = ""
+    shortened_prefix = ""
+  
+  
+  s = f"{prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
+  if len(s) >= 100:
+    s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
+    if len(s) >= 100:
+      s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
+      if len(s) >= 100:
+        tsplit = match.tournament_name.split(" ")[0]
+        s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
+        if len(s) >= 100:
+          s = s[:100]
+  return s
+
 
 def available_matches_name_code(session=None):
-  matches = get_all_db("Match", session)
-  match_t_list = []
-  for match in matches:
-    if match.date_closed is None:
-      match_t_list.append((f"{match.t1} vs {match.t2}", match))
-  return match_t_list
+  return [(shorten_match_name(match), match) for match in get_all_available_matches(session)]
 
-def current_matches_name_code():
-  matches = get_all_objects("match")
-  match_t_list = []
-  for match in matches:
-    if match.winner == 0:
-      match_t_list.append((f"{match.t1} vs {match.t2}", match))
-  return match_t_list
+def current_matches_name_code(session=None):
+  return [(shorten_match_name(match), match) for match in get_all_current_matches(session)]
 
-def all_matches_name_code():
-  matches = get_all_objects("match")
-  match_t_list = []
-  for match in matches:
-    if match.winner != 0:
-      s = f"Concluded: {match.t1} vs {match.t2}, {match.tournament_name}"
-      if len(s) >= 100:
-        s = f"Con: {match.t1} vs {match.t2}, {match.tournament_name}"
-        if len(s) >= 100:
-          s = f"Con: {match.t1}/{match.t2}, {match.tournament_name}"
-          if len(s) >= 100:
-            tsplit = match.tournament_name.split(" ")[0]
-            s = f"Con: {match.t1}/{match.t2}, {tsplit}"
-            
-      match_t_list.append((s, match))
-    else:
-      match_t_list.append((f"{match.t1} vs {match.t2}, {match.tournament_name}", match))
-  return match_t_list
+def all_matches_name_code(session=None):
+  return [shorten_match_name(match) for match in get_all_db("Match", session)]
 
-async def available_bets_name_code():
-  matches = get_all_objects("match")
-  bet_list = []
-  id_dict = {}
-  for match in matches:
-    if match.date_closed is None:
-      for bet_id in match.bet_ids:
-        bet = get_from_list("bet", bet_id)
-        if bet.user_id in id_dict:
-          name = id_dict[bet.user_id]
-        else: 
-          name = get_from_list("user", bet.user_id).username
-          id_dict[bet.user_id] = name
-        bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
-  return bet_list
+
+
+def get_all_current_bets(session=None):
+  return get_condition_db("Bet", Bet.winner == 0, session)
+
+def shorten_bet_name(bet, session=None):
+  if session is None:
+    with Session() as session:
+      return shorten_bet_name(bet, session)
+  if bet.winner != 0:
+    prefix = "Paid out: "
+    shortened_prefix = "Paid: "
+  else:
+    prefix = ""
+    shortened_prefix = ""
+  
+  s = f"{prefix}{bet.user.name}: {bet.amount_bet} on {bet.get_team()}"
+  if len(s) >= 100:
+    s = f"{shortened_prefix}{bet.user.name}: {bet.amount_bet} on {bet.get_team()}"
+    if len(s) >= 100:
+      s = s[:100]
+  return s
+
 
 def current_bets_name_code(session=None):
-  bets = get_all_db("Bet", session)
-  bet_list = []
-  id_dict = {}
-  for bet in bets:
-    if bet.winner == 0:
-      if bet.user_id in id_dict:
-        name = id_dict[bet.user_id]
-      else: 
-        name = bet.user.username
-        id_dict[bet.user_id] = name
-      bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
-  return bet_list
+  return [(shorten_bet_name(bet, session), bet) for bet in get_all_current_bets(session)]
 
 
 def all_bets_name_code(session=None):
-  if session is None:
-    with Session() as session:
-      return all_bets_name_code(session)
-  
-  bets = get_all_db("bet", session)
-  bet_list = []
-  id_dict = {}
-  for bet in bets:
-    if bet.winner != 0:
-      if bet.user_id in id_dict:
-        name = id_dict[bet.user_id]
-      else: 
-        name = bet.user.username
-        id_dict[bet.user_id] = name
-        
-      bet_list.append((f"Paid out: {name}: {bet.amount_bet} on {bet.get_team()}", bet))
-    else:
-      bet_list.append((f"{name}: {bet.amount_bet} on {bet.get_team()}", bet))
-  return bet_list
+  return [shorten_bet_name(bet) for bet in get_all_db("Bet", session)]
 
 
 def get_users_from_multiuser(compare, session=None):
@@ -302,11 +277,11 @@ def get_unique_code(prefix, session=None):
   return code
 
 
-def create_user(user_id, username):
+def create_user(user_id, username, session=None):
   random.seed()
   color = secrets.token_hex(3)
   user = User(user_id, username, color, get_date())
-  print(jsonpickle.encode(user))
+  print(jsonpickle.encode(user), session)
   add_to_db("User", user)
   return user
 
@@ -537,7 +512,7 @@ async def award_give(ctx,
       first = True
       for user in users:
         abu = add_balance_user(user, amount, bet_id, get_date(), session)
-        embedd = await create_user_embedded(abu)
+        embedd = await create_user_embedded(abu, session)
         if first:
           await ctx.respond(embed=embedd)
           first = False
@@ -618,20 +593,21 @@ bot.add_application_command(award)
 #balance start
 @bot.slash_command(name = "balance", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
 async def balance(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
-  if user is None:
-    user = get_from_db("User", ctx.author.id)
-    print(user)
+  with Session.begin() as session:
     if user is None:
-      print("creating_user")
-      user = create_user(ctx.author.id, ctx.author.display_name)
-  else:
-    if (user := await get_user_from_member(ctx, user)) is None: return
-    
-  embedd = await create_user_embedded(user)
-  if embedd is None:
-    await ctx.respond("User not found.")
-    return
-  await ctx.respond(embed=embedd)
+      user = get_from_db("User", ctx.author.id, session)
+      print(user)
+      if user is None:
+        print("creating_user")
+        user = create_user(ctx.author.id, ctx.author.display_name, session)
+    else:
+      if (user := await get_user_from_member(ctx, user)) is None: return
+      
+    embedd = await create_user_embedded(user, session)
+    if embedd is None:
+      await ctx.respond("User not found.")
+      return
+    await ctx.respond(embed=embedd)
 #balance end
 
 
@@ -736,7 +712,7 @@ class BetCreateModal(Modal):
 
       add_to_active_ids(user.code, bet, session)
 
-      embedd = await create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.")
+      embedd = await create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
       
       if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
         inter = await interaction.response.send_message(embed=embedd)
@@ -942,7 +918,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
     remove_from_active_ids(bet.user_id, bet.code)
     user = bet.user
     delete_from_db(bet, session=session)
-    embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.")
+    embedd = await create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.", session)
     await gen_msg.edit_original_message(content="", embed=embedd)
 #bet cancel end
 
@@ -973,11 +949,10 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
       if (fbet := await user_from_autocomplete_tuple(ctx, all_bets_name_code(session), bet, "Bet", session)) is None: return
     bet = fbet
     user = bet.user
-    embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.") embedds need session
+    embedd = await create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
     inter = await ctx.respond(embed=embedd)
     msg = await inter.original_message()
     bet.message_ids.append((msg.id, msg.channel.id))
-    replace_in_list("bet", bet.code, bet)
 #bet find end
 
 

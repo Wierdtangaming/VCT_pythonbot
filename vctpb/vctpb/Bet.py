@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from datetime import datetime
 from sqlalchemy.ext.mutable import MutableList
-from sqlaobjs import mapper_registry
+from sqlaobjs import mapper_registry, Session
 
 @mapper_registry.mapped
 class Bet():
@@ -124,11 +124,14 @@ class Bet():
 
     return(team, winner)
 
-  async def short_to_string(self, bot):
+  def short_to_string(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.short_to_string(session)
     
     (team, payout) = self.get_team_and_payout()
 
-    return f"User: <@!{self.user_id}>, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
+    return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
 
   async def basic_to_string(self, bot, match=None):
     if match is None:

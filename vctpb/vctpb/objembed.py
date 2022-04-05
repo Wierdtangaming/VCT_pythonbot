@@ -7,6 +7,7 @@ from convert import ambig_to_obj, id_to_metion
 from colorinterface import hex_to_tuple
 import math
 import emoji
+from sqlaobjs import Session
 
 
 async def create_match_embedded(match_ambig, title, session=None):
@@ -86,15 +87,18 @@ async def create_bet_embedded(bet_ambig, title, session=None):
 
 
 async def create_bet_list_embedded(embed_title, bets_ambig, bot, session=None):
+  if session is None:
+    with Session.begin() as session:
+      create_bet_list_embedded(embed_title, bets_ambig, bot, session)
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
-    bets_ambig = get_mult_from_db("Bet", bets_ambig, session=session)
+    bets_ambig = get_mult_from_db("Bet", bets_ambig, session)
   for bet in bets_ambig:
-      embed.add_field(name="\n" + "Bet: " + bet.code, value=await bet.short_to_string(bot) + "\n", inline=False)
+    embed.add_field(name="\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline=False)
   return embed
 
 
-async def create_user_embedded(user_ambig, session=None):
+def create_user_embedded(user_ambig, session=None):
   user = ambig_to_obj(user_ambig, "User", session=session)
   if user is None:
     return None
