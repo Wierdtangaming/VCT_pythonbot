@@ -1,5 +1,5 @@
 import discord
-from dbinterface import get_mult_from_db, get_all_db
+from dbinterface import get_mult_from_db, get_all_db, get_condition_db
 from Match import Match
 from Bet import Bet
 from User import User
@@ -10,8 +10,8 @@ import emoji
 from sqlaobjs import Session
 
 
-async def create_match_embedded(match_ambig, title, session=None):
-  match = ambig_to_obj(match_ambig, "Match", session=session)
+def create_match_embedded(match_ambig, title, session=None):
+  match = ambig_to_obj(match_ambig, "Match", session)
   if match is None:
     return None
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
@@ -46,17 +46,17 @@ async def create_match_embedded(match_ambig, title, session=None):
   return embed
 
 
-async def create_match_list_embedded(embed_title, matches_ambig, session=None):
+def create_match_list_embedded(embed_title, matches_ambig, session=None):
   embed = discord.Embed(title=embed_title, color=discord.Color.red())
   if all(isinstance(s, str) for s in matches_ambig):
-    matches_ambig = get_mult_from_db("Match", matches_ambig, session=session)
+    matches_ambig = get_mult_from_db("Match", matches_ambig, session)
   for match in matches_ambig:
     embed.add_field(name="\n" + "Match: " + match.code, value=match.short_to_string() + "\n", inline=False)
   return embed
 
 
-async def create_bet_embedded(bet_ambig, title, session=None):
-  bet = ambig_to_obj(bet_ambig, "Bet", session=session)
+def create_bet_embedded(bet_ambig, title, session=None):
+  bet = ambig_to_obj(bet_ambig, "Bet", session)
   if bet is None:
     return None
 
@@ -86,7 +86,7 @@ async def create_bet_embedded(bet_ambig, title, session=None):
   return embed
 
 
-async def create_bet_list_embedded(embed_title, bets_ambig, bot, session=None):
+def create_bet_list_embedded(embed_title, bets_ambig, bot, session=None):
   if session is None:
     with Session.begin() as session:
       create_bet_list_embedded(embed_title, bets_ambig, bot, session)
@@ -99,7 +99,7 @@ async def create_bet_list_embedded(embed_title, bets_ambig, bot, session=None):
 
 
 def create_user_embedded(user_ambig, session=None):
-  user = ambig_to_obj(user_ambig, "User", session=session)
+  user = ambig_to_obj(user_ambig, "User", session)
   if user is None:
     return None
 
@@ -111,8 +111,8 @@ def create_user_embedded(user_ambig, session=None):
   return embed
 
 
-async def create_leaderboard_embedded(session=None):
-  users = get_all_db("User", session=session)
+def create_leaderboard_embedded(session=None):
+  users = get_condition_db("User", User.hidden == False, session)
   user_rankings = [(user, user.balances[-1][1]) for user in users]
   user_rankings.sort(key=lambda x: x[1])
   user_rankings.reverse()
@@ -121,8 +121,6 @@ async def create_leaderboard_embedded(session=None):
   rank_num = 1
   for user_rank in user_rankings:
     rank = ""
-    if not user_rank[0].hidden:
-      continue
     if rank_num > len(medals):
       rank = "#" + str(rank_num)
       name = user_rank[0].username
@@ -135,7 +133,7 @@ async def create_leaderboard_embedded(session=None):
   return embed
 
   
-async def create_payout_list_embedded(embed_title, match, bet_user_payouts):
+def create_payout_list_embedded(embed_title, match, bet_user_payouts):
   embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
   for bet, user, payout in bet_user_payouts:
     if payout > 0:
