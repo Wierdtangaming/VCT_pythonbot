@@ -86,11 +86,7 @@ def is_key_in_db(table_name, key, session=None):
   if session is None:
     with Session.begin() as session:
       return is_key_in_db(table_name, key, session)
-  if table_name == "Color":
-    return session.scalars(select(Color).where(Color.name == key)).one_or_none() is not None
-  else:
-    obj = eval(table_name)
-    return session.scalars(select(obj).where(obj.code == key)).one_or_none() is not None
+  return session.get(eval(table_name), key, populate_existing=True) is not None
       
       
 def get_channel_from_db(channel_name, session=None):
