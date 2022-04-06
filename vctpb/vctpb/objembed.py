@@ -1,5 +1,5 @@
 import discord
-from dbinterface import get_mult_from_db, get_all_db, get_condition_db
+from dbinterface import get_mult_from_db, get_condition_db
 from Match import Match
 from Bet import Bet
 from User import User

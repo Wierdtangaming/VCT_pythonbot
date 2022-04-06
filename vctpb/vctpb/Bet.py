@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 
+
 @mapper_registry.mapped
 class Bet():
   
@@ -132,16 +133,13 @@ class Bet():
     (team, payout) = self.get_team_and_payout()
 
     return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
-
-  async def basic_to_string(self, bot, match=None):
-    if match is None:
-      match = get_from_list("Match", self.match_id)
-
-    return f"Bet: {self.code}, User: <@!{self.user_id}>, Team: {self.get_team()}, Amount: {self.amount_bet}, Match ID: {match.code}"
   
-  def balance_to_string(self, balances):
-    
-    match = get_from_list("Match", self.match_id)
+  def balance_to_string(self, balances, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.balance_to_string(balances, session)
+
+    match = self.match
     (team, winner) = self.get_team_and_winner()
 
     return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.amount_bet)}, balance change: {math.floor(balances)}"

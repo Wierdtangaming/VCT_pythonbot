@@ -39,9 +39,9 @@ class User():
     #a tuple (bet_id, balances after change, date)
     #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
-    #bet_id = award_[award_id]: awards
+    #bet_id = award_[award_id]_[name]: awards
     #bet_id = start: start balances
-    #bet_id = reset_[reset_name]: changed balances with command
+    #bet_id = reset_[reset_id]_[reset_name]: changed balances with command
     
     self.balances = [("start", Decimal(500), date_created)]
     
@@ -70,12 +70,28 @@ class User():
     self.color_hex = color.hex
   
   def __repr__(self):
-    return f"<User {self.code}>"
+    return f"<User {self.code}, {self.username}>"
 
   def get_unique_code(self, prefix):
+    #test
+    #test
+    #test
+    #test
+    #test
+    #test
+    #test
     #combine all_bal into one array
     prefix_bal = [x for x in self.balances if x[0].startswith(prefix)]
     codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
+    for bal in self.balances:
+      split = bal.split("_")
+      if len(split) > 1:
+        codes.append(split[1])
+    print(codes)
+    for code in codes:
+      if len(code) != 8:
+        print(code)
+        quit()
     code = ""
     copy = True
     while copy:
@@ -112,12 +128,17 @@ class User():
     return loan_amount
 
   def unavailable(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.unavailable(session)
+      
     from dbinterface import get_mult_from_db
     used = 0
     bets = get_mult_from_db("Bet", self.active_bet_ids_bets(), session)
     
     for bet in bets:
       if bet is None:
+        print("---------------------------------------------error, bet in active not found---------------------------------------------")
         self.active_bet_ids.remove(bet.code)
         continue
       used += bet.amount_bet
@@ -134,7 +155,7 @@ class User():
     return self.balances[-1][1] + self.loan_bal()
 
   def avaliable_nonloan_bal(self, session=None):
-    return self.balances[-1][1] - self.unavailable(session=session)
+    return self.balances[-1][1] - self.unavailable(session)
 
   def get_resets(self):
     return [i for i, x in enumerate(self.balances) if x[0].startswith("reset_")]
