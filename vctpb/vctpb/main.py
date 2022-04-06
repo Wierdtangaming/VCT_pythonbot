@@ -297,29 +297,6 @@ def create_user(user_id, username, session=None):
 
 
 
-def add_to_active_ids(user_ambig, bet_ambig, session=None):
-  if session is None:
-    with Session.begin() as session:
-      add_to_active_ids(user_ambig, bet_ambig, session)
-  if (user := ambig_to_obj(user_ambig, "User", session)) is None: return None
-  if (bet := ambig_to_obj(bet_ambig, "Bet", session)) is None: return None
-
-  user.active_bet_ids.append((bet.code, bet.match_id))
-
-
-def remove_from_active_ids(user_ambig, bet_id, session=None):
-  if session is None:
-    with Session.begin() as session:
-      remove_from_active_ids(user_ambig, bet_id, session)
-  
-  if (user := ambig_to_obj(user_ambig, "User", session)) is None: return None
-  
-  if (t := next((t for t in user.active_bet_ids if bet_id == t[0]), None)) is None:
-    print("Bet_id Not Found")
-    return
-  user.active_bet_ids.remove(t)
-
-
 def add_balance_user(user_ambig, change, description, date, session=None):
   if session is None:
     with Session.begin() as session:

@@ -1,7 +1,5 @@
-poetry.lock
-pyproject.toml
 *.zip
-.DS_Store
+*.DS_Store
 *.db
 *.db-journal
 *.ini

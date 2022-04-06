@@ -8,7 +8,7 @@ import random
 import math
 import secrets
 import sys
-from sqlalchemy import Column, String, BOOLEAN, ForeignKey, select
+from sqlalchemy import Column, String, BOOLEAN, ForeignKey
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
@@ -24,10 +24,10 @@ class User():
   color = relationship("Color", back_populates="users")
   color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
-  balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balances after change, date)
-  active_bet_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of strings code of active bets
-  loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balances, date created, date paid)
-  bets = relationship("Bet", back_populates="user", cascade="all, delete")
+  balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
+  active_bets = relationship("Bet", primaryjoin="and_(Bet.user_id == User.code, Bet.winner == 0)", overlaps="active_bets, user", cascade="all, delete")
+  loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
+  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
   matches = relationship("Match", back_populates="creator")
   
   def __init__(self, code, username, color, date_created):
@@ -44,20 +44,17 @@ class User():
     #bet_id = reset_[reset_id]_[reset_name]: changed balances with command
     
     self.balances = [("start", Decimal(500), date_created)]
-    
-    self.active_bet_ids = []
 
     #a tuple (balances, date created, date paid)
     
     self.loans = []
 
-  def __init__(self, code, username, color, hidden, balances, active_bet_ids, loans):
+  def __init__(self, code, username, color, hidden, balances, loans):
     self.code = code
     self.username = username
     self.set_color(color)
     self.hidden = hidden
     self.balances = balances
-    self.active_bet_ids = active_bet_ids
     self.loans = loans
   
   def set_color(self, color):
@@ -104,11 +101,6 @@ class User():
           copy = True
     return code
 
-  def active_bet_ids_bets(self):
-    return [active_id[0] for active_id in self.active_bet_ids]
-
-  def active_bet_ids_matches(self):
-    return [active_id[1] for active_id in self.active_bet_ids]
   
   def get_open_loans(self):
     open_loans = []
@@ -132,15 +124,10 @@ class User():
       with Session.begin() as session:
         return self.unavailable(session)
       
-    from dbinterface import get_mult_from_db
     used = 0
-    bets = get_mult_from_db("Bet", self.active_bet_ids_bets(), session)
+    bets = self.active_bets
     
     for bet in bets:
-      if bet is None:
-        print("---------------------------------------------error, bet in active not found---------------------------------------------")
-        self.active_bet_ids.remove(bet.code)
-        continue
       used += bet.amount_bet
 
     return used
@@ -712,7 +699,7 @@ def num_of_bal_with_name(name, users):
   return num
 
 
-def is_valid_user(code, username, color, hidden, balances, active_bet_ids, loans):
+def is_valid_user(code, username, color, hidden, balances, loans):
   errors = [False for _ in range(7)]
   if isinstance(code, int) == False or len(str(code)) > 20:
     errors[0] = True
@@ -724,8 +711,7 @@ def is_valid_user(code, username, color, hidden, balances, active_bet_ids, loans
     errors[3] = True
   if isinstance(balances, list) == False:
     errors[4] = True
-  if isinstance(active_bet_ids, list) == False:
-    errors[5] = True
+  errors[5] = True
   if isinstance(loans, list) == False:
     errors[6] = True
   return errors
