@@ -57,7 +57,7 @@ class User():
     self.hidden = hidden
     self.balances = balances
     self.loans = loans
-  
+        
   def set_color(self, color):
     if isinstance(color, str):
       self.color_name = None
