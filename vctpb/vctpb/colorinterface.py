@@ -1,5 +1,5 @@
 from hashlib import new
-from dbinterface import get_all_db, get_from_db, is_key_in_db, add_to_db, delete_from_db
+from dbinterface import get_from_db, is_key_in_db, add_to_db, delete_from_db
 from sqlaobjs import Session
 from Color import Color
 
@@ -27,7 +27,7 @@ def hex_to_tuple(hex):
   
   
 def get_color(name, session=None):
-  name = name.lower()
+  name = name
   color = get_from_db("Color", name, session)
   return color
   
@@ -59,7 +59,7 @@ def remove_color(name, session):
   if not is_key_in_db("Color", name, session):
     return f"{name} was not found in color list."
   
-  delete_from_db("Color", name, session)
+  delete_from_db("Color", name, session)     
   return f"Removed {name} from color list"
 
 
@@ -75,6 +75,12 @@ def rename_color(old_name, new_name, session):
   if color is None:
     return f"{old_name} was not found in color list."
   color.name = new_name
+  for match in color.matches:
+    match.set_color(color)
+  for bet in color.bets:
+    bet.set_color(color)
+  for user in color.users:
+    user.set_color(color)
   return f"{old_name} has been renamed to {new_name}"
     
   
@@ -91,4 +97,10 @@ def recolor_color(name, hex):
   if color is None:
     return f"{hex} was not found in color list."
   color.hex = hex
+  for match in color.matches:
+    match.set_color(color)
+  for bet in color.bets:
+    bet.set_color(color)
+  for user in color.users:
+    user.set_color(color)
   return f"{name} now has the color {hex}"

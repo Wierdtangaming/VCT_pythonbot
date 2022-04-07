@@ -50,12 +50,6 @@ bot = commands.Bot(intents=intents, command_prefix="$")
 gid = get_setting("guild_ids")
 
 
-# matches are in match_list_[identifier] one key contains 50 matches, indentifyer incrimentaly counts up
-# user is in user_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
-# bet is in bet_list_[identifier] one key contains 50 users, indentifyer incrimentaly counts up
-# logs are log_[ID] holds (log, date)
-
-
 
 #current is no winner
 #avalible is betting open
@@ -126,7 +120,7 @@ def current_bets_name_code(session=None):
 
 
 def all_bets_name_code(session=None):
-  return [shorten_bet_name(bet) for bet in get_all_db("Bet", session)]
+  return [shorten_bet_name(bet, session) for bet in get_all_db("Bet", session)]
 
 
 def get_users_from_multiuser(compare, session=None):
@@ -192,34 +186,6 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id, session=None):
     balat = user.balances[indices[0]]
     user.balances[indices[0]] = (new_balance_id, balat[1], balat[2])
 
-
-def delete_balance_id(user_ambig, balance_id, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return delete_balance_id(user_ambig, balance_id, session)
-    
-  user = ambig_to_obj(user_ambig, "User", session)
-  if user is None:
-    return "User not found"
-  indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
-  if len(indices) > 1:
-    print("More than one balance_id found")
-  elif len(indices) == 0:
-    return "No balance id found"
-  reset_range = user.get_to_reset_range(indices[0])
-  
-  index = indices[0]
-  diff = user.balances[index][1] - user.balances[index-1][1]
-  print(diff)
-  for i in reset_range:
-    bal_list = list(user.balances[i])
-    bal_list[1] = bal_list[1] - diff
-    user.balances[i] = tuple(bal_list)
-  balat = user.balances[indices[0]]
-  
-  user.balances.remove(balat)
-  print(f"removed {balance_id}")
-  return "Removed"
 
 
 def print_all_balances(user_ambig, session=None):
@@ -374,8 +340,7 @@ async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
       if username_t[1].startswith(last_value):
         auto_completes.append(f"{all_but} {username_t[0]}")
     return auto_completes
-  auto_completes = [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
-  return auto_completes
+  return [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
 #multi user autocomplete end
 
 #autocomplete end
@@ -445,9 +410,7 @@ async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   
   award_labels = user.get_award_strings()
   
-  auto_completes = [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
-  
-  return auto_completes
+  return [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
 #user award autocomplete end  
 
 
@@ -678,8 +641,6 @@ class BetCreateModal(Modal):
       
       bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date())
 
-      add_to_active_ids(user.code, bet, session)
-
       embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
       
       if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
@@ -799,11 +760,8 @@ class BetEditModal(Modal):
 #new match list autocomplete start
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    match_t_list = available_matches_name_code(session)
-    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
-    active_bet_ids_matches = user.active_bet_ids_matches()
-    auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower() and (match_t[1].code not in active_bet_ids_matches))]
-    return auto_completes
+    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return []
+    return [shorten_match_name(match) for match in user.open_matches]
 #new match list autocomplete end
 
 #bet list autocomplete start
@@ -839,8 +797,7 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #user bet list autocomplete start
 async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   bet_t_list = current_bets_name_code()
-  auto_completes = [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
-  return auto_completes
+  return [bet_t[0] for bet_t in bet_t_list if ctx.value.lower() in bet_t[0].lower() if ctx.interaction.user.id == bet_t[1].user_id]
 #user bet list autocomplete end
 
 
@@ -883,7 +840,6 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
       
     
     await delete_all_messages(bet.message_ids)
-    remove_from_active_ids(bet.user_id, bet.code)
     user = bet.user
     delete_from_db(bet, session=session)
     embedd = create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.", session)
@@ -927,34 +883,29 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 #bet list start
 @betscg.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
-  
-  bets = get_all_objects("bet")
-  bet_list = []
-  for bet in bets:
-    if int(bet.winner) == 0:
-      bet_list.append(bet)
-  if len(bet_list) == 0:
-    await ctx.respond("No undecided bets.")
-    return
+  with Session.begin() as session:
+    bets = get_all_current_bets(session)
+    if len(bets) == 0:
+      await ctx.respond("No undecided bets.", ephemeral=True)
+      return
 
-  if type == 0:
-    #short
-    gen_msg = await ctx.respond("Generating list...")
-    embedd = create_bet_list_embedded("Bets:", bet_list, bot)
-    await gen_msg.edit_original_message(content = "", embed=embedd)
+    if type == 0:
+      #short
+      gen_msg = await ctx.respond("Generating list...")
+      embedd = create_bet_list_embedded("Bets:", bet_list, session)
+      await gen_msg.edit_original_message(content = "", embed=embedd)
     
-  elif type == 1:
-    #full
-    for i, bet in enumerate(bet_list):
-      user = get_from_list("user", bet.user_id)
-      embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
-      if i == 0:
-        inter = await ctx.respond(embed=embedd)
-        msg = await inter.original_message()
-      else:
-        msg = await ctx.interaction.followup.send(embed=embedd)
-      bet.message_ids.append((msg.id, msg.channel.id))
-      replace_in_list("bet", bet.code, bet)
+    elif type == 1:
+      #full
+      for i, bet in enumerate(bet_list):
+        user = bet.user
+        embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+        if i == 0:
+          inter = await ctx.respond(embed=embedd)
+          msg = await inter.original_message()
+        else:
+          msg = await ctx.interaction.followup.send(embed=embedd)
+        bet.message_ids.append((msg.id, msg.channel.id))
 #bet list end
   
 bot.add_application_command(betscg)
@@ -973,7 +924,7 @@ colorscg = SlashCommandGroup(
 xkcd_colors = mcolors.XKCD_COLORS
 #color xkcd autocomplete start
 async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
-  val = ctx.value.lower() 
+  val = ctx.value.lower()
   colors = [x[5:].lower() for x in xkcd_colors.keys() if val in x]
   
   colors = colors[::-1]
@@ -1012,10 +963,9 @@ async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext):
 #color list start
 @colorscg.command(name = "list", description = "Lists all colors.")
 async def color_list(ctx):
-  print("getting list")
-  colors = get_all_colors_key_hex()
+  colors = get_all_db("Color")
   if len(colors) == 0:
-    await ctx.respond("No colors found.")
+    await ctx.respond("No colors found.", ephemeral=True)
     return
   
   font = ImageFont.truetype("font/whitneybold.otf", size=40)
@@ -1024,7 +974,7 @@ async def color_list(ctx):
   for i, color in enumerate(colors):
     x = ((i % 2) * 350) + 50
     y = (int(i / 2) * 100) + 50
-    hex = color[1]
+    hex = color.hex
     color_tup = hex_to_tuple(hex)
     d.text((x,y), color[0].capitalize(), fill=(*color_tup,255), font=font)
   with BytesIO() as image_binary:
@@ -1042,12 +992,15 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
     if hex is not None:
       await ctx.respond("You can't add a hex code and a xkcd color name.")
       return
+    
     hex = xkcd_colors[f"xkcd:{xkcd_color_name.lower()}"]
     if custom_color_name is not None:
       xkcd_color_name = custom_color_name
     await ctx.respond(add_color(xkcd_color_name, hex), ephemeral = True)
+    
   elif custom_color_name is not None and hex is not None:
     await ctx.respond(add_color(custom_color_name, hex), ephemeral = True)
+    
   else:
     await ctx.respond("Please enter a name and hex code or a xkcd color.", ephemeral = True)
 #color add end
@@ -1092,13 +1045,13 @@ profile = SlashCommandGroup(
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
-  if (color_hex := get_color(color_name)) is None:
-    await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
-    return
-  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-  user.color = color_hex
-  replace_in_list("user", user.code, user)
-  await ctx.respond(f"Profile color is now {color_name}.")
+  with Session.begin() as session:
+    if (color := get_color(color_name)) is None:
+      await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
+      return
+    if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+    user.set_color = color
+    await ctx.respond(f"Profile color is now {color.name}.")
 #profile color end
 
 bot.add_application_command(profile)
@@ -1535,27 +1488,21 @@ async def match_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_current_list_autocomplete(ctx: discord.AutocompleteContext):
   text = ctx.value.lower()
   match_t_list = current_matches_name_code()
-  auto_completes = [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
-        
-  return auto_completes
+  return [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
 #match current list autocomplete end
 
 #match available list autocomplete start
 async def match_available_list_autocomplete(ctx: discord.AutocompleteContext):
   text = ctx.value.lower()
   match_t_list = available_matches_name_code()
-  auto_completes = [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
-        
-  return auto_completes
+  return [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
 #match available list autocomplete end
   
 #match bet free available list autocomplete start
 async def match_bet_free_available_list_autocomplete(ctx: discord.AutocompleteContext):
   text = ctx.value.lower()
   match_t_list = available_matches_name_code()
-  auto_completes = [match_t[0] for match_t in match_t_list if ((text in match_t[0].lower()) and (match_t[1].bet_ids == []))]
-        
-  return auto_completes
+  return [match_t[0] for match_t in match_t_list if ((text in match_t[0].lower()) and (match_t[1].bet_ids == []))]
   
 
 #match open close list autocomplete start
@@ -1574,26 +1521,21 @@ async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   
 #match match team autocomplete start
 async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
-  match = ctx.options["match"]
-  if match is None: return []
+  if(match := ctx.options["match"]) is None: return []
   if (match := await user_from_autocomplete_tuple(None, current_matches_name_code(), match, "Match")) is None: return []
-  auto_completes = [match.t1, match.t2]
-  return auto_completes
+  return [match.t1, match.t2]
 #match match team autocomplete end
 
   
 #match winner autocomplete start
 async def match_winner_list_autocomplete(ctx: discord.AutocompleteContext):
-  match = ctx.options["match"]
-  if match is None: return []
+  if(match := ctx.options["match"]) is None: return []
   if (match := await user_from_autocomplete_tuple(None, all_matches_name_code(), match, "Match")) is None: return []
   
   strin = "None"
   if match.t1 == "None" or match.t2 == "None":
     strin = "Set winner to none"
-  auto_completes = [match.t1, match.t2, strin]
-  
-  return auto_completes
+  return [match.t1, match.t2, strin]
 #match winner autocomplete end
   
 
@@ -1680,7 +1622,6 @@ async def match_delete(ctx, match: Option(str, "Match you want to delete.", auto
   for bet_id in match.bet_ids:
     bet = get_from_list("bet", bet_id)
     await delete_all_messages(bet.message_ids)
-    remove_from_active_ids(bet.user_id, bet.code)
     remove_from_list("bet", bet)
   
   await delete_all_messages(match.message_ids)
@@ -1797,7 +1738,6 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       if bet.team_num == team:
         payout += bet.amount_bet * odds
       user = get_from_list("user", bet.user_id)
-      remove_from_active_ids(user, bet.code)
       add_balance_user(user, payout, "id_" + str(bet.code), date)
       
       replace_in_list("bet", bet.code, bet)
@@ -1884,7 +1824,6 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       if bet.team_num == team:
         payout += bet.amount_bet * odds
       user = get_from_list("user", bet.user_id)
-      remove_from_active_ids(user, bet.code)
       add_balance_user(user, payout, "id_" + str(bet.code), date)
 
       replace_in_list("bet", bet.code, bet)

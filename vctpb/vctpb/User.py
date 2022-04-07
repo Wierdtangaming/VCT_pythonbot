@@ -25,10 +25,11 @@ class User():
   color_hex = Column(String(6), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
-  active_bets = relationship("Bet", primaryjoin="and_(Bet.user_id == User.code, Bet.winner == 0)", overlaps="active_bets, user", cascade="all, delete")
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
-  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
-  matches = relationship("Match", back_populates="creator")
+  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user, open_matches")
+  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user, open_matches", cascade="all, delete")
+  matches = relationship("Match", back_populates="creator", overlaps="open_matches, creator")
+  open_matches = relationship("Match", secondary="join(Bet, Match, not Bet.match_id == Match.code)", primaryjoin="and_(Match.winner == 0, Bet.user_id == User.code)", overlaps="matches, creator", viewonly=True)
   
   def __init__(self, code, username, color, date_created):
     self.code = code
@@ -69,22 +70,13 @@ class User():
   def __repr__(self):
     return f"<User {self.code}, {self.username}>"
 
-  def get_unique_code(self, prefix):
-    #test
-    #test
-    #test
-    #test
-    #test
-    #test
-    #test
+  def get_unique_code(self):
     #combine all_bal into one array
-    prefix_bal = [x for x in self.balances if x[0].startswith(prefix)]
-    codes = [bal[0][len(prefix):len(prefix)+8] for bal in prefix_bal]
+    codes = []
     for bal in self.balances:
-      split = bal.split("_")
+      split = bal[0].split("_")
       if len(split) > 1:
         codes.append(split[1])
-    print(codes)
     for code in codes:
       if len(code) != 8:
         print(code)
