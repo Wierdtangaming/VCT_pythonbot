@@ -3,7 +3,7 @@ from pytz import timezone
 import jsonpickle
 
 from sqlaobjs import Session 
-from sqlalchemy import select, func
+from sqlalchemy import select, desc
 
 from Match import Match
 from User import User
@@ -37,6 +37,17 @@ def get_from_db(table_name, code, session=None):
     with Session.begin() as session:
       return session.get(eval(table_name), code, populate_existing=True)
   return session.get(eval(table_name), code, populate_existing=True)
+    
+    
+def get_new_db(tabel_name, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_new_db(tabel_name, session)
+  if tabel_name == "Match":
+    order_by = Match.date_created
+  if tabel_name == "Bet":
+    order_by = Bet.date_created
+  return session.scalars(select(eval(tabel_name)).order_by(desc(order_by))).first()
     
     
 def get_condition_db(table_name, condition, session=None):

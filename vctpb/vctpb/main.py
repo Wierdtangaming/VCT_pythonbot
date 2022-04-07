@@ -22,7 +22,7 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
@@ -167,6 +167,10 @@ def get_last_odds_source(amount, session=None):
       if amount == 1:
         return list(name_set)[0]
       return list(name_set)
+
+def get_current_tournament_odds(session=None):
+  match = get_new_db("Match", session)
+  return (match.tournament_name, match.odds_source)
 
       
 def rename_balance_id(user_ambig, balance_id, new_balance_id, session=None):
@@ -1058,6 +1062,7 @@ bot.add_application_command(profile)
 #profile end
 
 
+
 #graph start
 graph = SlashCommandGroup(
   name = "graph", 
@@ -1184,23 +1189,23 @@ async def leaderboard(ctx):
 #log start
 @bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)", guild_ids = gid)
 async def log(ctx, amount: Option(int, "How many balance changes you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
-
-  if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  if amount <= 0:
-    await ctx.respond("Amount has to be greater than 0.")
-    return
+  with Session.begin() as session:
+    if (user := await get_user_from_member(ctx, user, session)) is None: return
     
-  gen_msg = await ctx.respond("Generating log...")
-  
-  embedds = user.get_new_balance_changes_embeds(amount)
-  if embedds is None:
-    await gen_msg.edit_original_message(content = "No log generated.")
-    return
+    if amount <= 0:
+      await ctx.respond("Amount has to be greater than 0.")
+      return
+      
+    gen_msg = await ctx.respond("Generating log...")
+    
+    embedds = user.get_new_balance_changes_embeds(amount)
+    if embedds is None:
+      await gen_msg.edit_original_message(content = "No log generated.", ephemeral = True)
+      return
 
-  await gen_msg.edit_original_message(content="", embed=embedds[0])
-  for embedd in embedds[1:]:
-    await ctx.channel.send(embed=embedd)
+    await gen_msg.edit_original_message(content="", embed=embedds[0])
+    for embedd in embedds[1:]:
+      await ctx.interaction.followup.send(embed=embedd)
 #log end
 
 
@@ -1216,15 +1221,15 @@ loan = SlashCommandGroup(
 #loan create start
 @loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
-    
-  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+  with Session.begin() as session:
+    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
 
-  if user.get_clean_bal_loan() >= 100:
-    await ctx.respond("You must have less than 100 to make a loan")
-    return
-  user.loans.append((50, get_date(), None))
-  replace_in_list("user", user.code, user)
-  await ctx.respond("You have been loaned 50")
+    if user.get_clean_bal_loan() >= 100:
+      await ctx.respond("You must have less than 100 to make a loan", ephemeral = True)
+      return
+    
+    user.loans.append((50, get_date(), None))
+    await ctx.respond(f"{user.username} has been loaned 50")
 #loan create end
 
   
@@ -1232,37 +1237,35 @@ async def loan_create(ctx):
 @loan.command(name = "count", description = "See how many loans you have active.")
 async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
   if (user := await get_user_from_member(ctx, user)) is None: return
-  
-  user = get_from_list("user", ctx.author.id)
-  await ctx.respond(f"You currently have {len(user.get_open_loans())} active loans")
+  await ctx.respond(f"{user.username} currently has {len(user.get_open_loans())} active loans")
 #loan count end
 
   
 #loan pay start
 @loan.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
-  if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-    
-  loan_amount = user.loan_bal()
-  if loan_amount == 0:
-    await ctx.respond("You currently have no loans")
-    return
-  anb = user.get_balance()
-  if(anb < loan_amount):
-    await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
-    return
+  with Session.begin() as session:
+    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+      
+    loan_amount = user.loan_bal()
+    if loan_amount == 0:
+      await ctx.respond("You currently have no loans")
+      return
+    anb = user.get_balance(session)
+    if(anb < loan_amount):
+      await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
+      return
 
-  loans = user.get_open_loans()
-  for loan in loans:
-    new_loan = list(loan)
-    new_loan[2] = get_date()
-    new_loan = tuple(new_loan)
+    loans = user.get_open_loans()
+    for loan in loans:
+      new_loan = list(loan)
+      new_loan[2] = get_date()
+      new_loan = tuple(new_loan)
 
 
-    index = user.loans.index(loan)
-    user.loans[index] = new_loan
-  replace_in_list("user", user.code, user)
-  await ctx.respond(f"You have paid off {len(loans)} loan(s)")
+      index = user.loans.index(loan)
+      user.loans[index] = new_loan
+    await ctx.respond(f"You have paid off {len(loans)} loan(s)")
 #loan pay end
 
 bot.add_application_command(loan)
@@ -1279,18 +1282,19 @@ matchscg = SlashCommandGroup(
 #match create modal start
 class MatchCreateModal(Modal):
   
-  def __init__(self, balance_odds=0, *args, **kwargs) -> None:
+  def __init__(self, balance_odds=0, session=None, *args, **kwargs) -> None:
+    
     super().__init__(*args, **kwargs)
     
     self.balance_odds = balance_odds
-    
+    leaderboard, odds_source = get_current_tournament_odds(session)
     self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
     self.add_item(InputText(label="Enter team two name.", placeholder='Get from VLR', min_length=1, max_length=100))
     
     self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
-    self.add_item(InputText(label="Enter tournament name.", value=get_last_tournament_name(1), min_length=1, max_length=300))
+    self.add_item(InputText(label="Enter tournament name.", value=leaderboard, min_length=1, max_length=300))
     
-    self.add_item(InputText(label="Enter odds source.", value=get_last_odds_source(1), min_length=1, max_length=100))
+    self.add_item(InputText(label="Enter odds source.", value=odds_source, min_length=1, max_length=100))
 
   
   async def callback(self, interaction: discord.Interaction):

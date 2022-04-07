@@ -134,15 +134,11 @@ class Bet():
 
     return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
   
-  def balance_to_string(self, balances, session=None):
-    if session is None:
-      with Session.begin() as session:
-        return self.balance_to_string(balances, session)
+  def balance_to_string(self, balances):
 
-    match = self.match
     (team, winner) = self.get_team_and_winner()
 
-    return f"{match.t1} vs {match.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.amount_bet)}, balance change: {math.floor(balances)}"
+    return f"{self.t1} vs {self.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.amount_bet)}, balance change: {math.floor(balances)}"
 
 def is_valid_bet(code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
   errors = [False for _ in range(12)]

@@ -201,6 +201,7 @@ class User():
     return award_labels
   
   def get_new_balance_changes_embeds(self, amount):
+    from dbinterface import get_mult_from_db
     if amount <= 0:
       return None
     if amount >= len(self.balances):
@@ -219,13 +220,22 @@ class User():
     
     bal_index = 3
     
+    bets = []
+    for new_balance in new_balances:
+      if new_balance[0].startswith("bet_"):
+        bets.append(balance[0][3:])
+    
+    bets = get_mult_from_db("Bet", bets)
+    
+    bets_i = iter(bets)
+    
     for balance in new_balances:
       endex = int(embed_index / 25)
       
       balance_change = balance[1] - before
       if balance[0].startswith("id_"):
         #bet id
-        bet = get_from_list("Bet", balance[0][3:])
+        bet = next(bets_i)
 
         embeds[endex].add_field(name=f"Bet: {bet.code}", value=bet.balance_to_string(balance_change), inline=False)
         
@@ -260,6 +270,8 @@ class User():
     if len(embeds) == 0:
       return None
     return embeds
+  
+  
 
   def get_graph_image(self, balance_range_ambig):
     xlabel = ""
