@@ -1,4 +1,3 @@
-from hashlib import new
 from dbinterface import get_from_db, is_key_in_db, add_to_db, delete_from_db
 from sqlaobjs import Session
 from Color import Color

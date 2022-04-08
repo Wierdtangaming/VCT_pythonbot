@@ -5,7 +5,6 @@
 # test prefix unique with 1 long in test code
 
 from io import BytesIO
-import collections
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -22,15 +21,14 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import *
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_at, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, get_user_from_username, usernames_to_users
+from convert import ambig_to_obj, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
-from savefiles import  get_all_names, backup
-import time
+from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
 import matplotlib.colors as mcolors
 import secrets
@@ -1764,7 +1762,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
 
     for bet in match.bets:
       user = bet.user
-      user.remove_balance_id(f"id_{bet.code}")
+      user.remove_balance_id(f"id_{bet.code}", session)
 
     if match.winner == 0:
       await gen_msg.edit_original_message("Winner has been set to None.")

@@ -163,12 +163,15 @@ class User():
   def to_string(self):
     return "Balance: " + str(self.balances)
 
-  def remove_balance_id(self, id):
+  def remove_balance_id(self, id, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.remove_balance_id(id, session)
+    
     for balance in self.balances:
       if balance[0] == id:
         self.balances.remove(balance)
         break
-    replace_in_list("User", self.code, self)
 
   def change_award_name(self, award_label, name, session=None):
     if session is None:

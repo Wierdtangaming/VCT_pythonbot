@@ -4,8 +4,7 @@ from Bet import Bet
 from User import User
 import discord
 from dbinterface import get_from_db, get_condition_db
-from sqlaobjs import Session
-from sqlalchemy import select, literal
+from sqlalchemy import literal
 
 
 def ambig_to_obj(ambig, prefix, session=None):
@@ -64,7 +63,7 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
     
   if obj == [] or obj is None:
     if ctx is not None:
-      await ctx.respond(f"{prefix.capitalize()} ID not found.")
+      await ctx.respond(f"{prefix.capitalize()} ID not found.", ephemeral = True)
     return None
   return obj
 
