@@ -416,9 +416,9 @@ async def award_give(ctx,
   if (user is not None) and (users is not None):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
+  user = ctx.author
   if (user is None) and (users is None):
-    await ctx.respond("You must have either compare or user.", ephemeral = True)
-    return
+    user = ctx.author
   
   with Session.begin() as session:
     if users is not None:
@@ -518,14 +518,11 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
   with Session.begin() as session:
     if user is None:
       user = get_from_db("User", ctx.author.id, session)
-      print(user)
       if user is None:
         print("creating_user")
         user = create_user(ctx.author.id, ctx.author.display_name, session)
     else:
       if (user := await get_user_from_member(ctx, user, session)) is None: return
-    print(user.color)
-    print(user.color_hex)
     embedd = create_user_embedded(user, session)
     if embedd is None:
       await ctx.respond("User not found.")
@@ -1037,10 +1034,10 @@ profile = SlashCommandGroup(
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
   with Session.begin() as session:
-    if (color := get_color(color_name)) is None:
+    if (color := get_color(color_name, session)) is None:
       await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
       return
-    if (user := await get_user_from_member(ctx, ctx.author)) is None: return
+    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
     user.set_color(color)
     await ctx.respond(f"Profile color is now {color.name}.")
 #profile color end
