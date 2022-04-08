@@ -416,9 +416,9 @@ async def award_give(ctx,
   if (user is not None) and (users is not None):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
-  user = ctx.author
   if (user is None) and (users is None):
-    user = ctx.author
+    await ctx.respond("You must have either compare or user.", ephemeral = True)
+    return
   
   with Session.begin() as session:
     if users is not None:
@@ -1072,9 +1072,9 @@ async def graph_balances(ctx,
   if (user is not None) and (compare is not None):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
-  if (user is None) and (compare is None):
-    await ctx.respond("You must have either compare or user.", ephemeral = True)
-    return
+  user = ctx.author
+  if (user is None) and (users is None):
+    user = ctx.author
   
   with Session.begin() as session:
     if compare is None:
