@@ -1038,7 +1038,7 @@ profile = SlashCommandGroup(
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
   with Session.begin() as session:
     if (color := get_color(color_name)) is None:
-      await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add")
+      await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
       return
     if (user := await get_user_from_member(ctx, ctx.author)) is None: return
     user.set_color = color
@@ -1073,19 +1073,71 @@ async def graph_balances(ctx,
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
   
   if (user is not None) and (compare is not None):
-    await ctx.respond("You can't use compare and user at the same time.")
+    await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
   if (user is None) and (compare is None):
-    await ctx.respond("You must have either compare or user.")
+    await ctx.respond("You must have either compare or user.", ephemeral = True)
     return
+  
+  with Session.begin() as session:
+    if compare is None:
+      if (user := await get_user_from_member(ctx, user, session)) is None: return
+      
+      if amount is not None:
+        if amount > len(user.balances):
+          amount = len(user.balances)
+        if amount <= 1:
+          await ctx.respond("Amount needs to be higher.", ephemeral = True)
+        graph_type = amount
+      else:
+        if type == 0:
+          graph_type = "current"
+        elif type == 1:
+          graph_type = "all"
+        else:
+          await ctx.respond("Not a valid type.", ephemeral = True)
+          return
+
+      with BytesIO() as image_binary:
+        gen_msg = await ctx.respond("Generating graph...")
+        image = user.get_graph_image(graph_type, session)
+        if isinstance(image, str):
+          await gen_msg.edit_original_message(content = image)
+          return
+        image.save(image_binary, 'PNG')
+        image_binary.seek(0)
+        await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+      return
     
-  if compare is None:
-    if (user := await get_user_from_member(ctx, user)) is None: return
+
+    usernames_split = compare.split(" ")
+    
+    users = usernames_to_users(compare, session)
+
+    
+    if len(users) == 1:
+      await ctx.respond("You need to compare more than one user.", ephemeral = True)
+      return
+
+    
+    usernames = " ".join([user.username for user in users])
+
+    for username_word in usernames_split:
+      if username_word not in usernames:
+        await ctx.respond(f"User {username_word} not found.", ephemeral = True)
+        return
+
+    print(users)
+
+    
+
     if amount is not None:
-      if amount > len(user.balances):
-        amount = len(user.balances)
-      if amount <= 1:
-        await ctx.respond("Amount needs to be higher.")
+      highest_length = 0
+      highest_length = len(get_all_unique_balance_ids(users))
+      if amount > highest_length:
+        amount = highest_length
+        if amount <= 1:
+          await ctx.respond("Amount needs to be higher.", ephemeral = True)
       graph_type = amount
     else:
       if type == 0:
@@ -1093,70 +1145,18 @@ async def graph_balances(ctx,
       elif type == 1:
         graph_type = "all"
       else:
-        await ctx.respond("Not a valid type.")
+        await ctx.respond("Not a valid type.", ephemeral = True)
         return
 
     with BytesIO() as image_binary:
       gen_msg = await ctx.respond("Generating graph...")
-      image = user.get_graph_image(graph_type)
+      image = get_multi_graph_image(users, graph_type)
       if isinstance(image, str):
         await gen_msg.edit_original_message(content = image)
         return
       image.save(image_binary, 'PNG')
       image_binary.seek(0)
       await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
-    return
-  
-
-  usernames_split = compare.split(" ")
-  
-  users = usernames_to_users(compare)
-
-  
-  if len(users) == 1:
-    await ctx.respond("You need to compare more than one user.")
-    return
-
-  
-  usernames = " ".join([user.username for user in users])
-
-  for username_word in usernames_split:
-    if username_word not in usernames:
-      await ctx.respond(f"User {username_word} not found.")
-      return
-
-  print(users)
-
-  
-
-  if amount is not None:
-    highest_length = 0
-    highest_length = len(get_all_unique_balance_ids(users))
-    if amount > highest_length:
-      amount = highest_length
-      if amount <= 1:
-        await ctx.respond("Amount needs to be higher.")
-    graph_type = amount
-  else:
-    if type == 0:
-      graph_type = "current"
-    elif type == 1:
-      graph_type = "all"
-    else:
-      await ctx.respond("Not a valid type.")
-      return
-
-  with BytesIO() as image_binary:
-    gen_msg = await ctx.respond("Generating graph...")
-    image = get_multi_graph_image(users, graph_type)
-    if isinstance(image, str):
-      await gen_msg.edit_original_message(content = image)
-      return
-    image.save(image_binary, 'PNG')
-    image_binary.seek(0)
-    await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
-    
-  
 #graph balance end
 
 bot.add_application_command(graph)
@@ -1839,42 +1839,14 @@ async def reset_season(ctx, name):
       user.balances.append((name, Decimal(500), date))
     await ctx.send(f"Season reset. New season {name} has sarted.")
 
+
 #debug
 @bot.command()
 async def debug(ctx, *args):
   await ctx.send("Not valid command.")
-
-@bot.command()
-async def clean_match_bet_ids_without_bet(ctx):
-  return
-  matches = get_all_objects("match")
-  bets = get_all_objects("bet")
-  for match in matches:
-    for bet_id in match.bet_ids:
-      in_bet = 0
-      for bet in bets:
-        if bet.code == bet_id:
-          in_bet += 1
-
-      if in_bet != 1:
-        print(bet_id, in_bet, match.code)
-        match.bet_ids.remove(bet_id)
-        replace_in_list("match", match.code, match)
-  print("end")
-
-@bot.command()
-async def add_team_names(ctx):
-  return
-  bets = get_all_objects("bet")
-  for bet in bets:
-    match = get_from_list("match", bet.match_id)
-    bet.t1 = match.t1
-    bet.t2 = match.t2
-    bet.tournament_name = match.tournament_name
-    replace_in_list("bet", bet.code, bet)
-  print("done")
   
-# debug command
+
+#debug command
 @bot.command()
 async def check_balance_order(ctx):
   #check if the order of user balance and the order of timer in balances[2] are the same
@@ -1885,146 +1857,6 @@ async def check_balance_order(ctx):
     if sorted != user.balances:
       print(f"{user.code} balance order is wrong")
   print("check order done")
-
-    
-# debug command
-@bot.command()
-async def reset_bet_winners_to_match_winners(ctx):
-  return
-  bets = get_all_objects("bet")
-  for bet in bets:
-    if not int(get_from_list("match", bet.match_id).winner) == 0:
-      bet.winner = int(get_from_list("match", bet.match_id).winner)
-      replace_in_list("bet", bet.code, bet)
-      await ctx.send(embed=create_bet_embedded(bet))
-
-
-# debug command
-@bot.command()
-async def round_all_user_balances(ctx):
-  return
-  users = get_all_objects("user")
-  for user in users:
-    for bal in user.balances:
-
-      user.balances[user.balances.index(bal)] = (user.balances[user.balances.index(bal)][0], round(user.balances[user.balances.index(bal)][1], 5), user.balances[user.balances.index(bal)][2])
-
-    replace_in_list("user", user.code, user)
-
-
-# debug command
-@bot.command()
-async def delete_last_bal(ctx):
-  return
-  users = get_all_objects("user")
-  for user in users:
-    print(user.balances)
-    if type(user.balances[-1][1]) == tuple:
-      user.balances.pop()
-      print(user.balances)
-      replace_in_list("user", user.code, user)
-
-      
-# debug command
-@bot.command()
-async def add_var(ctx):
-  return
-  users = get_all_objects("user")
-  reset_dict = {}
-  for user in users:
-    for i, bal in enumerate(user.balances):
-      bet_id, amount, time = bal
-      bet_id = bet_id.split("_")[0] + "_" + bet_id.split("_")[-1]
-      if bet_id.startswith("award_"):
-        code = user.get_unique_code("award_")
-        bet_id = bet_id[:bet_id.index("award_")+6] + code + "_" + bet_id[bet_id.index("award_")+6:]
-        print(bet_id)
-        user.balances[i] = (bet_id, amount, time)
-        
-      elif bet_id.startswith("reset_"):
-        if bet_id in reset_dict:
-          bet_id = reset_dict[bet_id]
-        else:
-          code = user.get_unique_code("reset_")
-          #insert code after reset_
-          old_bet_id = bet_id
-          bet_id = bet_id[:bet_id.index("reset_")+6] + code + "_" + bet_id[bet_id.index("reset_")+6:]
-          reset_dict[old_bet_id] = bet_id
-        print(bet_id)
-        user.balances[i] = (bet_id, amount, time)
-    replace_in_list("user", user.code, user)
-  print("done add var")
-
-
-# debug command
-@bot.command()
-async def add_diff(ctx):
-  return
-  users = get_all_objects("user")
-  for user in users:
-    last = None
-    for i, bal in enumerate(user.balances):
-      if len(bal) == 3:
-        diff = None
-        if last is None or bal[0] == "start" or bal[0].startswith("reset_"):
-          diff = None
-          user.balances[i] = (bal[0], round(bal[1], 5), None, bal[2])
-        else:
-          diff = bal[1] - last
-          user.balances[i] = (bal[0], round(bal[1], 5), round(diff, 5), bal[2])
-        last = bal[1]
-    
-    x = Decimal(0)
-    good = True
-    for bal in user.balances:
-      if bal[2] is None:
-        x = Decimal(bal[1])
-        continue 
-      x += bal[2]
-      if x != bal[1]:
-        print(f"{user.username} balanceorder is wrong. {bal}: {x} != {bal[1]}")
-        good = False
-    if good:
-      print(f"{user.username} balanceorder is good")
-    else:
-      print(f"{user.username} balanceorder is wrong")
-    print([(bal[0], bal[1], bal[2]) for bal in user.balances])
-    #replace_in_list("user", user.code, user)
-
-  print("done")
-  return
-
-# debug command
-@bot.command()
-async def test_get_object(ctx):
-  return
-  user = get_from_list("user", ctx.author.id)
-  replace_in_list("user", user.code, user)
-  print("done")
-
-@bot.command()
-async def find_common_ids(ctx):
-  return
-  matches = get_all_objects("match")
-  bets = get_all_objects("bet")
-  
-  
-  match_copies = [item for item, count in collections.Counter(matches).items() if count > 1]
-  bet_copies = [item for item, count in collections.Counter(bets).items() if count > 1]
-  await ctx.send(f"match copies {match_copies}, bet copies {bet_copies}")
-  
-# debug command
-@bot.command()
-async def update_bet_ids(ctx):
-  return
-  users = get_all_objects("user")
-  for user in users:
-    for bal in user.balances:
-      if user.balances[user.balances.index(bal)][0] == "reset 1":
-        user.balances[user.balances.index(bal)] = ("reset_2022 Stage 1" , user.balances[user.balances.index(bal)][1], user.balances[user.balances.index(bal)][2])
-
-    replace_in_list("user", user.code, user)
-
 
 token = get_setting("discord_token")
 #print(f"discord: {token}")

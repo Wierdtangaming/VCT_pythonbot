@@ -200,7 +200,11 @@ class User():
       
     return award_labels
   
-  def get_new_balance_changes_embeds(self, amount):
+  def get_new_balance_changes_embeds(self, amount, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.get_new_balance_changes_embeds(amount, session)
+    
     from dbinterface import get_mult_from_db
     if amount <= 0:
       return None
@@ -225,7 +229,7 @@ class User():
       if new_balance[0].startswith("bet_"):
         bets.append(balance[0][3:])
     
-    bets = get_mult_from_db("Bet", bets)
+    bets = get_mult_from_db("Bet", bets, session)
     
     bets_i = iter(bets)
     
@@ -273,7 +277,13 @@ class User():
   
   
 
-  def get_graph_image(self, balance_range_ambig):
+  def get_graph_image(self, balance_range_ambig, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.get_graph_image(balance_range_ambig, session)
+    
+    from dbinterface import get_all_db, get_mult_from_db
+    
     xlabel = ""
     if isinstance(balance_range_ambig, list):
       balance = balance_range_ambig
@@ -287,18 +297,29 @@ class User():
         if len(resets) > 0:
           xlabel = self.balances[resets[-1]][0][15:]
         else:
-          users = get_all_objects("user")
+          users = get_all_db("User", session)
           for user in users:
             resets = user.get_resets()
             if len(resets) > 0:
               xlabel = user.balance[resets[-1]][0][15:]
               break
+    
     elif isinstance(balance_range_ambig, int):
       balance = self.balances[-balance_range_ambig:]
       xlabel = f"Last {balance_range_ambig}"
     else:
       return f"Invalid range of {balance_range_ambig}."
-      
+    
+    bets = []
+    for balanc in balance:
+      if balanc[0].startswith("bet_"):
+        bets.append(balanc[0][3:])
+    
+    bets = get_mult_from_db("Bet", bets, session)
+    
+    bets_i = iter(bets)
+    
+    
     labels = []
     label_colors = []
     balances = []
@@ -322,7 +343,7 @@ class User():
           line_colors.append('k')
       before = amount
       if bet_id.startswith('id_'):
-        bet = get_from_list("Bet", bet_id[3:])
+        bet = next(bets_i)
         match = bet.get_match()
         t1 = match.t1
         t2 = match.t2
@@ -335,7 +356,6 @@ class User():
         label_colors.append(f"#{match.color}")
         balances.append(amount)
         colors.append('b')
-        last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
         if len(label) > 40:
@@ -411,14 +431,18 @@ class User():
       buf.seek(0)
       im = Image.open(buf)
       print(sys.getsizeof(im.tobytes()))
-      #if sys.getsizeof(im.tobytes()):
-
 
       return im
   
 
     
-def get_multi_graph_image(users, balance_range_ambig):
+def get_multi_graph_image(users, balance_range_ambig, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_multi_graph_image(users, balance_range_ambig, session)
+  
+  from dbinterface import get_mult_from_db
+  
   all_balances = []
   xlabel = ""
   if type(balance_range_ambig) == str:
@@ -461,6 +485,15 @@ def get_multi_graph_image(users, balance_range_ambig):
     all_balances = all_balances[-x:]
 
   
+  bets = []
+  for all_balance in all_balances:
+    if all_balance[0].startswith("bet_"):
+      bets.append(all_balance[0][3:])
+  
+  bets = get_mult_from_db("Bet", bets, session)
+  
+  bets_i = iter(bets)
+  
   x = []
   y = []
   labels = []
@@ -476,7 +509,7 @@ def get_multi_graph_image(users, balance_range_ambig):
     bet_id, amount = balance[:2]
 
     if bet_id.startswith('id_'):
-      bet = get_from_list("Bet", bet_id[3:])
+      bet = next(bets_i)
       match = bet.get_match()
       bet_id = f"id_{match.code}"
 
@@ -641,6 +674,8 @@ def get_multi_graph_image(users, balance_range_ambig):
     print(byte)
 
     return im
+  
+  
     
 def all_user_unique_code(prefix, users):
   all_bal = [user.balances for user in users]
