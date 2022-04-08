@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
-from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata
+from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import matplotlib.colors as mcolors
 import secrets
 
@@ -283,13 +283,22 @@ async def on_ready():
   
   save_savedata_from_github()
   zip_savedata()
+  #if savedata does not exist pull
+  if not os.path.exists("savedata"):
+    print("savedata folder does not exist")
+    print("-----------Pulling Savesdata-----------")
+    pull_from_github()
   if (not are_equivalent("backup.zip", "gitbackup.zip")):
     print("savedata not is not synced with github")
-    
-    if get_setting("override_savedata"):
-      print("overriding savedata")
-    else:
-      print("quitting")
+    git_savedata = get_setting("git_savedata")
+    if git_savedata == "override":
+      print("-----------Overriding Savedata-----------")
+    elif git_savedata == "pull":
+      print("-----------Pulling Savesdata-----------")
+      pull_from_github()
+    elif git_savedata == "quit":
+      print("-----------Missmatch Savedata-----------")
+      print("-----------Quitting-----------")
       quit()
       
   auto_backup_timer.start()
@@ -810,7 +819,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
         await ctx.respond("You already have a bet on this match.", ephemeral=True)
         return
 
-    bet_modal = BetCreateModal(match, user, session, title="Create Bet", )
+    bet_modal = BetCreateModal(match, user, session, title="Create Bet")
     await ctx.interaction.response.send_modal(bet_modal)
 #bet create end
 

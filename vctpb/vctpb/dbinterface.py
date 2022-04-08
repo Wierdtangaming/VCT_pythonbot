@@ -143,10 +143,10 @@ def set_channel_in_db(channel_name, channel_value, session=None):
                            
                           
 def get_setting(setting_name):
-  #setting_names: "discord_token", "github_token", "guild_ids", "override_savedata", "save_repo"
+  #setting_names: "discord_token", "github_token", "guild_ids", "git_savedata", "save_repo"
   configur = ConfigParser()
   configur.read('settings.ini')
   val = configur.get('settings', setting_name)
-  if setting_name == "guild_ids" or setting_name == "override_savedata":
+  if setting_name == "guild_ids":
     return jsonpickle.decode(val)
   return configur.get("settings", setting_name)

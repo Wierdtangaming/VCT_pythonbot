@@ -280,14 +280,17 @@ class User():
     return embeds
   
   
+  from time import time
 
   def get_graph_image(self, balance_range_ambig, session=None):
     if session is None:
       with Session.begin() as session:
         return self.get_graph_image(balance_range_ambig, session)
     
-    from dbinterface import get_all_db, get_mult_from_db
+    from dbinterface import get_all_db, get_mult_from_db, get_from_db
     
+    upfrount_pull = True
+
     xlabel = ""
     if isinstance(balance_range_ambig, list):
       balance = balance_range_ambig
@@ -314,14 +317,15 @@ class User():
     else:
       return f"Invalid range of {balance_range_ambig}."
     
-    bets = []
-    for balanc in balance:
-      if balanc[0].startswith("bet_"):
-        bets.append(balanc[0][3:])
-    
-    bets = get_mult_from_db("Bet", bets, session)
-    
-    bets_i = iter(bets)
+    if upfrount_pull:
+      bets = []
+      for balanc in balance:
+        if balanc[0].startswith("bet_"):
+          bets.append(balanc[0][3:])
+      
+      bets = get_mult_from_db("Bet", bets, session)
+      
+      bets_i = iter(bets)
     
     
     labels = []
@@ -347,7 +351,10 @@ class User():
           line_colors.append('k')
       before = amount
       if bet_id.startswith('id_'):
-        bet = next(bets_i)
+        if upfrount_pull:
+          bet = next(bets_i)
+        else:
+          bet = get_from_db("Bet", bet_id[3:], session)
         match = bet.get_match()
         t1 = match.t1
         t2 = match.t2
