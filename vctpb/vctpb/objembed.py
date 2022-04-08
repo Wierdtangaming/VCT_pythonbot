@@ -106,7 +106,7 @@ def create_user_embedded(user_ambig, session=None):
   embed = discord.Embed(title=f"{user.username}'s balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
   embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
   embed.add_field(name="Account balance:", value=math.floor(user.balances[-1][1]), inline=True)
-  embed.add_field(name="Balance Available:", value=math.floor(user.get_balance()), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.get_balance(session)), inline=True)
   embed.add_field(name="Loan balance:", value=math.floor(user.loan_bal()), inline=True)
   return embed
 
@@ -147,7 +147,8 @@ def create_payout_list_embedded(embed_title, match, bet_user_payouts):
 
 def create_award_label_list_embedded(user, award_labels):
   embed = discord.Embed(title=f"{user.username}'s Awards:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
-  award_labels = award_labels[-24:]
+  award_labels.reverse()
+  award_labels = award_labels[:25]
   for award_label in award_labels:
         
     award_t = award_label.split(", ")

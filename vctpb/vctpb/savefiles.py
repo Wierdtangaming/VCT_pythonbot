@@ -40,15 +40,14 @@ def delete_folder(name, path):
   except OSError as e:
     print("Error: %s - %s." % (e.filename, e.strerror))
 
-  
-  
-  
+
+
 def backup():
   date_string = get_date_string()
   make_folder(date_string, f"backup/")
   date_path = f"savedata/backup/{date_string}/"
   copy_db_to(date_path)
-  print("coppy done")
+  print("copy done")
   delete_old_backup()
 
 

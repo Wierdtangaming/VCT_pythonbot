@@ -36,7 +36,7 @@ class User():
     self.username = username
     self.set_color(color)
     
-    self.hidden = True
+    self.hidden = False
     #a tuple (bet_id, balances after change, date)
     #if change is None then it is a reset
     #bet_id = id_[bet_id]: bet id
@@ -60,17 +60,19 @@ class User():
         
   def set_color(self, color):
     if isinstance(color, str):
+      self.color = None
       self.color_name = None
       self.color_hex = color
       return
     
+    self.color = color
     self.color_name = color.name
     self.color_hex = color.hex
   
   def __repr__(self):
     return f"<User {self.code}, {self.username}>"
 
-  def get_unique_code(self):
+  def get_unique_bal_code(self):
     #combine all_bal into one array
     codes = []
     for bal in self.balances:
@@ -115,7 +117,6 @@ class User():
     if session is None:
       with Session.begin() as session:
         return self.unavailable(session)
-      
     used = 0
     bets = self.active_bets
     

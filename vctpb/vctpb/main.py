@@ -399,6 +399,7 @@ async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
   user = get_user_from_id(member)
   
   award_labels = user.get_award_strings()
+  award_labels.reverse()
   
   return [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
 #user award autocomplete end  
@@ -442,7 +443,7 @@ async def award_give(ctx,
       return
     
     if (user := await get_user_from_member(ctx, user, session)) is None: return
-    bet_id = "award_" + user.get_unique_code("award_") + "_" + description
+    bet_id = "award_" + user.get_unique_bal_code() + "_" + description
     print(bet_id)
     abu = add_balance_user(user, amount, bet_id, get_date(), session)
     if abu is None:
@@ -522,8 +523,9 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
         print("creating_user")
         user = create_user(ctx.author.id, ctx.author.display_name, session)
     else:
-      if (user := await get_user_from_member(ctx, user)) is None: return
-      
+      if (user := await get_user_from_member(ctx, user, session)) is None: return
+    print(user.color)
+    print(user.color_hex)
     embedd = create_user_embedded(user, session)
     if embedd is None:
       await ctx.respond("User not found.")
@@ -958,14 +960,14 @@ async def color_list(ctx):
     return
   
   font = ImageFont.truetype("font/whitneybold.otf", size=40)
-  img = Image.new("RGBA", (800, (int((len(colors)+1)/2) * 100) + 100), (255,255,255,0))
+  img = Image.new("RGBA", (800, (int((len(colors)+1)/2) * 100)), (255,255,255,0))
   d = ImageDraw.Draw(img)
   for i, color in enumerate(colors):
     x = ((i % 2) * 350) + 50
     y = (int(i / 2) * 100) + 50
     hex = color.hex
     color_tup = hex_to_tuple(hex)
-    d.text((x,y), color[0].capitalize(), fill=(*color_tup,255), font=font)
+    d.text((x,y), color.name.capitalize(), fill=(*color_tup,255), font=font)
   with BytesIO() as image_binary:
     gen_msg = await ctx.respond("Generating color list...")
     img.save(image_binary, 'PNG')
@@ -985,10 +987,10 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
     hex = xkcd_colors[f"xkcd:{xkcd_color_name.lower()}"]
     if custom_color_name is not None:
       xkcd_color_name = custom_color_name
-    await ctx.respond(add_color(xkcd_color_name, hex), ephemeral = True)
+    await ctx.respond(add_color(xkcd_color_name, hex))
     
   elif custom_color_name is not None and hex is not None:
-    await ctx.respond(add_color(custom_color_name, hex), ephemeral = True)
+    await ctx.respond(add_color(custom_color_name, hex))
     
   else:
     await ctx.respond("Please enter a name and hex code or a xkcd color.", ephemeral = True)
@@ -998,21 +1000,21 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
 async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of.", autocomplete=color_picker_autocomplete), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.")):
-  await ctx.respond(recolor_color(color_name, hex), ephemeral = True)
+  await ctx.respond(recolor_color(color_name, hex))
 #color recolor end
 
   
 #color remove start
 @colorscg.command(name = "remove", description = "Removes the color from color list.")
 async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.", autocomplete=color_picker_autocomplete)):
-  await ctx.respond(remove_color(color_name)[0], ephemeral = True)
+  await ctx.respond(await remove_color(color_name))
 #color remove end
 
   
 #color rename start
 @colorscg.command(name = "rename", description = "Renames the color.")
 async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename.", autocomplete=color_picker_autocomplete), new_color_name: Option(str, "New name of color.")):
-  await ctx.respond(rename_color(old_color_name, new_color_name), ephemeral = True)
+  await ctx.respond(rename_color(old_color_name, new_color_name))
 #color rename end
 
   
@@ -1039,7 +1041,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
       await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
       return
     if (user := await get_user_from_member(ctx, ctx.author)) is None: return
-    user.set_color = color
+    user.set_color(color)
     await ctx.respond(f"Profile color is now {color.name}.")
 #profile color end
 

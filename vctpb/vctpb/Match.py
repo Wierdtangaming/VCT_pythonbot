@@ -84,10 +84,12 @@ class Match():
   
   def set_color(self, color):
     if isinstance(color, str):
+      self.color = None
       self.color_name = None
       self.color_hex = color
       return
     
+    self.color = color
     self.color_name = color.name
     self.color_hex = color.hex
   
