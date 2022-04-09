@@ -2,8 +2,11 @@ import os
 from github import Github
 from zipfile import ZipFile
 import zipfile
-from savefiles import get_setting, create_error_file, backup, get_days, get_all_names, get_date_string
+from savefiles import backup, get_days, get_all_names, get_date_string
+from dbinterface import get_setting
 import atexit
+
+from savefiles import delete_folder
 
 
 
@@ -24,7 +27,31 @@ def is_new_day():
   return last_day != today_day
 
 
-
+def pull_from_github():
+  token = get_setting("github_token")
+  g = Github(token)
+  repo_name = get_setting("save_repo")
+  repo = g.get_user().get_repo(repo_name)
+  contents = repo.get_contents("")
+  all_files = []
+  while contents:
+    file_content = contents.pop(0)
+    if file_content.type == "dir":
+      contents.extend(repo.get_contents(file_content.path))
+    else:
+      file = file_content 
+      all_files.append(str(file).replace('ContentFile(path="','').replace('")',''))
+  content = repo.get_contents(all_files[0])
+  delete_folder("", "")
+  #get savedata.fb from zip
+  with open("gitbackup.zip", "wb") as f:
+    f.write(content.decoded_content)
+  #unzip savedata.fb
+  with ZipFile("gitbackup.zip", "r") as zf:
+    zf.extractall("")
+  #remove savedata.fb
+  os.remove("gitbackup.zip")
+  print("Pulled from github.")
 
 
 def save_to_github(message):
@@ -78,7 +105,8 @@ def save_to_github(message):
   
   backup()
   
-    
+  print("\n-----------Uploading-----------\n")
+  
   try:
     os.remove("backup.zip")
   except:
@@ -136,7 +164,7 @@ def are_equivalent(filename1, filename2):
     """
   
     if (not zipfile.is_zipfile(filename1)) or (not zipfile.is_zipfile(filename2)):
-      create_error_file("not valid zip", f"{zipfile.is_zipfile(filename1)}, {zipfile.is_zipfile(filename2)}")
+      print("not valid zip", f"{zipfile.is_zipfile(filename1)}, {zipfile.is_zipfile(filename2)}")
       return False
     
     with ZipFile(filename1, 'r') as zip1, ZipFile(filename2, 'r') as zip2:
