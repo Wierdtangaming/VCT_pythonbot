@@ -87,7 +87,7 @@ def current_matches_name_code(session=None):
   return [(shorten_match_name(match), match) for match in get_all_current_matches(session)]
 
 def all_matches_name_code(session=None):
-  return [shorten_match_name(match) for match in get_all_db("Match", session)]
+  return [(shorten_match_name(match), match) for match in get_all_db("Match", session)]
 
 
 
@@ -756,7 +756,9 @@ class BetEditModal(Modal):
 #new match list autocomplete start
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return []
+    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
+    print(user.username, user.open_matches)
+    print(user.username, user.bets)
     return [shorten_match_name(match) for match in user.open_matches]
 #new match list autocomplete end
 
@@ -1474,7 +1476,6 @@ async def match_list_autocomplete(ctx: discord.AutocompleteContext):
           auto_completes.append(match_t[0])
           if len(auto_completes) == 25:
             break
-          
     return auto_completes
 #match list autocomplete end
   
