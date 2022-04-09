@@ -28,10 +28,9 @@ class User():
   hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
-  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user, open_matches")
-  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user, open_matches", cascade="all, delete")
-  matches = relationship("Match", back_populates="creator", overlaps="open_matches, creator")
-  open_matches = relationship("Match", secondary="join(Bet, Match, not Bet.match_id == Match.code)", primaryjoin="and_(Match.winner == 0, Bet.user_id == User.code)", overlaps="matches, creator", viewonly=True)
+  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
+  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user", cascade="all, delete")
+  matches = relationship("Match", back_populates="creator")
   
   def __init__(self, code, username, color, date_created):
     self.code = code
@@ -59,6 +58,9 @@ class User():
     self.hidden = hidden
     self.balances = balances
     self.loans = loans
+    
+  def __repr__(self):
+    return f"<User {self.code}, {self.username}>"
         
   def set_color(self, color):
     if isinstance(color, str):
@@ -70,10 +72,28 @@ class User():
     self.color = color
     self.color_name = color.name
     self.color_hex = color.hex
-  
-  def __repr__(self):
-    return f"<User {self.code}, {self.username}>"
 
+  def open_matches(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.open_matches(session)
+    
+    from dbinterface import get_condition_db
+    
+    open_match_codes = [(match, match.code) for match in get_condition_db("Match", "Match.date_closed == None", session)]
+    active_bets = self.active_bets
+    
+    open_match_list = []
+    for match, code in open_match_codes:
+      not_in_match = True
+      for bet in active_bets:
+        if bet.match_id == code:
+          not_in_match = False
+      if not_in_match:
+        open_match_list.append(match)
+      
+    return open_match_list
+  
   def get_unique_bal_code(self):
     #combine all_bal into one array
     codes = []

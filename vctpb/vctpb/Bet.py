@@ -91,7 +91,11 @@ class Bet():
       return self.t2
     
     
-  def get_team_and_payout(self):
+  def get_team_and_payout(self, session = None):
+    if session is None:
+      with Session.begin() as session:
+        return self.get_team_and_payout(session)
+
     match = self.match
 
     team = ""
@@ -130,7 +134,7 @@ class Bet():
       with Session.begin() as session:
         return self.short_to_string(session)
     
-    (team, payout) = self.get_team_and_payout()
+    (team, payout) = self.get_team_and_payout(session)
 
     return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
   

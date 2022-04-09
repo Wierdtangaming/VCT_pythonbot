@@ -65,7 +65,7 @@ def create_bet_embedded(bet_ambig, title, session=None):
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.amount_bet, inline=True)
-  (team, payout) = bet.get_team_and_payout()
+  (team, payout) = bet.get_team_and_payout(session)
 
   embed.add_field(name="Bet on:", value=team, inline=True)
   embed.add_field(name="Payout On Win:", value=math.floor(payout), inline=True)

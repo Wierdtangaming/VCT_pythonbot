@@ -61,6 +61,8 @@ def get_condition_db(table_name, condition, session=None):
   if session is None:
     with Session.begin() as session:
       return get_condition_db(table_name, condition, session)
+  if isinstance(condition, str):
+    condition = eval(condition)
   return session.scalars(select(eval(table_name)).where(condition)).all()
 
     
@@ -83,14 +85,14 @@ async def delete_from_db(ambig, bot=None, table_name=None, session=None):
   if session is None:
     with Session.begin() as session:
       return await delete_from_db(ambig, bot, session=session)
-    
+  
   if bot is not None:
     if isinstance(ambig, Match):
-      for bet in ambig.bet:
-        await delete_all_messages(bet.message_ids)
-      await delete_all_messages(ambig.message_ids)
+      for bet in ambig.bets:
+        await delete_all_messages(bet.message_ids, bot)
+      await delete_all_messages(ambig.message_ids, bot)
     elif isinstance(ambig, Bet):
-      await delete_all_messages(ambig.message_ids)
+      await delete_all_messages(ambig.message_ids, bot)
   session.delete(ambig)
   #session.expire_all()
     
