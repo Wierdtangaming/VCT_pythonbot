@@ -289,6 +289,7 @@ async def on_ready():
   
   save_savedata_from_github()
   zip_savedata()
+  backup_data = True
   #if savedata does not exist pull
   if not os.path.exists("savedata"):
     print("savedata folder does not exist")
@@ -305,10 +306,11 @@ async def on_ready():
     elif git_savedata == "quit":
       print("-----------Missmatch Savedata-----------")
       print("-----------Quitting-----------")
+      backup_data = False
       quit()
-      
-  auto_backup_timer.start()
-  print("\n-----------Bot Starting-----------\n")
+  if backup_data:
+    auto_backup_timer.start()
+    print("\n-----------Bot Starting-----------\n")
 
 
 @tasks.loop(minutes=20)
