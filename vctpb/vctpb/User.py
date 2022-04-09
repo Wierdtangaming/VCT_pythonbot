@@ -52,7 +52,7 @@ class User():
     
     self.loans = []
 
-  def __init__(self, code, username, color, hidden, balances, loans):
+  def full__init__(self, code, username, color, hidden, balances, loans):
     self.code = code
     self.username = username
     self.set_color(color)
@@ -211,7 +211,7 @@ class User():
       with Session.begin() as session:
         return self.get_new_balance_changes_embeds(amount, session)
     
-    from dbinterface import get_mult_from_db
+    from dbinterface import get_from_db
     if amount <= 0:
       return None
     if amount >= len(self.balances):
@@ -236,16 +236,15 @@ class User():
       balance_change = balance[1] - before
       if balance[0].startswith("id_"):
         #bet id
-        bet = balance[0][3:]
-
-        embeds[endex].add_field(name=f"Bet: {bet.code}", value=bet.balance_to_string(balance_change), inline=False)
+        bet = get_from_db("Bet", balance[0][3:], session)
+        embeds[endex].add_field(name=f"Bet: {bet.t1} vs {bet.t2}", value=bet.balance_to_string(balance_change) + f". ID: {bet.code}", inline=False)
         
       elif balance[0].startswith("award_"):
         text = f""
         if balance_change >= 0:
-          text = f"{round(balance_change)} added because {balance[0][15:]}"
+          text = f"{round(balance_change)} added because {balance[0][15:]}, ID: {balance[0][6:14]}"
         else:
-          text = f"{round(-balance_change)} removed because {balance[0][15:]}"
+          text = f"{round(-balance_change)} removed because {balance[0][15:]}, ID: {balance[0][6:14]}"
         embeds[endex].add_field(name="Award:", value=text, inline=False)
         #award
       elif balance[0] == "start":
@@ -671,7 +670,6 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     buf.seek(0)
     im = Image.open(buf)
     byte = im.tell()
-    print(byte)
     
     end = time()
     print(end - start)

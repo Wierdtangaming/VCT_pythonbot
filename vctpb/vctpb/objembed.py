@@ -19,8 +19,9 @@ def create_match_embedded(match_ambig, title, session=None):
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
   embed.add_field(name="Odds Source:", value=match.odds_source, inline=True)
-  embed.add_field(name="Creator:", value=id_to_metion(match.creator), inline=True)
-  bet_str = str(", ".join(match.bet_ids))
+  embed.add_field(name="Creator:", value=id_to_metion(match.creator_id), inline=True)
+  bet_codes = [bet.code for bet in match.bets]
+  bet_str = str(", ".join(bet_codes))
   if bet_str == "":
     bet_str = "None"
   embed.add_field(name="Bet IDs:", value=bet_str, inline=True)

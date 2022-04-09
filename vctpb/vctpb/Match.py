@@ -60,10 +60,9 @@ class Match():
     self.date_closed = None
     
     
-    self.bet_ids = []
     self.message_ids = []
   
-  def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color, creator_id, date_created, date_winner, date_closed, bet_ids, message_ids):
+  def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color, creator_id, date_created, date_winner, date_closed, message_ids):
     self.code = code
     self.t1 = t1
     self.t2 = t2
@@ -79,7 +78,6 @@ class Match():
     self.date_created = date_created
     self.date_winner = date_winner
     self.date_closed = date_closed
-    self.bet_ids = bet_ids
     self.message_ids = message_ids
   
   def set_color(self, color):
@@ -98,7 +96,7 @@ class Match():
   
   def to_string(self):
     date_formatted = self.date_created.strftime("%d/%m/%Y at %H:%M:%S")
-    return "Teams: " + str(self.t1) + " vs " + str(self.t2) + ", Odds: " + str(self.t1o) + " / " + str(self.t2o) +  ", Old Odds: " + str(self.t1oo) + " / " + str(self.t2oo) + ", Tournament Name: " + str(self.tournament_name) + ", Odds Source: " + str(self.odds_source) + ", Created On: " + str(date_formatted) + ", Bet IDs: " + str(self.bet_ids) + ", Date Closed: " + str(self.date_closed) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
+    return "Teams: " + str(self.t1) + " vs " + str(self.t2) + ", Odds: " + str(self.t1o) + " / " + str(self.t2o) +  ", Old Odds: " + str(self.t1oo) + " / " + str(self.t2oo) + ", Tournament Name: " + str(self.tournament_name) + ", Odds Source: " + str(self.odds_source) + ", Created On: " + str(date_formatted) + ", Date Closed: " + str(self.date_closed) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
 
 
   def short_to_string(self):

@@ -52,7 +52,7 @@ class Bet():
     #team num of winner
     self.message_ids = []
 
-  def __init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
+  def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
     self.code = code
     self.t1 = t1
     self.t2 = t2
