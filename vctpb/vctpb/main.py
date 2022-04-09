@@ -32,11 +32,13 @@ from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import matplotlib.colors as mcolors
 import secrets
+import atexit
 
 from sqlaobjs import Session
 
 if not os.path.isfile("savedata/savedata.db"):
   print("savedata.db does not exist.\nquitting")
+  atexit.unregister(backup_full)
   quit()
   
 
@@ -289,7 +291,6 @@ async def on_ready():
   
   save_savedata_from_github()
   zip_savedata()
-  backup_data = True
   #if savedata does not exist pull
   if not os.path.exists("savedata"):
     print("savedata folder does not exist")
@@ -306,15 +307,17 @@ async def on_ready():
     elif git_savedata == "quit":
       print("-----------Missmatch Savedata-----------")
       print("-----------Quitting-----------")
-      backup_data = False
+      atexit.unregister(backup_full)
       quit()
-  if backup_data:
-    auto_backup_timer.start()
-    print("\n-----------Bot Starting-----------\n")
+  
+  print(1)
+  auto_backup_timer.start()
+  print("\n-----------Bot Starting-----------\n")
 
 
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
+  print(2)
   print("timer")
   backup_full()
   
