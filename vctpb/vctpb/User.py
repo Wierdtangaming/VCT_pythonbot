@@ -14,6 +14,8 @@ from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 
+from time import time
+
 @mapper_registry.mapped
 class User():
   __tablename__ = "user"
@@ -223,19 +225,10 @@ class User():
     before = self.balances[-2][1]
     embed_amount = int((amount - 1) / 25) + 1
     
-    embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
+    embeds = [discord.Embed(title=f"Balance Log Part {x + 1}:", color=discord.Color.from_rgb(*tuple(int((self.color_hex)[i : i + 2], 16) for i in (0, 2, 4)))) for x in range(embed_amount)]
     embed_index = 0
     
     bal_index = 3
-    
-    bets = []
-    for new_balance in new_balances:
-      if new_balance[0].startswith("bet_"):
-        bets.append(balance[0][3:])
-    
-    bets = get_mult_from_db("Bet", bets, session)
-    
-    bets_i = iter(bets)
     
     for balance in new_balances:
       endex = int(embed_index / 25)
@@ -243,7 +236,7 @@ class User():
       balance_change = balance[1] - before
       if balance[0].startswith("id_"):
         #bet id
-        bet = next(bets_i)
+        bet = balance[0][3:]
 
         embeds[endex].add_field(name=f"Bet: {bet.code}", value=bet.balance_to_string(balance_change), inline=False)
         
@@ -279,17 +272,16 @@ class User():
       return None
     return embeds
   
-  
-  from time import time
 
   def get_graph_image(self, balance_range_ambig, session=None):
     if session is None:
       with Session.begin() as session:
         return self.get_graph_image(balance_range_ambig, session)
     
-    from dbinterface import get_all_db, get_mult_from_db, get_from_db
+    from dbinterface import get_all_db, get_from_db
+    start = time()
     
-    upfrount_pull = True
+    upfrount_pull = False
 
     xlabel = ""
     if isinstance(balance_range_ambig, list):
@@ -317,15 +309,24 @@ class User():
     else:
       return f"Invalid range of {balance_range_ambig}."
     
-    if upfrount_pull:
-      bets = []
-      for balanc in balance:
-        if balanc[0].startswith("bet_"):
-          bets.append(balanc[0][3:])
-      
-      bets = get_mult_from_db("Bet", bets, session)
-      
-      bets_i = iter(bets)
+    #print(balance)
+    
+    #if upfrount_pull:
+    #  ids = []
+    #  bets = []
+    #  for balanc in balance:
+    #    if balanc[0].startswith("id_"):
+    #      ids.append(balanc[0][3:])
+    #      bets.append(balanc[0][3:])
+    #  
+    #  bets = get_mult_from_db("Bet", bets, session)
+    #  ordered_bets = []
+    #  for id in ids:
+    #    for bet in bets:
+    #      if bet.code == id:
+    #        ordered_bets.append(bet)
+    #        break 
+    #  bets_i = iter(ordered_bets)
     
     
     labels = []
@@ -351,20 +352,16 @@ class User():
           line_colors.append('k')
       before = amount
       if bet_id.startswith('id_'):
-        if upfrount_pull:
-          bet = next(bets_i)
-        else:
-          bet = get_from_db("Bet", bet_id[3:], session)
-        match = bet.get_match()
-        t1 = match.t1
-        t2 = match.t2
-        if match.winner == 1:
+        bet = get_from_db("Bet", bet_id[3:], session)
+        t1 = bet.t1
+        t2 = bet.t2
+        if bet.winner == 1:
           t1 = fr"$\bf{t1}$"
-        elif match.winner == 2:
+        elif bet.winner == 2:
           t2 = fr"$\bf{t2}$"
         label = f"{t1} vs {t2}"
         labels.append(label)
-        label_colors.append(f"#{match.color}")
+        label_colors.append(f"#{bet.color_hex}")
         balances.append(amount)
         colors.append('b')
       elif bet_id.startswith('award_'):
@@ -441,8 +438,9 @@ class User():
       plt.savefig(buf, format='png')
       buf.seek(0)
       im = Image.open(buf)
-      print(sys.getsizeof(im.tobytes()))
-
+      #print(sys.getsizeof(im.tobytes()))
+      end = time()
+      print(end - start)
       return im
   
 
@@ -452,8 +450,8 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     with Session.begin() as session:
       return get_multi_graph_image(users, balance_range_ambig, session)
   
-  from dbinterface import get_mult_from_db
-  
+  from dbinterface import get_from_db
+  start = time()
   all_balances = []
   xlabel = ""
   if type(balance_range_ambig) == str:
@@ -496,20 +494,11 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     all_balances = all_balances[-x:]
 
   
-  bets = []
-  for all_balance in all_balances:
-    if all_balance[0].startswith("bet_"):
-      bets.append(all_balance[0][3:])
-  
-  bets = get_mult_from_db("Bet", bets, session)
-  
-  bets_i = iter(bets)
-  
   x = []
   y = []
   labels = []
   label_colors = []
-  user_color = [user.color for user in users]
+  user_color = [user.color_hex for user in users]
   lines_x = [[] for _ in users]
   lines_y = [[] for _ in users]
   resets = [[] for _ in users]
@@ -520,8 +509,8 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     bet_id, amount = balance[:2]
 
     if bet_id.startswith('id_'):
-      bet = next(bets_i)
-      match = bet.get_match()
+      bet = get_from_db("Bet", bet_id[3:], session)
+      match = bet.match
       bet_id = f"id_{match.code}"
 
     if not last_id == bet_id:
@@ -536,7 +525,7 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
           t2 = fr"$\bf{t2}$"
         label = f"{t1} vs {t2}"
         labels.append(label)
-        label_colors.append(f"#{match.color}")
+        label_colors.append(f"#{match.color_hex}")
         last_id = f"id_{match.code}"
       elif bet_id.startswith('award_'):
         label = bet_id[15:]
@@ -683,6 +672,9 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     im = Image.open(buf)
     byte = im.tell()
     print(byte)
+    
+    end = time()
+    print(end - start)
 
     return im
   
