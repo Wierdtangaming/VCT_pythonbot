@@ -93,6 +93,8 @@ async def delete_from_db(ambig, bot=None, table_name=None, session=None):
       await delete_all_messages(ambig.message_ids, bot)
     elif isinstance(ambig, Bet):
       await delete_all_messages(ambig.message_ids, bot)
+      
+      
   session.delete(ambig)
   #session.expire_all()
     
