@@ -5,6 +5,7 @@ from User import User
 import discord
 from dbinterface import get_from_db, get_condition_db
 from sqlalchemy import literal
+from sqlaobjs import Session
 
 
 def ambig_to_obj(ambig, prefix, session=None):
@@ -50,11 +51,12 @@ async def get_user_from_member(ctx, user, session=None):
 async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
   
   objs = [t[1] for t in t_list if text == t[0]]
-  
+  print(objs)
   if len(objs) >= 2:
     print("More than one of text found", objs)
     if ctx is not None:
       await ctx.respond(f"Error please @pig. Try typing in code instead.")
+      #2 with the same name
     return None
   if len(objs) == 0:
     obj = get_from_db(prefix, text, session)
