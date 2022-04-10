@@ -86,15 +86,15 @@ def shorten_match_name(match):
   
   
   s = f"{prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
-  if len(s) >= 100:
+  if len(s) >= 95:
     s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
-    if len(s) >= 100:
+    if len(s) >= 95:
       s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
-      if len(s) >= 100:
+      if len(s) >= 95:
         tsplit = match.tournament_name.split(" ")[0]
         s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
-        if len(s) >= 100:
-          s = s[:100]
+        if len(s) >= 95:
+          s = s[:95]
   return s
 
 
