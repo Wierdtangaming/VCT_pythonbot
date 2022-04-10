@@ -310,14 +310,12 @@ async def on_ready():
       atexit.unregister(backup_full)
       quit()
   
-  print(1)
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
 
 
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
-  print(2)
   print("timer")
   backup_full()
   
@@ -1047,11 +1045,12 @@ profile = SlashCommandGroup(
   guild_ids = gid,
 )
 
-
+from roleinterface import set_role, unset_role, edit_role
   
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete)):
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
+    
   with Session.begin() as session:
     if (color := get_color(color_name, session)) is None:
       await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
@@ -1059,7 +1058,19 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
     user.set_color(color)
     await ctx.respond(f"Profile color is now {color.name}.")
+    
+    author = ctx.author
+    username = user.username
+    
+    if sync == 0:
+      await set_role(ctx.interaction.guild, author, username, user.color_hex)
+    elif sync == 1:
+      await unset_role(author, username)
+    else:
+      await edit_role(author, username, user.color_hex)
 #profile color end
+
+
 
 bot.add_application_command(profile)
 #profile end
