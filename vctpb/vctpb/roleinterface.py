@@ -20,11 +20,8 @@ async def set_position(guild, role, bot):
   oroles = guild.roles
   user = bot.user
   for orole in oroles:
-    print(orole.name)
     if user in orole.members and not orole.is_default():
-      print(orole.position)
       await role.edit(position=orole.position-1)
-      print(role.position)
       return
   
   
@@ -36,7 +33,6 @@ async def delete_role(role):
   
 async def recolor_role(role, hex):
   await role.edit(color=discord.Color.from_rgb(*hex_to_tuple(hex)))
-  print(role.position)
 
 async def set_role(guild, author, username, hex, bot):
   role = get_role(author, username)
