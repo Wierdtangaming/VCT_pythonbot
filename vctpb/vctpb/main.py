@@ -1110,13 +1110,18 @@ async def graph_balances(ctx,
   type: Option(int, "What type of graph you wany to make.", choices = balance_choices, default = 0, required = False), 
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
-  compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False)):
+  compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False),
+  high_quality: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
+  if high_quality == 0:
+    dpi = 200
+  else:
+    dpi = 100
   
   if (user is not None) and (compare is not None):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
   
-  if (user is None) and (users is None):
+  if (user is None) and (compare is None):
     user = ctx.author
   
   with Session.begin() as session:
@@ -1140,7 +1145,7 @@ async def graph_balances(ctx,
 
       with BytesIO() as image_binary:
         gen_msg = await ctx.respond("Generating graph...")
-        image = user.get_graph_image(graph_type, session)
+        image = user.get_graph_image(graph_type, dpi, session)
         if isinstance(image, str):
           await gen_msg.edit_original_message(content = image)
           return
@@ -1190,7 +1195,7 @@ async def graph_balances(ctx,
 
     with BytesIO() as image_binary:
       gen_msg = await ctx.respond("Generating graph...")
-      image = get_multi_graph_image(users, graph_type)
+      image = get_multi_graph_image(users, graph_type, dpi, session)
       if isinstance(image, str):
         await gen_msg.edit_original_message(content = image)
         return
@@ -1536,7 +1541,7 @@ async def match_bet_free_available_list_autocomplete(ctx: discord.AutocompleteCo
 #match open close list autocomplete start
 async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
   type = ctx.options["type"]
-  match_t_list = current_matches_name_code()
+  match_t_list = available_matches_name_code()
   if type is None:
     auto_completes = [match_t[0] for match_t in match_t_list if (ctx.value.lower() in match_t[0].lower())]
   elif type == 0:
@@ -1611,10 +1616,10 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
       
     if type == 0:
       match.date_closed = None
-      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.", ephemeral = True)
+      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
     else:
       match.date_closed = get_date()
-      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.", ephemeral = True)
+      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
     embedd = create_match_embedded(match, "Placeholder", session)
     await edit_all_messages(match.message_ids, embedd)
 #match betting end

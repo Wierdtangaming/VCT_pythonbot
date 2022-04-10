@@ -291,8 +291,10 @@ class User():
       return None
     return embeds
   
+  
+  
 
-  def get_graph_image(self, balance_range_ambig, session=None):
+  def get_graph_image(self, balance_range_ambig, dpi, session=None):
     if session is None:
       with Session.begin() as session:
         return self.get_graph_image(balance_range_ambig, session)
@@ -422,7 +424,7 @@ class User():
     if x_length < 8:
       x_length = 8
     plt.clf()
-    with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+    with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': dpi, 'figure.autolayout': True}):
       fig, ax = plt.subplots()
       for i in range(len(line_colors)):
         if line_colors[i] is None:
@@ -463,7 +465,7 @@ class User():
   
 
     
-def get_multi_graph_image(users, balance_range_ambig, session=None):
+def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
   if session is None:
     with Session.begin() as session:
       return get_multi_graph_image(users, balance_range_ambig, session)
@@ -587,9 +589,10 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     if len(reset) > 0:
       if reset[0] == (0,0):
         reset.pop(0)
+  fmiddle = time()
     
   plt.clf()
-  with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': 200, 'figure.autolayout': True}):
+  with mpl.rc_context({"figure.figsize": (x_length,8), 'figure.dpi': dpi, 'figure.autolayout': True}):
     fig, ax = plt.subplots()
     for user_index, line_x in enumerate(lines_x):
       if len(line_x) <= 1:
@@ -683,7 +686,7 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     fig_width, fig_height = fig.get_size_inches()
     fig.set_size_inches(x_length, fig_height)
 
-
+    smiddle = time()
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
     buf.seek(0)
@@ -691,7 +694,7 @@ def get_multi_graph_image(users, balance_range_ambig, session=None):
     byte = im.tell()
     
     end = time()
-    print(end - start)
+    print(fmiddle - start, smiddle - fmiddle, end - smiddle, end - start)
 
     return im
   
