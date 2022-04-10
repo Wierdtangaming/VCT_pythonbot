@@ -1067,7 +1067,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     elif sync == 1:
       await unset_role(author, username)
     else:
-      await edit_role(author, username, user.color_hex)
+      await edit_role(ctx.interaction.guild, author, username, user.color_hex)
 #profile color end
 
 
