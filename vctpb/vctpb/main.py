@@ -1063,11 +1063,11 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     username = user.username
     
     if sync == 0:
-      await set_role(ctx.interaction.guild, author, username, user.color_hex)
+      await set_role(ctx.interaction.guild, author, username, user.color_hex, bot)
     elif sync == 1:
       await unset_role(author, username)
     else:
-      await edit_role(ctx.interaction.guild, author, username, user.color_hex)
+      await edit_role(author, username, user.color_hex)
 #profile color end
 
 
