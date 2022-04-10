@@ -134,7 +134,19 @@ class User():
       loan_amount += loan[0]
     
     return loan_amount
+  
+  def pay_loan(self, date):
+    loans = self.get_open_loans()
+    loan = loans[0]
+    new_loan = list(loan)
+    new_loan[2] = date
+    new_loan = tuple(new_loan)
 
+    index = self.loans.index(loan)
+    self.loans[index] = new_loan
+  
+  
+  
   def unavailable(self, session=None):
     if session is None:
       with Session.begin() as session:

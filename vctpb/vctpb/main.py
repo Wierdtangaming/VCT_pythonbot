@@ -208,12 +208,14 @@ def print_all_balances(user_ambig, session=None):
   [print(bal[0], bal[1]) for bal in user.balances]
 
 
-async def edit_all_messages(ids, embedd):
+async def edit_all_messages(ids, embedd, new_title=None):
   for id in ids:
     try:
       channel = await bot.fetch_channel(id[1])
       msg = await channel.fetch_message(id[0])
-      title = msg.embeds[0].title
+      title = msg.embeds[0].title.split(":")[0]
+      if new_title is not None:
+        title = title.split(":")[0] + ":" + ":".join(new_title.split(":")[1:])
       embedd.title = title
       await msg.edit(embed=embedd)
     except Exception:
@@ -754,13 +756,13 @@ class BetEditModal(Modal):
       bet.amount_bet = int(amount)
       bet.team_num = int(team_num)
 
-
-      embedd = create_bet_embedded(bet, f"Edit Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+      title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
+      embedd = create_bet_embedded(bet, title, session)
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
 
-      await edit_all_messages(bet.message_ids, embedd)
+      await edit_all_messages(bet.message_ids, embedd, title)
       bet.message_ids.append((msg.id, msg.channel.id))
 #bet edit modal end
 
@@ -1287,16 +1289,9 @@ async def loan_pay(ctx):
       await ctx.respond(f"You need {math.ceil(loan_amount - anb)} more to pay off all loans")
       return
 
-    loans = user.get_open_loans()
-    for loan in loans:
-      new_loan = list(loan)
-      new_loan[2] = get_date()
-      new_loan = tuple(new_loan)
-
-      index = user.loans.index(loan)
-      user.loans[index] = new_loan
+    user.pay_loan(get_date())
       
-    await ctx.respond(f"You have paid off {len(loans)} loan(s)")
+    await ctx.respond(f"You have paid off a loan")
 #loan pay end
 
 bot.add_application_command(loan)
@@ -1473,11 +1468,12 @@ class MatchEditModal(Modal):
       match.tournament_name = tournament_name
       match.odds_source = betting_site
 
-      embedd = create_match_embedded(match, f"Edited Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
-
+      title = f"Edited Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}."
+      embedd = create_match_embedded(match, title, session)
+      
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
-      await edit_all_messages(match.message_ids, embedd)
+      await edit_all_messages(match.message_ids, embedd, title)
       match.message_ids.append((msg.id, msg.channel.id))
 #match edit modal end
 
@@ -1752,7 +1748,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
         payout += bet.amount_bet * odds
       user = bet.user
       add_balance_user(user, payout, "id_" + str(bet.code), date, session)
-      
+      date = get_date()
+      while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
+        user.pay_loan(get_date())
       embedd = create_bet_embedded(bet, "Placeholder", session)
       msg_ids.append((bet.message_ids, embedd))
       bet_user_payouts.append((bet, user, payout))
@@ -1877,6 +1875,8 @@ async def reset_season(ctx, name):
     name = f"reset_{code}_{name}"
     for user in users:
       user.balances.append((name, Decimal(500), date))
+      for _ in user.get_open_loans():
+        user.pay_loan(date)
     await ctx.send(f"Season reset. New season {name} has sarted.")
 
 
