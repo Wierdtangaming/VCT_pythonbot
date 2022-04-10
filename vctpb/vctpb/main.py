@@ -316,7 +316,6 @@ async def on_ready():
 
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
-  print("timer")
   backup_full()
   
   
@@ -1111,7 +1110,7 @@ async def graph_balances(ctx,
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False),
-  high_quality: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
+  high_quality: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
   if high_quality == 0:
     dpi = 200
   else:
