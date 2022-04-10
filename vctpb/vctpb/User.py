@@ -299,8 +299,6 @@ class User():
     
     from dbinterface import get_all_db, get_from_db
     start = time()
-    
-    upfrount_pull = False
 
     xlabel = ""
     if isinstance(balance_range_ambig, list):
@@ -415,6 +413,7 @@ class User():
         label_colors.append('k')
         balances.append(amount)
         colors.append('k')
+    fmiddle = time()
     
     #make a 800 x 800 figure
     #fig, ax = plt.subplots(figsize=(8,8))
@@ -452,14 +451,14 @@ class User():
       plt.tight_layout()
       fig_width, fig_height = fig.get_size_inches()
       fig.set_size_inches(x_length, fig_height)
-
+      smiddle = time()
       buf = io.BytesIO()
       plt.savefig(buf, format='png')
       buf.seek(0)
       im = Image.open(buf)
       #print(sys.getsizeof(im.tobytes()))
       end = time()
-      print(end - start)
+      print(fmiddle - start, smiddle - fmiddle, end - smiddle, end - start)
       return im
   
 

@@ -1115,7 +1115,7 @@ async def graph_balances(ctx,
   if (user is not None) and (compare is not None):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
-  user = ctx.author
+  
   if (user is None) and (users is None):
     user = ctx.author
   
