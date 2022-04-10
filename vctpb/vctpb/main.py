@@ -703,8 +703,8 @@ class BetEditModal(Modal):
 
   async def callback(self, interaction: discord.Interaction):
     with Session.begin() as session:
-      match = self.match
-      user = self.user
+      match = get_from_db("Match", self.match.code, session)
+      user = get_from_db("User", self.user.code, session)
       bet = get_from_db("Bet", self.bet.code, session)
 
       team_num = self.children[0].value
@@ -761,9 +761,9 @@ class BetEditModal(Modal):
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
-
-      await edit_all_messages(bet.message_ids, embedd, title)
+      
       bet.message_ids.append((msg.id, msg.channel.id))
+    await edit_all_messages(bet.message_ids, embedd, title)
 #bet edit modal end
 
   
@@ -1389,16 +1389,18 @@ class MatchCreateModal(Modal):
 #match edit modal start
 class MatchEditModal(Modal):
   
-  def __init__(self, match, balance_odds=0, *args, **kwargs) -> None:
+  def __init__(self, match, has_bets, balance_odds=0, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     
     self.match = match
     self.balance_odds = balance_odds
+    self.has_bets = has_bets
     
     self.add_item(InputText(label="Enter team one name.", placeholder=match.t1, min_length=1, max_length=100, required=False))
     self.add_item(InputText(label="Enter team two name.", placeholder=match.t2, min_length=1, max_length=100, required=False))
     
-    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder=f"{match.t1oo}/{match.t2oo}", min_length=1, max_length=12, required=False))
+    if not has_bets:
+      self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder=f"{match.t1oo}/{match.t2oo}", min_length=1, max_length=12, required=False))
     self.add_item(InputText(label="Enter tournament name.", placeholder=match.tournament_name, min_length=1, max_length=300, required=False))
     
     self.add_item(InputText(label="Enter odds source.", placeholder=match.odds_source, min_length=1, max_length=100, required=False))
@@ -1406,68 +1408,82 @@ class MatchEditModal(Modal):
   
   async def callback(self, interaction: discord.Interaction):
     with Session.begin() as session:
-      team_one = self.children[0].value.strip()
-      if team_one == "":
-        team_one = self.match.t1
-      team_two = self.children[1].value.strip()
-      if team_two == "":
-        team_two = self.match.t2
-      odds_combined = self.children[2].value.strip()
-      if odds_combined == "":
-        odds_combined = f"{self.match.t1oo}/{self.match.t2oo}"
-      tournament_name = self.children[3].value.strip()
-      if tournament_name == "":
-        tournament_name = self.match.tournament_name
-      betting_site = self.children[4].value.strip()
-      if betting_site == "":
-        betting_site = self.match.odds_source
-      
-      
-      if odds_combined.count(" ") > 1:
-        odds_combined.strip(" ")
-        
-      splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
-      for spliter in splits:
-        if odds_combined.count(spliter) == 1:
-          team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
-          break
-      else:
-        await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].", ephemeral=True)
-        return
-        
-      if (to_float(team_one_old_odds) is None) or (to_float(team_two_old_odds) is None): 
-        await interaction.response.send_message(f"Odds are not valid. Odds must be valid decimal numbers.", ephemeral=True)
-        return
-      
-      team_one_old_odds = to_float(team_one_old_odds)
-      team_two_old_odds = to_float(team_two_old_odds)
-      if team_one_old_odds <= 1 or team_two_old_odds <= 1:
-        await interaction.response.send_message(f"Odds must be greater than 1.", ephemeral=True)
-        return
-      if self.balance_odds == 0:
-        odds1 = team_one_old_odds - 1
-        odds2 = team_two_old_odds - 1
-        
-        oneflip = 1 / odds1
-        
-        percentage1 = (math.sqrt(odds2/oneflip))
-        
-        team_one_odds = roundup(odds1 / percentage1) + 1
-        team_two_odds = roundup(odds2 / percentage1) + 1
-      else:
-        team_one_odds = team_one_old_odds
-        team_two_odds = team_two_old_odds
-        
       match = get_from_db("Match", self.match.code, session)
+      vals = [child.value.strip() for child in self.children]
+      
+      has_bets = self.has_bets
+      
+      if has_bets:
+        team_one, team_two, tournament_name, betting_site = vals
+      else:
+        team_one, team_two, odds_combined, tournament_name, betting_site = vals
+        
+        if odds_combined.count(" ") > 1:
+          odds_combined.strip(" ")
+        if odds_combined == "":
+          odds_combined = f"{match.t1oo}/{match.t2oo}"
+          
+      if team_one == "":
+        team_one = match.t1
+      if team_two == "":
+        team_two = match.t2
+      if tournament_name == "":
+        tournament_name = match.tournament_name
+      if betting_site == "":
+        betting_site = match.odds_source
+      
+      if not has_bets:
+        splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
+        for spliter in splits:
+          if odds_combined.count(spliter) == 1:
+            team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
+            break
+        else:
+          await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].", ephemeral=True)
+          return
+          
+        if (to_float(team_one_old_odds) is None) or (to_float(team_two_old_odds) is None): 
+          await interaction.response.send_message(f"Odds are not valid. Odds must be valid decimal numbers.", ephemeral=True)
+          return
+        
+        team_one_old_odds = to_float(team_one_old_odds)
+        team_two_old_odds = to_float(team_two_old_odds)
+        if team_one_old_odds <= 1 or team_two_old_odds <= 1:
+          await interaction.response.send_message(f"Odds must be greater than 1.", ephemeral=True)
+          return
+        if self.balance_odds == 0:
+          odds1 = team_one_old_odds - 1
+          odds2 = team_two_old_odds - 1
+          
+          oneflip = 1 / odds1
+          
+          percentage1 = (math.sqrt(odds2/oneflip))
+          
+          team_one_odds = roundup(odds1 / percentage1) + 1
+          team_two_odds = roundup(odds2 / percentage1) + 1
+        else:
+          team_one_odds = team_one_old_odds
+          team_two_odds = team_two_old_odds
+      
       match.t1 = team_one
       match.t2 = team_two
-      match.t1oo = team_one_old_odds
-      match.t2oo = team_two_old_odds
-      match.t1o = team_one_odds
-      match.t2o = team_two_odds
+      if not has_bets:
+        match.t1o = team_one_odds
+        match.t2o = team_two_odds
+        match.t1oo = team_one_old_odds
+        match.t2oo = team_two_old_odds
+      else:
+        team_one_odds = match.t1o
+        team_two_odds = match.t2o
       match.tournament_name = tournament_name
       match.odds_source = betting_site
 
+      if has_bets:
+        for bet in match.bets:
+          bet.t1 = team_one
+          bet.t2 = team_two
+          bet.tournament_name = tournament_name
+      
       title = f"Edited Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}."
       embedd = create_match_embedded(match, title, session)
       
@@ -1616,7 +1632,7 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
       match.date_closed = get_date()
       await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
     embedd = create_match_embedded(match, "Placeholder", session)
-    await edit_all_messages(match.message_ids, embedd)
+  await edit_all_messages(match.message_ids, embedd)
 #match betting end
   
   
@@ -1662,14 +1678,19 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
-async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_bet_free_available_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False), force: Option(int, "Force changes even if match already has winner.", choices = yes_no_choices, default=1, required=False)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_code(session), match, "Match", session)) is None: return
-    #to do let you cnage name but not odds
-    if match.bets != []:
-      await ctx.respond(f"Match must have no bets. You must delete the bets before editing the match. (To delete other users bets type in their bet code).", ephemeral = True)
+    if (fmatch := await user_from_autocomplete_tuple(None, current_matches_name_code(session), match, "Match", session)) is None:
+      if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_code(session), match, "Match", session)) is None: return
+    match = fmatch
+    print(match.date_closed, match.date_closed is None)
+    print(force, force == 0)
+    print(not(match.date_closed is None or force == 0))
+    if not(match.date_closed is None or force == 0):
+      await ctx.respond(f"Match must have betting open.", ephemeral = True)
       return
-    await ctx.interaction.response.send_modal(MatchEditModal(match, balance_odds, title="Edit Match"))
+      
+    await ctx.interaction.response.send_modal(MatchEditModal(match, match.bets != [], balance_odds, title="Edit Match"))
 #match edit end
 
 
@@ -1759,8 +1780,8 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     embedd = create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
     await ctx.interaction.followup.send(embed=embedd)
 
-    await edit_all_messages(match.message_ids, m_embedd)
-    [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+  await edit_all_messages(match.message_ids, m_embedd)
+  [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
 #match winner end
 
 
