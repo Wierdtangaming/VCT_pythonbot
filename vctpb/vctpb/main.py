@@ -995,16 +995,22 @@ async def color_list(ctx):
 async def color_add(ctx, custom_color_name:Option(str, "Name of color you want to add.", required=False), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False), xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False)):
   if xkcd_color_name is not None:
     if hex is not None:
-      await ctx.respond("You can't add a hex code and a xkcd color name.")
+      await ctx.respond("You can't add a hex code and a xkcd color name.", ephemeral=True)
       return
     
-    hex = xkcd_colors[f"xkcd:{xkcd_color_name.lower()}"]
+    hex = xkcd_colors.get(f"xkcd:{xkcd_color_name.lower()}")
+    if hex is None:
+      await ctx.respond("Invalid xkcd color.", ephemeral=True)
+      return
+    
     if custom_color_name is not None:
       xkcd_color_name = custom_color_name
-    await ctx.respond(add_color(xkcd_color_name, hex))
+    msg, color = add_color(xkcd_color_name, hex)
+    await ctx.respond(msg, ephemeral=(color is None))
     
   elif custom_color_name is not None and hex is not None:
-    await ctx.respond(add_color(custom_color_name, hex))
+    msg, color = add_color(custom_color_name, hex)
+    await ctx.respond(msg, ephemeral=(color is None))
     
   else:
     await ctx.respond("Please enter a name and hex code or a xkcd color.", ephemeral = True)
@@ -1014,21 +1020,28 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
 #color recolor start
 @colorscg.command(name = "recolor", description = "Recolors the color.")
 async def color_recolor(ctx, color_name: Option(str, "Name of color you want to replace color of.", autocomplete=color_picker_autocomplete), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.")):
-  await ctx.respond(recolor_color(color_name, hex))
+  with Session.begin() as session:
+    msg, color = recolor_color(color_name, hex, session)
+    await ctx.respond(msg, ephemeral=color is None)
+    if color is not None:
+      for user in color.users:
+        await edit_role(ctx.author, user.username, color.hex)
 #color recolor end
 
   
 #color remove start
 @colorscg.command(name = "remove", description = "Removes the color from color list.")
 async def color_remove(ctx, color_name: Option(str, "Name of color you want to remove.", autocomplete=color_picker_autocomplete)):
-  await ctx.respond(await remove_color(color_name))
+  msg, removed = remove_color(color_name)
+  await ctx.respond(msg, ephemeral=not removed)
 #color remove end
 
   
 #color rename start
 @colorscg.command(name = "rename", description = "Renames the color.")
 async def color_rename(ctx, old_color_name: Option(str, "Name of color you want to rename.", autocomplete=color_picker_autocomplete), new_color_name: Option(str, "New name of color.")):
-  await ctx.respond(rename_color(old_color_name, new_color_name))
+  msg, color = rename_color(old_color_name, new_color_name)
+  await ctx.respond(msg, ephemeral=color is None)
 #color rename end
 
   

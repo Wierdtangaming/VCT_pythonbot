@@ -38,15 +38,15 @@ def add_color(name, hex, session=None):
   name = name.capitalize()
   hex = hex.lower()
   if is_key_in_db("Color", name, session):
-    return f"{name} is already a color."
+    return (f"{name} is already a color.", None)
 
   old_hex = hex
   if (hex := valid_hex(hex)) is None:
-    return f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters."
+    return (f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters.", None)
 
   color = Color(name, hex)
   add_to_db(color, session)
-  return f"{name} has been added to the color list."
+  return (f"{name} has been added to the color list.", color)
   
   
 async def remove_color(name, session=None):
@@ -56,10 +56,10 @@ async def remove_color(name, session=None):
     
   name = name.capitalize()
   if not is_key_in_db("Color", name, session):
-    return f"{name} was not found in color list."
+    return (f"{name} was not found in color list.", False)
   
   await delete_from_db(name, table_name="Color", session=session)     
-  return f"Removed {name} from color list"
+  return (f"Removed {name} from color list", True)
 
 
 def rename_color(old_name, new_name, session=None):
@@ -72,7 +72,7 @@ def rename_color(old_name, new_name, session=None):
   
   color = get_from_db("Color", old_name, session)
   if color is None:
-    return f"{old_name} was not found in color list."
+    return (f"{old_name} was not found in color list.", None)
   color.name = new_name
   for match in color.matches:
     match.set_color(color)
@@ -80,7 +80,7 @@ def rename_color(old_name, new_name, session=None):
     bet.set_color(color)
   for user in color.users:
     user.set_color(color)
-  return f"{old_name} has been renamed to {new_name}"
+  return (f"{old_name} has been renamed to {new_name}", color)
     
   
 def recolor_color(name, hex, session=None):
@@ -89,13 +89,14 @@ def recolor_color(name, hex, session=None):
       return recolor_color(name, hex, session)
     
   name = name.capitalize()
+  ohex = hex
   if (hex := valid_hex(hex)) is None:
-    return f"{hex} is not a valid hex code. Only include the 6 numbers/letters."
+    return (f"{ohex} is not a valid hex code. Only include the 6 numbers/letters.", None)
   
   color = get_from_db("Color", name, session)
   if color is None:
-    return f"{hex} was not found in color list."
-  print(color)
+    return (f"{name} was not found in color list.", None)
+  
   color.hex = hex
   for match in color.matches:
     print(f"Setting {match} to {hex}")
@@ -106,4 +107,4 @@ def recolor_color(name, hex, session=None):
   for user in color.users:
     print(f"Setting {user}'s color to {hex}")
     user.set_color(color)
-  return f"{name} now has the hex {hex}"
+  return (f"{name} now has the hex {hex}", color)
