@@ -145,6 +145,11 @@ class User():
     index = self.loans.index(loan)
     self.loans[index] = new_loan
   
+  def is_in_first_place(self, users, session=None):
+    for user in users:
+      if self.balances[-1][1] < user.balances[-1][1]:
+        return False
+    return True
   
   
   def unavailable(self, session=None):
