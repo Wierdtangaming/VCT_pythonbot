@@ -22,8 +22,6 @@ async def set_position(guild, role, bot):
   for orole in oroles:
     if user in orole.members and not orole.is_default():
       await role.edit(position=orole.position-1)
-      return
-  
   
 async def add_role(user, role):
   await user.add_roles(role)
@@ -33,6 +31,9 @@ async def delete_role(role):
   
 async def recolor_role(role, hex):
   await role.edit(color=discord.Color.from_rgb(*hex_to_tuple(hex)))
+  
+async def rename_role(role, new_name):
+  await role.edit(name=new_name)
 
 async def set_role(guild, author, username, hex, bot):
   role = get_role(author, username)
@@ -51,7 +52,11 @@ async def edit_role(author, username, hex):
   role = get_role(author, username)
   if role is not None:
     await recolor_role(role, hex)
-    
+  
+async def set_role_name(author, username, new_name):
+  role = get_role(author, username)
+  if role is not None:
+    await rename_role(role, new_name)
   
 def has_role(user, username):
   return get_role(user, username) is not None

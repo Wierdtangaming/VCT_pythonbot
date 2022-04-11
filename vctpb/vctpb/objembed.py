@@ -116,8 +116,7 @@ def create_user_embedded(user_ambig, session=None):
 def create_leaderboard_embedded(session=None):
   users = get_condition_db("User", User.hidden == False, session)
   user_rankings = [(user, user.balances[-1][1]) for user in users]
-  user_rankings.sort(key=lambda x: x[1])
-  user_rankings.reverse()
+  user_rankings.sort(key=lambda x: x[1], reverse=True)
   embed = discord.Embed(title="Leaderboard:", color=discord.Color.gold())
   medals = [emoji.demojize("🥇"), emoji.demojize("🥈"), emoji.demojize("🥉")]
   rank_num = 1

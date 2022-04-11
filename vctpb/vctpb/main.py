@@ -21,10 +21,10 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
-from decimal import *
+from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, usernames_to_users
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
@@ -33,6 +33,7 @@ from savedata import backup_full, save_savedata_from_github, are_equivalent, zip
 import matplotlib.colors as mcolors
 import secrets
 import atexit
+from roleinterface import set_role, unset_role, edit_role, set_role_name
 
 from sqlaobjs import Session
 
@@ -1084,19 +1085,37 @@ profile = SlashCommandGroup(
   guild_ids = gid,
 )
 
-from roleinterface import set_role, unset_role, edit_role
-  
+
+#color profile autocomplete start
+async def color_profile_autocomplete(ctx: discord.AutocompleteContext):  
+  with Session.begin() as session:
+    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
+    if user.is_in_first_place(get_all_db("User", session), session):
+      val = ["First place gold"]
+    else:
+      val = []
+    return val + [color.name.capitalize() for color in get_all_db("Color", session) if ctx.value.lower() in color.name.lower()]
+#color profile autocomplete end
+
+
 #profile color start
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_picker_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
-    
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
   with Session.begin() as session:
-    if (color := get_color(color_name, session)) is None:
-      await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
-      return
     if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
-    user.set_color(color)
-    await ctx.respond(f"Profile color is now {color.name}.")
+    if color_name == "First place gold":
+      if user.is_in_first_place(get_all_db("User", session), session):
+        user.set_color(xkcd_colors["xkcd:gold"][1:])
+        await ctx.respond(f"Profile color is now GOLD.")
+      else:
+        await ctx.respond("You are not in the first place.", ephemeral=True)
+        return
+    else:
+      if (color := get_color(color_name, session)) is None:
+        await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
+        return
+      user.set_color(color)
+      await ctx.respond(f"Profile color is now {user.color_hex}.")
     
     author = ctx.author
     username = user.username
@@ -1118,8 +1137,13 @@ async def profile_username(ctx, username: Option(str, "New username.", required=
     if username is None:
       await ctx.respond(f"Your username is {user.username}.", ephemeral = True)
       return
+    if is_condition_in_db("User", User.username == username, session):
+      await ctx.respond(f"Username {username} is already taken.", ephemeral = True)
+      return
+    old_username = user.username
     user.username = username
-    await ctx.respond(f"Username is now {user.username}.", ephemeral = True)
+    await ctx.respond(f"Username is now {user.username}.")
+    await set_role_name(ctx.author, old_username, username)
 
 
 bot.add_application_command(profile)
