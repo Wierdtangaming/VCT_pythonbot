@@ -39,7 +39,7 @@ def id_to_metion(id):
 
 
   
-async def get_user_from_member(ctx, user, session=None):
+async def get_user_from_ctx(ctx, user, session=None):
   if user is None:
     user = ctx.author
   user = get_from_db("User", user.id, session)
@@ -68,6 +68,12 @@ async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
       await ctx.respond(f"{prefix.capitalize()} ID not found.", ephemeral = True)
     return None
   return obj
+
+async def get_member_from_id(guild, id):
+  member = guild.get_member(id)
+  if member is None:
+    member = await guild.fetch_member(id)
+  return member
 
 
 def get_user_from_username(username, session=None):

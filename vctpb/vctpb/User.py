@@ -72,7 +72,11 @@ class User():
     self.color = color
     self.color_name = color.name
     self.color_hex = color.hex
-
+  
+  async def has_leader_profile(self):
+    return self.color_hex == "dbb40c"
+    
+  
   def open_matches(self, session=None):
     if session is None:
       with Session.begin() as session:
@@ -145,7 +149,7 @@ class User():
     index = self.loans.index(loan)
     self.loans[index] = new_loan
   
-  def is_in_first_place(self, users, session=None):
+  def is_in_first_place(self, users):
     for user in users:
       if self.balances[-1][1] < user.balances[-1][1]:
         return False
@@ -794,3 +798,15 @@ def is_valid_user(code, username, color, hidden, balances, loans):
   if isinstance(loans, list) == False:
     errors[6] = True
   return errors
+
+
+def get_first_place(users):
+  if len(users) == 0:
+    return None
+  highest_bal = users[0].balances[-1][1]
+  first_place = users[0]
+  for user in users:
+    if user.balances[-1][1] > highest_bal:
+      highest_bal = user.balances[-1][1]
+      first_place = user
+  return first_place

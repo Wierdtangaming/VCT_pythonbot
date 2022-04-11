@@ -20,13 +20,13 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name
+from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
 from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_member, user_from_autocomplete_tuple, usernames_to_users
+from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -132,10 +132,10 @@ def shorten_bet_name(bet, session=None):
   else:
     prefix = ""
     shortened_prefix = ""
-  
-  s = f"{prefix}{bet.user.username}: {bet.amount_bet} on {bet.get_team()}"
+  user = bet.user
+  s = f"{prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
   if len(s) >= 100:
-    s = f"{shortened_prefix}{bet.user.name}: {bet.amount_bet} on {bet.get_team()}"
+    s = f"{shortened_prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
     if len(s) >= 100:
       s = s[:100]
   return s
@@ -487,7 +487,7 @@ async def award_give(ctx,
           await ctx.interaction.followup.send(embed=embedd)
       return
     
-    if (user := await get_user_from_member(ctx, user, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
     bet_id = "award_" + user.get_unique_bal_code() + "_" + description
     print(bet_id)
     abu = add_balance_user(user, amount, bet_id, get_date(), session)
@@ -501,7 +501,7 @@ async def award_give(ctx,
 #award list start
 @award.command(name = "list", description = "Lists all the awards given to a user.")
 async def award_list(ctx, user: Option(discord.Member, "User you want to list awards for.")):
-  if (user := await get_user_from_member(ctx, user)) is None: return
+  if (user := await get_user_from_ctx(ctx, user)) is None: return
   
   award_labels = user.get_award_strings()
   
@@ -514,7 +514,7 @@ async def award_list(ctx, user: Option(discord.Member, "User you want to list aw
 async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
   
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, user, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
     
     award_labels = user.get_award_strings()
     
@@ -567,7 +567,7 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
         print("creating_user")
         user = create_user(ctx.author.id, ctx.author.display_name, session)
     else:
-      if (user := await get_user_from_member(ctx, user, session)) is None: return
+      if (user := await get_user_from_ctx(ctx, user, session)) is None: return
     embedd = create_user_embedded(user, session)
     if embedd is None:
       await ctx.respond("User not found.")
@@ -1090,7 +1090,7 @@ profile = SlashCommandGroup(
 async def color_profile_autocomplete(ctx: discord.AutocompleteContext):  
   with Session.begin() as session:
     if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    if user.is_in_first_place(get_all_db("User", session), session):
+    if user.is_in_first_place(get_all_db("User", session)):
       val = ["First place gold"]
     else:
       val = []
@@ -1102,9 +1102,9 @@ async def color_profile_autocomplete(ctx: discord.AutocompleteContext):
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if color_name == "First place gold":
-      if user.is_in_first_place(get_all_db("User", session), session):
+      if user.is_in_first_place(get_all_db("User", session)):
         user.set_color(xkcd_colors["xkcd:gold"][1:])
         await ctx.respond(f"Profile color is now GOLD.")
       else:
@@ -1133,7 +1133,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
 @profile.command(name = "username", description = "Sets the username for embeds.")
 async def profile_username(ctx, username: Option(str, "New username.", required=False, max_value=32)):
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if username is None:
       await ctx.respond(f"Your username is {user.username}.", ephemeral = True)
       return
@@ -1187,7 +1187,7 @@ async def graph_balances(ctx,
   
   with Session.begin() as session:
     if compare is None:
-      if (user := await get_user_from_member(ctx, user, session)) is None: return
+      if (user := await get_user_from_ctx(ctx, user, session)) is None: return
       
       if amount is not None:
         if amount > len(user.balances):
@@ -1283,7 +1283,7 @@ async def leaderboard(ctx):
 @bot.slash_command(name = "log", description = "Shows the last x amount of balance changes (awards, bets, etc)", guild_ids = gid)
 async def log(ctx, amount: Option(int, "How many balance changes you want to see."), user: Option(discord.Member, "User you want to check log of (defaulted to you).", default = None, required = False)):
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, user, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
     
     if amount <= 0:
       await ctx.respond("Amount has to be greater than 0.")
@@ -1315,7 +1315,7 @@ loan = SlashCommandGroup(
 @loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
 
     if user.get_clean_bal_loan() >= 100:
       await ctx.respond("You must have less than 100 to make a loan", ephemeral = True)
@@ -1329,7 +1329,7 @@ async def loan_create(ctx):
 #loan count start
 @loan.command(name = "count", description = "See how many loans you have active.")
 async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
-  if (user := await get_user_from_member(ctx, user)) is None: return
+  if (user := await get_user_from_ctx(ctx, user)) is None: return
   await ctx.respond(f"{user.username} currently has {len(user.get_open_loans())} active loans")
 #loan count end
 
@@ -1338,7 +1338,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 @loan.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
       
     loan_amount = user.loan_bal()
     if loan_amount == 0:
@@ -1816,15 +1816,20 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       odds = match.t2o
       await ctx.respond(f"Winner has been set to {match.t2}.")
 
+    users = get_all_db("User", session)
+    leader = get_first_place(users)
+    print(leader)
     msg_ids = []
     bet_user_payouts = []
     date = get_date()
+    new_users = []
     for bet in match.bets:
       bet.winner = int(match.winner)
       payout = -bet.amount_bet
       if bet.team_num == team:
         payout += bet.amount_bet * odds
       user = bet.user
+      new_users.append(user)
       add_balance_user(user, payout, "id_" + str(bet.code), date, session)
       date = get_date()
       while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
@@ -1833,9 +1838,19 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       msg_ids.append((bet.message_ids, embedd))
       bet_user_payouts.append((bet, user, payout))
 
+    new_leader = get_first_place(users)
+    print(new_leader)
 
     embedd = create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
     await ctx.interaction.followup.send(embed=embedd)
+    if new_leader != leader:
+      await ctx.respond(f"{new_leader.username} is now the leader.")
+      if await leader.has_leader_profile():
+        leader.set_color(str(secrets.token_hex(3)))
+        member = await get_member_from_id(ctx.interaction.guild, leader.code)
+        print(member, type(member))
+        await edit_role(member, user.username, user.color_hex)
+    
 
   await edit_all_messages(match.message_ids, m_embedd)
   [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
@@ -1934,7 +1949,7 @@ async def backup_db(ctx):
 @bot.command()
 async def hide_from_leaderboard(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_member(None, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(None, ctx.author, session)) is None: return
     user.hidden = not user.hidden
     print(user.hidden)
 
