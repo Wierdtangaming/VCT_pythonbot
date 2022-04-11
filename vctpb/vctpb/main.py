@@ -1000,7 +1000,7 @@ async def color_list(ctx):
     await ctx.respond("No colors found.", ephemeral=True)
     return
   
-  font = ImageFont.truetype("font/whitneybold.otf", size=40)
+  font = ImageFont.truetype("fonts/whitneybold.otf", size=40)
   img = Image.new("RGBA", (800, (int((len(colors)+1)/2) * 100)), (255,255,255,0))
   d = ImageDraw.Draw(img)
   for i, color in enumerate(colors):
@@ -1109,6 +1109,17 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
       await edit_role(author, username, user.color_hex)
 #profile color end
 
+
+#profile username start
+@profile.command(name = "username", description = "Sets the username for embeds.")
+async def profile_username(ctx, username: Option(str, "New username.", required=False, max_value=32)):
+  with Session.begin() as session:
+    if (user := await get_user_from_member(ctx, ctx.author, session)) is None: return
+    if username is None:
+      await ctx.respond(f"Your username is {user.username}.", ephemeral = True)
+      return
+    user.username = username
+    await ctx.respond(f"Username is now {user.username}.", ephemeral = True)
 
 
 bot.add_application_command(profile)
