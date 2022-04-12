@@ -5,3 +5,4 @@
 *.ini
 */savedata
 */settings
+__pycache__/
