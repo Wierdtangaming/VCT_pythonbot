@@ -1,10 +1,15 @@
-from sqlalchemy.orm import registry
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 
-
-mapper_registry = registry()
 Engine = create_engine('sqlite:///testdata/savedata.db', future=True)
-Session = sessionmaker(bind=Engine, future=True, expire_on_commit=False)
+
+with Engine.begin() as connection:
+  connection.execute( text(
+"""
+ALTER TABEL bet
+ADD COLUMN hidden BOOLEAN 
+NOT NULL DEFAULT 0
+"""
+  ))
 
  
