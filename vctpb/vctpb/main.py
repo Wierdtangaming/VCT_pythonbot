@@ -21,7 +21,7 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db
+from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import Decimal
@@ -337,6 +337,10 @@ async def on_ready():
       print("-----------Quitting-----------")
       atexit.unregister(backup_full)
       quit()
+    elif git_savedata == "once":
+      print("-----------pushing then setting to quit-----------")
+      set_setting("git_savedata", "quit")
+      
   
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
@@ -674,7 +678,7 @@ class BetCreateModal(Modal):
 
       color = code[:6]
       
-      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date())
+      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date(), False)
       add_to_db(bet, session)
       
       session.flush([bet])

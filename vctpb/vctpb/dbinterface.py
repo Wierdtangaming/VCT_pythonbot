@@ -154,3 +154,10 @@ def get_setting(setting_name):
   if setting_name == "guild_ids":
     return jsonpickle.decode(val)
   return configur.get("settings", setting_name)
+
+def set_setting(setting_name, setting_value):
+  configur = ConfigParser()
+  configur.read('settings.ini')
+  configur.set('settings', setting_name, setting_value)
+  with open('settings.ini', 'w') as configfile:
+    configur.write(configfile)
