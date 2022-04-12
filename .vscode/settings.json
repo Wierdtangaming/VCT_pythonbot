@@ -2,6 +2,7 @@
     "actionButtons": {
 
 
+
         "defaultColor": "#ff0034", // Can also use string color names.
         "loadNpmCommands":false, // Disables automatic generation of actions for npm commands.
         "reloadButton":"♻️", // Custom reload button text or icon (default ↻). null value enables automatic reload on configuration change
@@ -22,13 +23,13 @@
                 "name": "Run update tabel python3",
                 "singleInstance": true,
                 "color": "orange",
-                "command": "cd vctpb\npython3 -m poetry run python3 vctpb/addcolumn.py"
+                "command": "cd vctpb\npython3 -m poetry run python3 vctpb/editdb.py"
             },
             {
                 "name": "Run update tabel poetry",
                 "singleInstance": true,
                 "color": "orange",
-                "command": "cd vctpb\npoetry run python vctpb/addcolumn.py",
+                "command": "cd vctpb\npoetry run python vctpb/editdb.py",
             },
         ]
     },
