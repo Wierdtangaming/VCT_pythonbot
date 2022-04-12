@@ -25,12 +25,12 @@ class User():
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")
   color_hex = Column(String(6), nullable=False)
-  hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
   active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
+  hidden = Column(BOOLEAN, nullable=False)
   
   def __init__(self, code, username, color, date_created):
     self.code = code
