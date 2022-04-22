@@ -2,7 +2,7 @@
 *.DS_Store
 *.db
 *.db-journal
-*.ini
+settings.ini
 */savedata
 */settings
 __pycache__/

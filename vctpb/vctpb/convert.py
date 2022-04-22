@@ -82,3 +82,11 @@ def get_user_from_username(username, session=None):
 
 def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
+
+
+def get_all_bets_hidden(session=None, show_hidden=False):
+  if show_hidden:
+    cond = (Bet.winner == 0)
+  else:
+    cond = (Bet.winner == 0 & Bet.hidden == False)
+  return get_condition_db("Bet", cond, session)

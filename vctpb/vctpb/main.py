@@ -26,7 +26,7 @@ from colorinterface import hex_to_tuple, get_color, add_color, remove_color, ren
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id
+from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_all_bets_hidden
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -60,7 +60,8 @@ def get_all_available_matches(session=None):
 def get_all_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)
 
-
+def get_all_closed_matches(session=None):
+  return get_condition_db("Match", Match.winner == 0 & Match.date_closed != None, session)
 
 def add_time_name_obj(name_objs, session=None):
   if session is None:
@@ -119,8 +120,12 @@ def all_matches_name_obj(session=None):
 
 
 
-def get_all_current_bets(session=None):
-  return get_condition_db("Bet", Bet.winner == 0, session)
+def get_all_current_bets(session=None, show_hidden=True):
+  if show_hidden:
+    cond = (Bet.winner == 0)
+  else:
+    cond = (Bet.winner == 0 & Bet.hidden == False)
+  return get_condition_db("Bet", cond, session)
 
 def shorten_bet_name(bet, session=None):
   if session is None:
@@ -141,18 +146,18 @@ def shorten_bet_name(bet, session=None):
   return s
 
 
-def current_bets_name_obj(session=None):
+def current_bets_name_obj(session=None, show_hidden=True):
   if session is None:
     with Session() as session:
-      return current_bets_name_obj(session)
-  return add_time_name_obj([(shorten_bet_name(bet, session), bet) for bet in get_all_current_bets(session)], session)
+      return current_bets_name_obj(session, show_hidden)
+  return add_time_name_obj([(shorten_bet_name(bet, session), bet) for bet in get_all_current_bets(session, show_hidden)], session)
 
 
-def all_bets_name_obj(session=None):
+def all_bets_name_obj(session=None, show_hidden=True):
   if session is None:
     with Session() as session:
-      return all_bets_name_obj(session)
-  return add_time_name_obj([(shorten_bet_name(bet, session), bet) for bet in get_all_db("Bet", session)], session)
+      return all_bets_name_obj(session, show_hidden)
+  return add_time_name_obj([(shorten_bet_name(bet, session), bet) for bet in get_all_bets_hidden(session, show_hidden)], session)
 
 
 def get_users_from_multiuser(compare, session=None):
@@ -592,11 +597,11 @@ betscg = SlashCommandGroup(
 #bet create modal start
 class BetCreateModal(Modal):
   
-  def __init__(self, match: Match, user: User, session, error=[None, None], *args, **kwargs) -> None:
+  def __init__(self, hidden, match: Match, user: User, session, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
-    
+    self.hidden = hidden
     if error[0] is None: 
       team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
       if len(team_label) >= 45:
@@ -843,7 +848,7 @@ async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete)):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=1, required=False),):
   with Session.begin() as session:
     user = get_user_from_id(ctx.author.id, session)
     if user is None:
@@ -860,7 +865,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
         await ctx.respond("You already have a bet on this match.", ephemeral=True)
         return
 
-    bet_modal = BetCreateModal(match, user, session, title="Create Bet")
+    bet_modal = BetCreateModal(hide, match, user, session, title="Create Bet")
     await ctx.interaction.response.send_modal(bet_modal)
 #bet create end
 
@@ -922,7 +927,7 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 @betscg.command(name = "list", description = "Sends embed with all bets. If type is full it sends the whole embed of each bet.")
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
   with Session.begin() as session:
-    bets = get_all_current_bets(session)
+    bets = get_all_current_bets(session, True)
     if len(bets) == 0:
       await ctx.respond("No undecided bets.", ephemeral=True)
       return
@@ -944,7 +949,10 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
           msg = await ctx.interaction.followup.send(embed=embedd)
         bet.message_ids.append((msg.id, msg.channel.id))
 #bet list end
-  
+
+#bet hidden start
+@betscg.command(name = "hidden", description = "Sends embed with all hidden bets.")
+
 bot.add_application_command(betscg)
 #bet end
 
@@ -1372,10 +1380,10 @@ matchscg = SlashCommandGroup(
 #match create modal start
 class MatchCreateModal(Modal):
   
-  def __init__(self, session, balance_odds=0, *args, **kwargs) -> None:
+  def __init__(self, session, hidden, balance_odds=0, *args, **kwargs) -> None:
     
     super().__init__(*args, **kwargs)
-    
+    self.hidden = hidden
     self.balance_odds = balance_odds
     leaderboard, odds_source = get_current_tournament_odds(session)
     self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
@@ -1605,13 +1613,27 @@ async def match_available_list_autocomplete(ctx: discord.AutocompleteContext):
   return [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
 #match available list autocomplete end
   
+#match bet free available list autocomplete start
 async def match_bet_free_available_list_autocomplete(ctx: discord.AutocompleteContext):
   text = ctx.value.lower()
   with Session() as session:
     match_t_list = available_matches_name_obj(session)
     return [match_t[0] for match_t in match_t_list if ((text in match_t[0].lower()) and (match_t[1].bets == []))]
-#match bet free available list autocomplete start
+#match bet free available list autocomplete end
   
+#match open list autocomplete start
+async def match_open_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = available_matches_name_obj()
+  return [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
+#match open list autocomplete end
+
+#match close list autocomplete start
+async def match_close_list_autocomplete(ctx: discord.AutocompleteContext):
+  text = ctx.value.lower()
+  match_t_list = get_all_closed_matches()
+  return [match_t[0] for match_t in match_t_list if (text in match_t[0].lower())]
+#match close list autocomplete end
 
 #match open close list autocomplete start
 async def match_open_close_list_autocomplete(ctx: discord.AutocompleteContext):
@@ -1702,7 +1724,7 @@ async def match_betting(ctx, type: Option(int, "Set to open or close", choices =
   
 #match create start
 @matchscg.command(name = "create", description = "Create a match.")
-async def match_create(ctx, balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
+async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
     match_modal = MatchCreateModal(session, balance_odds=balance_odds, title="Create Match")
     await ctx.interaction.response.send_modal(match_modal)
@@ -1849,11 +1871,15 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     await ctx.interaction.followup.send(embed=embedd)
     if new_leader != leader:
       await ctx.respond(f"{new_leader.username} is now the leader.")
-      if await leader.has_leader_profile():
+      print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
+      if leader.has_leader_profile():
+        print("start")
         leader.set_color(str(secrets.token_hex(3)))
+        print("2")
         member = await get_member_from_id(ctx.interaction.guild, leader.code)
         print(member, type(member))
         await edit_role(member, user.username, user.color_hex)
+        print("3")
     
 
   await edit_all_messages(match.message_ids, m_embedd)

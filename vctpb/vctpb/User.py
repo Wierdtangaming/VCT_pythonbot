@@ -73,7 +73,7 @@ class User():
     self.color_name = color.name
     self.color_hex = color.hex
   
-  async def has_leader_profile(self):
+  def has_leader_profile(self):
     return self.color_hex == "dbb40c"
     
   
