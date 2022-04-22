@@ -1837,10 +1837,10 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     #change when autocomplete
     if team == 1:
       odds = match.t1o
-      await ctx.respond(f"Winner has been set to {match.t1}.")
+      winner_msg = f"Winner has been set to {match.t1}."
     else:
       odds = match.t2o
-      await ctx.respond(f"Winner has been set to {match.t2}.")
+      winner_msg = f"Winner has been set to {match.t2}."
 
     users = get_all_db("User", session)
     leader = get_first_place(users)
@@ -1868,7 +1868,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     print(new_leader)
 
     embedd = create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
-    await ctx.interaction.followup.send(embed=embedd)
+    await ctx.interaction.followup.send(content=winner_msg, embed=embedd)
     if new_leader != leader:
       await ctx.respond(f"{new_leader.username} is now the leader.")
       print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
@@ -1877,7 +1877,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
         leader.set_color(str(secrets.token_hex(3)))
         print("2")
         member = await get_member_from_id(ctx.interaction.guild, leader.code)
-        print(member, type(member))
+        print("winner_member", member, type(member))
         await edit_role(member, user.username, user.color_hex)
         print("3")
     
