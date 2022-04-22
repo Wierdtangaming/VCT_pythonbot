@@ -951,7 +951,24 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
 #bet list end
 
 #bet hidden start
-@betscg.command(name = "hidden", description = "Sends embed with all hidden bets.")
+@betscg.command(name = "hidden", description = "Hide and unhide your bet.")
+async def bet_hidden(ctx, bet: Option(str, "Bet you want to hide or unhide.", autocomplete=user_bet_list_autocomplete)):
+  with Session.begin() as session:
+    if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_obj(session), bet, "Bet", session)) is None: return
+    
+    match = bet.match
+    if (match is None) or (match.date_closed is not None):
+      await ctx.respond("Match betting has closed, you cannot edit the bet.", ephemeral=True)
+      return
+    
+    user = bet.user
+    if bet.hidden == 1:
+      bet.hidden = 0
+      await ctx.respond(f"Bet {user.username} with {bet.amount_bet} on {bet.get_team()} is now unhidden.", ephemeral=True)
+    else:
+      bet.hidden = 1
+      await ctx.respond(f"Bet {user.username} with {bet.amount_bet} on {bet.get_team()} is now hidden.", ephemeral=True)
+#bet hidden end
 
 bot.add_application_command(betscg)
 #bet end
@@ -1703,22 +1720,51 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
 #match bets end
 
 
-#match betting start
-@matchscg.command(name = "betting", description = "Open and close betting.")
-async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
+#match open start
+@matchscg.command(name = "open", description = "Open a match.")
+async def match_open(ctx, match: Option(str, "Match you want to open.", autocomplete=match_open_list_autocomplete)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_obj(session), match, "Match", session)) is None: return
-
-    #if already on dont do anything complex
-      
-    if type == 0:
-      match.date_closed = None
-      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
-    else:
-      match.date_closed = get_date()
-      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
+    if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_obj(session), match, "Match", session)) is None:
+      match = match
+    
+    
+    
+    match.date_closed = None
+    await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
     embedd = create_match_embedded(match, "Placeholder", session)
   await edit_all_messages(match.message_ids, embedd)
+#match open end
+
+#match close start
+@matchscg.command(name = "close", description = "Close a match.")
+async def match_close(ctx, match: Option(str, "Match you want to close.", autocomplete=match_close_list_autocomplete)):
+  with Session.begin() as session:
+    if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_obj(session), match, "Match", session)) is None:
+      match = match
+    
+    match.date_closed = get_date()
+    await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
+    embedd = create_match_embedded(match, "Placeholder", session)
+  await edit_all_messages(match.message_ids, embedd)
+#match close end
+
+
+#match betting start
+#@matchscg.command(name = "betting", description = "Open and close betting.")
+#async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
+#  with Session.begin() as session:
+#    if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_obj(session), match, "Match", session)) is None: return
+#
+#    #if already on dont do anything complex
+#      
+#    if type == 0:
+#      match.date_closed = None
+#      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
+#    else:
+#      match.date_closed = get_date()
+#      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
+#    embedd = create_match_embedded(match, "Placeholder", session)
+#  await edit_all_messages(match.message_ids, embedd)
 #match betting end
   
   
