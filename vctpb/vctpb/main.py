@@ -694,19 +694,21 @@ class BetCreateModal(Modal):
 
       color = code[:6]
       
-      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date(), False)
+      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date(), self.hidden)
       add_to_db(bet, session)
       
       session.flush([bet])
       session.expire(bet)
       embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
-      
-      if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
-        inter = await interaction.response.send_message(embed=embedd)
-        msg = await inter.original_message()
+      if self.hidden:
+        inter = await interaction.response.send_message(embed=embedd, ephemeral = True)
       else:
-        await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
-        msg = await channel.send(embed=embedd)
+        if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
+          inter = await interaction.response.send_message(embed=embedd)
+          msg = await inter.original_message()
+        else:
+          await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral = True)
+          msg = await channel.send(embed=embedd)
 
       bet.message_ids.append((msg.id, msg.channel.id))
       #add_to_db(bet, session)
@@ -1699,7 +1701,8 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
       if (fmatch := await user_from_autocomplete_tuple(ctx, all_matches_name_obj(session), match, "Match", session)) is None: return
     match = fmatch
     
-    bets = match.bets
+    all_bets = match.bets
+    bets = (bet for bet in all_bets if bet.hidden == False)
     
     if len(bets) == 0:
       await ctx.respond(f"No bets on match {match.t1} vs {match.t2}.", ephemeral = True)
