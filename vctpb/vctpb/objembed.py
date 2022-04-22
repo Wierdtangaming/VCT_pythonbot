@@ -94,6 +94,8 @@ def create_bet_list_embedded(embed_title, bets_ambig, session=None):
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
     bets_ambig = get_mult_from_db("Bet", bets_ambig, session)
+  if len(bets_ambig) == 0:
+    return None
   bets_ambig.sort(key=lambda x: x.match_id)
   for bet in bets_ambig:
     embed.add_field(name="\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline=False)

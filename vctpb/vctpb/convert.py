@@ -90,3 +90,9 @@ def get_all_bets_hidden(session=None, show_hidden=False):
   else:
     cond = (Bet.winner == 0 & Bet.hidden == False)
   return get_condition_db("Bet", cond, session)
+
+def get_user_hidden_bets(user, session=None):
+  return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == True, Bet.winner == 0, session)
+
+def get_user_unhidden_bets(user, session=None):
+  return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == False, session)
