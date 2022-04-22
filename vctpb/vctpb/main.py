@@ -608,7 +608,7 @@ betscg = SlashCommandGroup(
 #bet create modal start
 class BetCreateModal(Modal):
   
-  def __init__(self, hidden, match: Match, user: User, session, error=[None, None], *args, **kwargs) -> None:
+  def __init__(self, match: Match, user: User, hidden, session, error=[None, None], *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
@@ -864,12 +864,12 @@ async def user_hidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=1, required=False),):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=1, required=False)):
   with Session.begin() as session:
     user = get_user_from_id(ctx.author.id, session)
     if user is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
-      
+    
     if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_obj(session), match, "Match", session)) is None: return
       
     if match.date_closed is not None:
@@ -880,8 +880,12 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
       if bet.match_id == match.code:
         await ctx.respond("You already have a bet on this match.", ephemeral=True)
         return
-
-    bet_modal = BetCreateModal(hide, match, user, session, title="Create Bet")
+    hidden = hide == 1
+    if hidden:
+      title = "Create hidden bet"
+    else:
+      title = "Create bet"
+    bet_modal = BetCreateModal(match, user, hidden, session, title)
     await ctx.interaction.response.send_modal(bet_modal)
 #bet create end
 
@@ -1746,13 +1750,11 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
       match = match
     
     match.date_closed = get_date()
-    text = f"{match.t1} vs {match.t2} betting has closed."
     hidden_bets = []
     for bet in match.bets:
       if bet.hidden == True:
         hidden_bets.append(bet)
         bet.hidden = True
-    
     await ctx.respond(content=f"{match.t1} vs {match.t2} betting has closed.", embed=create_bet_list_embedded(f"Hidden bets on {match.t1} vs {match.t2}:", hidden_bets, session))
     embedd = create_match_embedded(match, "Placeholder", session)
   await edit_all_messages(match.message_ids, embedd)
