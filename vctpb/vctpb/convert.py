@@ -84,6 +84,57 @@ def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
 
 
+def add_time_name_objs(name_objs):
+  new_name_objs = []
+  names = [name for name, _ in name_objs]
+  for name_obj in name_objs:
+    if names.count(name_obj[0]) == 2:
+      new_name_objs.append((f"{name_obj[0]}, {name_obj[1].date_created.strftime('%m/%d')}", name_obj[1]))
+    else:
+      new_name_objs.append(name_obj)
+  return new_name_objs
+
+
+def shorten_match_name(match):
+  if match.winner != 0:
+    prefix = "Concluded: "
+    shortened_prefix = "Con: "
+  else:
+    prefix = ""
+    shortened_prefix = ""
+  
+  
+  s = f"{prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
+  if len(s) >= 95:
+    s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
+    if len(s) >= 95:
+      s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
+      if len(s) >= 95:
+        tsplit = match.tournament_name.split(" ")[0]
+        s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
+        if len(s) >= 95:
+          s = s[:95]
+  return s
+
+def shorten_bet_name(bet, session=None):
+  if session is None:
+    with Session() as session:
+      return shorten_bet_name(bet, session)
+  if bet.winner != 0:
+    prefix = "Paid out: "
+    shortened_prefix = "Paid: "
+  else:
+    prefix = ""
+    shortened_prefix = ""
+  user = bet.user
+  s = f"{prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
+  if len(s) >= 100:
+    s = f"{shortened_prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
+    if len(s) >= 100:
+      s = s[:100]
+  return s
+
+
 def get_all_bets_hidden(session=None, show_hidden=False):
   if show_hidden:
     cond = (Bet.winner == 0)
@@ -91,8 +142,23 @@ def get_all_bets_hidden(session=None, show_hidden=False):
     cond = (Bet.winner == 0 & Bet.hidden == False)
   return get_condition_db("Bet", cond, session)
 
+def get_user_bets(user, session=None):
+  return get_condition_db("Bet", Bet.user_id == user.id, session)
+
 def get_user_hidden_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == True, Bet.winner == 0, session)
 
 def get_user_unhidden_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == False, session)
+
+def bets_to_name_objs(bets, session=None):
+  return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])
+
+def matches_to_name_objs(matches, session=None):
+  return add_time_name_objs([(shorten_match_name(match), match) for match in matches], session)
+
+def bets_to_names(bets, session=None):
+  return [no[0] for no in add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])]
+
+def matches_to_names(matches, session=None):
+  return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches], session)]
