@@ -49,7 +49,7 @@ async def get_user_from_ctx(ctx, user, session=None):
 
 
 async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
-  
+  have ambig test if t_list is a list of name_objs or objs
   objs = [t[1] for t in t_list if text == t[0]]
   print(objs)
   if len(objs) >= 2:
@@ -84,7 +84,15 @@ def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
 
 
-def filter_names(value, names):
+def filter_names(value, ambig):
+  have ambig test if it is a list of objs or names
+  if len(ambig) == 0:
+    return []
+  if isinstance(ambig[0], str):
+    names = ambig
+  elif isinstance(ambig[0], User):
+    
+  
   value = value.lower()
   value.replace(",", "")
   value_keywords = value.split(" ")
@@ -177,6 +185,12 @@ def get_user_hidden_bets(user, session=None):
 
 def get_user_unhidden_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == False, session)
+
+def get_user_visible_current_bets(user, session=None):
+  return get_condition_db("Bet", Bet.winner == 0 & ((Bet.user_id == user.id) | (Bet.user_id != user.id & Bet.hidden == False)), session)
+
+def get_user_visible_bets(user, session=None):
+  return get_condition_db("Bet", Bet.user_id == user.id | (Bet.user_id != user.id & Bet.hidden == False), session)
 
 def bets_to_name_objs(bets, session=None):
   return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])

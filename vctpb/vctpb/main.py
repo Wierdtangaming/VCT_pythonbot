@@ -26,7 +26,7 @@ from colorinterface import hex_to_tuple, get_color, add_color, remove_color, ren
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_all_bets, get_user_hidden_bets, get_user_unhidden_bets, bets_to_name_objs, matches_to_name_objs, bets_to_names, matches_to_names, get_open_user_bets, shorten_match_name, filter_names
+from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_all_bets, get_user_hidden_bets, get_user_unhidden_bets, bets_to_name_objs, matches_to_name_objs, bets_to_names, matches_to_names, get_open_user_bets, shorten_match_name, filter_names, get_user_visible_bets, get_user_visible_current_bets
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -54,72 +54,7 @@ gid = get_setting("guild_ids")
 
 
 #current is no winner
-#avalible is betting open
-def get_all_available_matches(session=None):
-  return get_condition_db("Match", Match.date_closed == None, session)
-
-def get_all_current_matches(session=None):
-  return get_condition_db("Match", Match.winner == 0, session)
-
-def get_all_closed_matches(session=None):
-  return get_condition_db("Match", Match.winner == 0 & Match.date_closed != None, session)
-
-      
-    
-
-
-def available_matches_name_objs(session=None):
-  if session is None:
-    with Session() as session:
-      return available_matches_name_objs(session)
-  return matches_to_name_objs(get_all_available_matches(session), session)
-
-def current_matches_name_objs(session=None):
-  if session is None:
-    with Session() as session:
-      return current_matches_name_objs(session)
-  return matches_to_name_objs(get_all_current_matches(session), session)
-
-def all_matches_name_objs(session=None):
-  if session is None:
-    with Session() as session:
-      return all_matches_name_objs(session)
-  return matches_to_name_objs(get_all_db("Match", session), session)
-
-
-
-def get_all_current_bets(session=None, show_hidden=True):
-  if show_hidden:
-    cond = (Bet.winner == 0)
-  else:
-    cond = (Bet.winner == 0 & Bet.hidden == False)
-  return get_condition_db("Bet", cond, session)
-
-
-def current_bets_name_objs(session=None, show_hidden=True):
-  if session is None:
-    with Session() as session:
-      return current_bets_name_objs(session, show_hidden)
-  return bets_to_name_objs(get_all_current_bets(session, show_hidden), session)
-
-
-def all_bets_name_objs(session=None, show_hidden=True):
-  if session is None:
-    with Session() as session:
-      return all_bets_name_objs(session, show_hidden)
-  return bets_to_name_objs(get_all_bets(session, show_hidden), session)
-
-def user_current_hidden_bets(user, session=None):
-  if session is None:
-    with Session() as session:
-      return user_current_unhidden_bets(user, session)
-  return bets_to_name_objs(get_user_hidden_bets(user, session), session)
-
-def user_current_unhidden_bets(user, session=None):
-  if session is None:
-    with Session() as session:
-      return user_current_unhidden_bets(user, session)
-  return bets_to_name_objs(get_user_unhidden_bets(user, session), session)
+#open is betting open
 
 def get_users_from_multiuser(compare, session=None):
   usernames_split = compare.split(" ")
@@ -776,29 +711,10 @@ async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
 #bet list autocomplete start
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    text = ctx.value.lower()
-    bet_t_list = current_bets_name_objs(session)
-    auto_completes = [bet_t[0] for bet_t in bet_t_list if text in bet_t[0].lower()]
+    lower_value = ctx.value.lower()
+    auto_completes = filter_names(lower_value, get_user_visible_current_bets(ctx.user, session))
     if auto_completes == []:
-      text.replace(",", "")
-      text.replace(":", "")
-      text_keywords = text.split(" ")
-      all_bet_t_list = all_bets_name_objs(session)
-      all_bet_t_list.reverse()
-      if len(text_keywords) == 0:
-        return []
-      for bet_t in all_bet_t_list:
-        bet_detail = bet_t[0].lower()
-        all_in = True
-        for text_keyword in text_keywords:
-          if text_keyword not in bet_detail:
-            all_in = False
-            break
-        if all_in:
-          auto_completes.append(bet_t[0])
-          if len(auto_completes) == 25:
-            break
-          
+      auto_completes = filter_names(lower_value, get_user_visible_bets(ctx.user, session))
     return auto_completes
 #bet list autocomplete end
  
@@ -806,19 +722,19 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #user bet list autocomplete start
 async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    return filter_names(ctx.value, bets_to_names(get_open_user_bets(ctx.interaction.user, session), session))
+    return filter_names(ctx.value, get_open_user_bets(ctx.interaction.user, session, session))
 #user bet list autocomplete end
 
 #user hidden bet list autocomplete start
 async def user_hidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    return bets_to_names(get_user_hidden_bets(ctx.interaction.user, session), session)
+    return filter_names(ctx.value, get_user_hidden_bets(ctx.interaction.user, session, session))
 #user hidden bet list autocomplete end
 
 #user unhidden bet list autocomplete start
 async def user_unhidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    return bets_to_names(get_user_unhidden_bets(ctx.interaction.user, session), session)
+    return filter_names(ctx.value, get_user_unhidden_bets(ctx.interaction.user, session, session))
 #user unhidden bet list autocomplete end
 
 #bet create start
@@ -853,7 +769,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 @betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_open_bet_list_autocomplete)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, bets_to_name_objs(get_active_user_bets(ctx.interaction.user, session), session), bet, "Bet", session)) is None: return
+    if (bet := await user_from_autocomplete_tuple(ctx, bets_to_name_objs(get_open_user_bets(ctx.interaction.user, session), session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
@@ -873,7 +789,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 @betscg.command(name = "edit", description = "Edit a bet.")
 async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_objs(session), bet, "Bet", session)) is None: return
+    if (bet := await user_from_autocomplete_tuple(ctx, bets_to_name_objs(get_open_user_bets(ctx.interaction.user, session), session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
