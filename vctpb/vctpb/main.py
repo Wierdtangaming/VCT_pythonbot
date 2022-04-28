@@ -26,7 +26,7 @@ from colorinterface import hex_to_tuple, get_color, add_color, remove_color, ren
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_all_bets_hidden, get_user_hidden_bets, get_user_unhidden_bets, bets_to_name_objs, matches_to_name_objs, bets_to_names, matches_to_names, get_user_bets, shorten_match_name
+from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_all_bets, get_user_hidden_bets, get_user_unhidden_bets, bets_to_name_objs, matches_to_name_objs, bets_to_names, matches_to_names, get_open_user_bets, shorten_match_name, filter_names
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -107,7 +107,7 @@ def all_bets_name_objs(session=None, show_hidden=True):
   if session is None:
     with Session() as session:
       return all_bets_name_objs(session, show_hidden)
-  return bets_to_name_objs(get_all_bets_hidden(session, show_hidden), session)
+  return bets_to_name_objs(get_all_bets(session, show_hidden), session)
 
 def user_current_hidden_bets(user, session=None):
   if session is None:
@@ -769,8 +769,9 @@ class BetEditModal(Modal):
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    return [shorten_match_name(match) for match in user.open_matches(session)]
+    return filter_names(ctx.value, [shorten_match_name(match) for match in user.open_matches(session)])
 #new match list autocomplete end
+
 
 #bet list autocomplete start
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
@@ -803,9 +804,9 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
  
   
 #user bet list autocomplete start
-async def user_bet_list_autocomplete(ctx: discord.AutocompleteContext):
+async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    return bets_to_names(get_user_bets(ctx.interaction.user, session), session)
+    return filter_names(ctx.value, bets_to_names(get_open_user_bets(ctx.interaction.user, session), session))
 #user bet list autocomplete end
 
 #user hidden bet list autocomplete start
@@ -828,7 +829,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     if user is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
     
-    if (match := await user_from_autocomplete_tuple(ctx, available_matches_name_objs(session), match, "Match", session)) is None: return
+    if (match := await user_from_autocomplete_tuple(ctx, [shorten_match_name(match) for match in user.open_matches(session)], match, "Match", session)) is None: return
       
     if match.date_closed is not None:
       await ctx.respond("Betting has closed.", ephemeral=True)
@@ -850,9 +851,9 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 
 #bet cancel start
 @betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
-async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_bet_list_autocomplete)):
+async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_open_bet_list_autocomplete)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, bets_to_name_objs(get_user_bets(ctx.interaction.user, session), session), bet, "Bet", session)) is None: return
+    if (bet := await user_from_autocomplete_tuple(ctx, bets_to_name_objs(get_active_user_bets(ctx.interaction.user, session), session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
@@ -870,7 +871,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
-async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_bet_list_autocomplete)):
+async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete)):
   with Session.begin() as session:
     if (bet := await user_from_autocomplete_tuple(ctx, current_bets_name_objs(session), bet, "Bet", session)) is None: return
     
@@ -1358,10 +1359,9 @@ matchscg = SlashCommandGroup(
 #match create modal start
 class MatchCreateModal(Modal):
   
-  def __init__(self, session, hidden, balance_odds=0, *args, **kwargs) -> None:
+  def __init__(self, session, balance_odds=0, *args, **kwargs) -> None:
     
     super().__init__(*args, **kwargs)
-    self.hidden = hidden
     self.balance_odds = balance_odds
     leaderboard, odds_source = get_current_tournament_odds(session)
     self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))

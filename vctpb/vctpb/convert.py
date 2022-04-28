@@ -84,6 +84,27 @@ def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
 
 
+def filter_names(value, names):
+  value = value.lower()
+  value.replace(",", "")
+  value_keywords = value.split(" ")
+  if len(value_keywords) == 0:
+    return [names]
+  new_names = []
+  for name in names:
+    lower_name = name.lower()
+    all_in = True
+    for value_keyword in value_keywords:
+      if value_keyword not in lower_name:
+        all_in = False
+        break
+    if all_in:
+      new_names.append(name)
+      if len(new_names) == 25:
+        break
+  return new_names
+
+
 def add_time_name_objs(name_objs):
   new_name_objs = []
   names = [name for name, _ in name_objs]
@@ -135,15 +156,21 @@ def shorten_bet_name(bet, session=None):
   return s
 
 
-def get_all_bets_hidden(session=None, show_hidden=False):
+def get_all_bets(session=None, show_hidden=False):
   if show_hidden:
     cond = (Bet.winner == 0)
   else:
     cond = (Bet.winner == 0 & Bet.hidden == False)
   return get_condition_db("Bet", cond, session)
 
-def get_user_bets(user, session=None):
+def get_all_user_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id, session)
+
+def get_open_user_bets(user, session=None):
+  if session is None:
+    with Session() as session:
+      return get_open_user_bets(user, session)
+  return [bet for bet in get_condition_db("Bet", Bet.user_id == user.id, session) if bet.match.date_closed is None]
 
 def get_user_hidden_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == True, Bet.winner == 0, session)
@@ -155,10 +182,10 @@ def bets_to_name_objs(bets, session=None):
   return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])
 
 def matches_to_name_objs(matches, session=None):
-  return add_time_name_objs([(shorten_match_name(match), match) for match in matches], session)
+  return add_time_name_objs([(shorten_match_name(match), match) for match in matches])
 
 def bets_to_names(bets, session=None):
   return [no[0] for no in add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])]
 
 def matches_to_names(matches, session=None):
-  return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches], session)]
+  return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches])]
