@@ -20,6 +20,28 @@ def ambig_to_obj(ambig, prefix, session=None):
     print(ambig, type(ambig))
   return obj
 
+def t_list_ambig_to_name_objs(ambig, session=None):
+  if len(ambig) == 0:
+    return []
+  elif isinstance(ambig[0], Bet):
+    return bets_to_name_objs(ambig, session)
+  elif isinstance(ambig[0], Match):
+    return matches_to_name_objs(ambig)
+  elif isinstance(ambig[0], tuple):
+    return ambig
+
+def names_ambig_to_names(ambig, session=None):
+  if len(ambig) == 0:
+    return []
+  elif isinstance(ambig[0], str):
+    return ambig
+  elif isinstance(ambig[0], Bet):
+    return bets_to_names(ambig, session)
+  elif isinstance(ambig[0], Match):
+    return matches_to_names(ambig)
+  elif isinstance(ambig[0], tuple):
+    return [a[0] for a in ambig]
+
 def get_user_from_at(id, session=None):
   uid = id.replace("<", "")
   uid = uid.replace(">", "")
@@ -48,8 +70,18 @@ async def get_user_from_ctx(ctx, user, session=None):
   return user
 
 
-async def user_from_autocomplete_tuple(ctx, t_list, text, prefix, session=None):
-  have ambig test if t_list is a list of name_objs or objs
+async def user_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None):
+  if len(ambig) == 0:
+    if ctx is not None:
+      if prefix == "Matches":
+        plural = "matches"
+      else:
+        plural = prefix + "s"
+      await ctx.respond(f"no {plural} found.", ephemeral = True)
+    return None
+  else:
+    t_list = t_list_ambig_to_name_objs(ambig, session)
+    
   objs = [t[1] for t in t_list if text == t[0]]
   print(objs)
   if len(objs) >= 2:
@@ -84,13 +116,11 @@ def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
 
 
-def filter_names(value, ambig):
-  have ambig test if it is a list of objs or names
+def filter_names(value, ambig, session=None):
   if len(ambig) == 0:
     return []
-  if isinstance(ambig[0], str):
-    names = ambig
-  elif isinstance(ambig[0], User):
+  else:
+    names = names_ambig_to_names(ambig, session)
     
   
   value = value.lower()
@@ -164,13 +194,6 @@ def shorten_bet_name(bet, session=None):
   return s
 
 
-def get_all_bets(session=None, show_hidden=False):
-  if show_hidden:
-    cond = (Bet.winner == 0)
-  else:
-    cond = (Bet.winner == 0 & Bet.hidden == False)
-  return get_condition_db("Bet", cond, session)
-
 def get_all_user_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user.id, session)
 
@@ -180,11 +203,8 @@ def get_open_user_bets(user, session=None):
       return get_open_user_bets(user, session)
   return [bet for bet in get_condition_db("Bet", Bet.user_id == user.id, session) if bet.match.date_closed is None]
 
-def get_user_hidden_bets(user, session=None):
-  return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == True, Bet.winner == 0, session)
-
-def get_user_unhidden_bets(user, session=None):
-  return get_condition_db("Bet", Bet.user_id == user.id & Bet.hidden == False, session)
+def get_current_visible_bets(session=None):
+  return get_condition_db("Bet", Bet.winner == 0 & Bet.hidden == False, session)
 
 def get_user_visible_current_bets(user, session=None):
   return get_condition_db("Bet", Bet.winner == 0 & ((Bet.user_id == user.id) | (Bet.user_id != user.id & Bet.hidden == False)), session)
@@ -195,11 +215,20 @@ def get_user_visible_bets(user, session=None):
 def bets_to_name_objs(bets, session=None):
   return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])
 
-def matches_to_name_objs(matches, session=None):
+def matches_to_name_objs(matches):
   return add_time_name_objs([(shorten_match_name(match), match) for match in matches])
 
 def bets_to_names(bets, session=None):
   return [no[0] for no in add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])]
 
-def matches_to_names(matches, session=None):
+def matches_to_names(matches):
   return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches])]
+
+def get_current_matches(session=None):
+  return get_condition_db("Match", Match.winner == 0, session)
+
+def get_open_matches(session=None):
+  return get_condition_db("Match", Match.date_closed is None, session)
+
+def get_closed_matches(session=None):
+  return get_condition_db("Match", Match.winner == 0 & (Match.date_closed is not None), session)
