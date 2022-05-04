@@ -713,9 +713,9 @@ async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
 async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     lower_value = ctx.value.lower()
-    auto_completes = filter_names(lower_value, get_user_visible_current_bets(ctx.user, session), session)
+    auto_completes = filter_names(lower_value, get_user_visible_current_bets(ctx.interaction.user, session), session)
     if auto_completes == []:
-      auto_completes = filter_names(lower_value, get_user_visible_bets(ctx.user, session), session)
+      auto_completes = filter_names(lower_value, get_user_visible_bets(ctx.interaction.user, session), session)
     return auto_completes
 #bet list autocomplete end
  
@@ -730,7 +730,7 @@ async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=1, required=False)):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
     user = get_user_from_id(ctx.author.id, session)
     if user is None:
@@ -799,11 +799,13 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   with Session.begin() as session:
     if (fbet := await user_from_autocomplete_tuple(None, get_user_visible_bets(ctx.user, session), bet, "Bet", session)) is None: 
-      if (fbet := await user_from_autocomplete_tuple(ctx, get_user_visible_current_bets(ctx.user, session), bet, "Bet", session)) is None: return
+      if (fbet := await user_from_autocomplete_tuple(None, get_user_visible_current_bets(ctx.user, session), bet, "Bet", session)) is None: 
+        if (fbet := get_from_db("Bet", bet, session)) is None: return
     bet = fbet
     user = bet.user
     embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
-    inter = await ctx.respond(embed=embedd)
+    
+    inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
     msg = await inter.original_message()
     bet.message_ids.append((msg.id, msg.channel.id))
 #bet find end
@@ -1460,7 +1462,7 @@ async def tournament_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     lower_value = ctx.value.lower()
-    auto_completes = filter_names(lower_value, get_current_matches(ctx.user, session), session)
+    auto_completes = filter_names(lower_value, get_current_matches(ctx.interaction.user, session), session)
     if auto_completes == []:
       auto_completes = filter_names(lower_value, get_all_db("Match", session), session)
     return auto_completes

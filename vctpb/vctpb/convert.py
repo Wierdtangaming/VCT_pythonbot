@@ -77,14 +77,13 @@ async def user_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None):
       if prefix == "Matches":
         plural = "matches"
       else:
-        plural = prefix + "s"
+        plural = prefix.lower() + "s"
       await ctx.respond(f"no {plural} found.", ephemeral = True)
     return None
   else:
     t_list = t_list_ambig_to_name_objs(ambig, session)
     
   objs = [t[1] for t in t_list if text == t[0]]
-  print(objs)
   if len(objs) >= 2:
     print("More than one of text found", objs)
     if ctx is not None:
@@ -221,7 +220,7 @@ def get_current_visible_bets(session=None):
   return get_condition_db("Bet", (Bet.winner == 0) & (Bet.hidden == False), session)
 
 def get_user_visible_current_bets(user, session=None):
-  return get_condition_db("Bet", Bet.winner == 0 & ((Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False))), session)
+  return get_condition_db("Bet",(Bet.winner == 0) & ((Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False))), session)
 
 def get_user_visible_bets(user, session=None):
   return get_condition_db("Bet", (Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False)), session)
