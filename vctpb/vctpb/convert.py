@@ -21,6 +21,7 @@ def ambig_to_obj(ambig, prefix, session=None):
   return obj
 
 def t_list_ambig_to_name_objs(ambig, session=None):
+  print(ambig, type(ambig[0]))
   if len(ambig) == 0:
     return []
   elif isinstance(ambig[0], Bet):
@@ -203,15 +204,6 @@ def get_open_user_bets(user, session=None):
       return get_open_user_bets(user, session)
   return [bet for bet in get_condition_db("Bet", Bet.user_id == user.id, session) if bet.match.date_closed is None]
 
-def get_current_visible_bets(session=None):
-  return get_condition_db("Bet", Bet.winner == 0 & Bet.hidden == False, session)
-
-def get_user_visible_current_bets(user, session=None):
-  return get_condition_db("Bet", Bet.winner == 0 & ((Bet.user_id == user.id) | (Bet.user_id != user.id & Bet.hidden == False)), session)
-
-def get_user_visible_bets(user, session=None):
-  return get_condition_db("Bet", Bet.user_id == user.id | (Bet.user_id != user.id & Bet.hidden == False), session)
-
 def bets_to_name_objs(bets, session=None):
   return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])
 
@@ -224,6 +216,16 @@ def bets_to_names(bets, session=None):
 def matches_to_names(matches):
   return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches])]
 
+
+def get_current_visible_bets(session=None):
+  return get_condition_db("Bet", (Bet.winner == 0) & (Bet.hidden == False), session)
+
+def get_user_visible_current_bets(user, session=None):
+  return get_condition_db("Bet", Bet.winner == 0 & ((Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False))), session)
+
+def get_user_visible_bets(user, session=None):
+  return get_condition_db("Bet", (Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False)), session)
+
 def get_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)
 
@@ -231,4 +233,4 @@ def get_open_matches(session=None):
   return get_condition_db("Match", Match.date_closed is None, session)
 
 def get_closed_matches(session=None):
-  return get_condition_db("Match", Match.winner == 0 & (Match.date_closed is not None), session)
+  return get_condition_db("Match", (Match.winner == 0) & (Match.date_closed is not None), session)
