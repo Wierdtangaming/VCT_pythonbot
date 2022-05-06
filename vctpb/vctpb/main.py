@@ -732,7 +732,7 @@ async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 @betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, session)) is None:
+    if (user := await get_user_from_ctx(ctx, session=session)) is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
     
     if (match := await user_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session)) is None: return
@@ -815,19 +815,21 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
   with Session.begin() as session:
     bets = get_current_visible_bets(session)
-    show_hidden = show_hidden == 1
-    if len(bets) == 0:
+    if show_hidden == 1:
+      if (user := await get_user_from_ctx(ctx, session=session)) is not None:
+        hidden_bets = get_user_hidden_current_bets(user, session)
+          
+    if len(bets) == 0 and len(hidden_bets) == 0:
       await ctx.respond("No undecided bets.", ephemeral=True)
       return
+    
 
     if type == 0:
       #short
-      await ctx.respond(embed=create_bet_list_embedded("Bets:", bets, session))
-      
-      if show_hidden:
-        if (user := await get_user_from_ctx(ctx, session)) is not None:
-          bets = get_user_hidden_current_bets(user, session)
-          await ctx.respond(embed=create_bet_list_embedded("Your Hidden Bets:", bets, session), ephemeral=True)
+      if (embedd := create_bet_list_embedded("Bets:", bets, session)) is not None:
+        await ctx.respond(embed=embedd)
+      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, session)) is not None:
+        await ctx.respond(embed=hidden_embedd, ephemeral=True)
           
     
     elif type == 1:
@@ -842,9 +844,8 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
           msg = await ctx.interaction.followup.send(embed=embedd)
         bet.message_ids.append((msg.id, msg.channel.id))
         
-      if show_hidden:
-        bets = get_user_hidden_current_bets(user, session)
-        for i, bet in enumerate(bets):
+      if hidden_bets is not None:
+        for i, bet in enumerate(hidden_bets):
           user = bet.user
           embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
           if i == 0:

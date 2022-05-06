@@ -91,6 +91,8 @@ def create_bet_list_embedded(embed_title, bets_ambig, session=None):
   if session is None:
     with Session.begin() as session:
       create_bet_list_embedded(embed_title, bets_ambig, session)
+  if bets_ambig is None:
+    return None
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
     bets_ambig = get_mult_from_db("Bet", bets_ambig, session)

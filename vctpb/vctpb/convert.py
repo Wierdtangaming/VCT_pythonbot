@@ -20,8 +20,15 @@ def ambig_to_obj(ambig, prefix, session=None):
     print(ambig, type(ambig))
   return obj
 
+def user_id_ambig(user):
+  if isinstance(user, int):
+    return user
+  elif isinstance(user, User):
+    return user.code
+  elif isinstance(user, discord.Member):
+    return user.id
+
 def t_list_ambig_to_name_objs(ambig, session=None):
-  print(ambig, type(ambig[0]))
   if len(ambig) == 0:
     return []
   elif isinstance(ambig[0], Bet):
@@ -62,7 +69,7 @@ def id_to_metion(id):
 
 
   
-async def get_user_from_ctx(ctx, user, session=None):
+async def get_user_from_ctx(ctx, user=None, session=None):
   if user is None:
     user = ctx.author
   user = get_from_db("User", user.id, session)
@@ -193,15 +200,15 @@ def shorten_bet_name(bet, session=None):
       s = s[:100]
   return s
 
-
 def get_all_user_bets(user, session=None):
-  return get_condition_db("Bet", Bet.user_id == user.id, session)
+  
+  return get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session)
 
 def get_open_user_bets(user, session=None):
   if session is None:
     with Session() as session:
       return get_open_user_bets(user, session)
-  return [bet for bet in get_condition_db("Bet", Bet.user_id == user.id, session) if bet.match.date_closed is None]
+  return [bet for bet in get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session) if bet.match.date_closed is None]
 
 def bets_to_name_objs(bets, session=None):
   return add_time_name_objs([(shorten_bet_name(bet, session), bet) for bet in bets])
@@ -220,13 +227,13 @@ def get_current_visible_bets(session=None):
   return get_condition_db("Bet", (Bet.winner == 0) & (Bet.hidden == False), session)
 
 def get_user_visible_current_bets(user, session=None):
-  return get_condition_db("Bet",(Bet.winner == 0) & ((Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False))), session)
+  return get_condition_db("Bet",(Bet.winner == 0) & ((Bet.user_id == user_id_ambig(user)) | ((Bet.user_id != user_id_ambig(user)) & (Bet.hidden == False))), session)
 
 def get_user_visible_bets(user, session=None):
-  return get_condition_db("Bet", (Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == False)), session)
+  return get_condition_db("Bet", (Bet.user_id == user_id_ambig(user)) | ((Bet.user_id != user_id_ambig(user)) & (Bet.hidden == False)), session)
 
 def get_user_hidden_current_bets(user, session=None):
-  return get_condition_db("Bet", (Bet.user_id == user.id) | ((Bet.user_id != user.id) & (Bet.hidden == True)), session)
+  return get_condition_db("Bet", (Bet.user_id == user_id_ambig(user)) | ((Bet.user_id != user_id_ambig(user)) & (Bet.hidden == True)), session)
 
 def get_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)
