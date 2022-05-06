@@ -201,6 +201,14 @@ class User():
         return rrange
     return None
 
+  def get_bet_on_match(self, match, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.has_bet_on_match(match, session)
+    for bet in self.active_bets:
+      if bet.match_code == match.code:
+        return bet
+
   def get_to_reset_range(self, index):
     return range(index, self.get_reset_range(index).stop)
 

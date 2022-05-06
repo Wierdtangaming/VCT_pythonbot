@@ -26,7 +26,7 @@ from colorinterface import hex_to_tuple, get_color, add_color, remove_color, ren
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_open_user_bets, shorten_match_name, filter_names, get_user_visible_bets, get_user_visible_current_bets, get_current_visible_bets, get_open_matches, get_current_matches, get_closed_matches
+from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_open_user_bets, shorten_match_name, filter_names, get_user_visible_bets, get_user_visible_current_bets, get_current_visible_bets, get_open_matches, get_current_matches, get_closed_matches, get_user_hidden_current_bets
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -732,8 +732,7 @@ async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 @betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
-    user = get_user_from_id(ctx.author.id, session)
-    if user is None:
+    if (user := await get_user_from_ctx(ctx, session)) is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
     
     if (match := await user_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session)) is None: return
@@ -813,20 +812,23 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 
 #bet list start
 @betscg.command(name = "list", description = "Sends embed with all undecided bets. If type is full it sends the whole embed of each bet.")
-async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False)):
+async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
   with Session.begin() as session:
     bets = get_current_visible_bets(session)
+    show_hidden = show_hidden == 1
     if len(bets) == 0:
       await ctx.respond("No undecided bets.", ephemeral=True)
       return
 
     if type == 0:
       #short
-      embedd = create_bet_list_embedded("Bets:", bets, session)
-      if embedd is None:
-        await ctx.respond("No undecided bets.", ephemeral=True)
-      else:
-        await ctx.respond(embed=embedd)
+      await ctx.respond(embed=create_bet_list_embedded("Bets:", bets, session))
+      
+      if show_hidden:
+        if (user := await get_user_from_ctx(ctx, session)) is not None:
+          bets = get_user_hidden_current_bets(user, session)
+          await ctx.respond(embed=create_bet_list_embedded("Your Hidden Bets:", bets, session), ephemeral=True)
+          
     
     elif type == 1:
       #full
@@ -839,6 +841,17 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
         else:
           msg = await ctx.interaction.followup.send(embed=embedd)
         bet.message_ids.append((msg.id, msg.channel.id))
+        
+      if show_hidden:
+        bets = get_user_hidden_current_bets(user, session)
+        for i, bet in enumerate(bets):
+          user = bet.user
+          embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          if i == 0:
+            inter = await ctx.respond(embed=embedd, ephemeral=True)
+            msg = await inter.original_message()
+          else:
+            msg = await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
 #bet list end
 
 bot.add_application_command(betscg)
