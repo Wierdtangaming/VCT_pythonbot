@@ -233,7 +233,7 @@ def get_user_visible_bets(user, session=None):
   return get_condition_db("Bet", (Bet.user_id == user_id_ambig(user)) | ((Bet.user_id != user_id_ambig(user)) & (Bet.hidden == False)), session)
 
 def get_user_hidden_current_bets(user, session=None):
-  return get_condition_db("Bet", (Bet.user_id == user_id_ambig(user)) | ((Bet.user_id != user_id_ambig(user)) & (Bet.hidden == True)), session)
+  return get_condition_db("Bet", (Bet.user_id == user_id_ambig(user)) & (Bet.hidden == True), session)
 
 def get_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)

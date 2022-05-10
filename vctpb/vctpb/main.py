@@ -777,7 +777,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
-async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete)):
+async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
     if (bet := await user_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
     
@@ -818,6 +818,8 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_user_hidden_current_bets(user, session)
+    else:
+      hidden_bets = []
           
     if len(bets) == 0 and len(hidden_bets) == 0:
       await ctx.respond("No undecided bets.", ephemeral=True)
