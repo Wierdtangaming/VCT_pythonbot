@@ -27,7 +27,7 @@ import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_open_user_bets, shorten_match_name, filter_names, get_user_visible_bets, get_user_visible_current_bets, get_current_visible_bets, get_open_matches, get_current_matches, get_closed_matches, get_user_hidden_current_bets
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import matplotlib.colors as mcolors
@@ -585,7 +585,10 @@ class BetCreateModal(Modal):
       
       session.flush([bet])
       session.expire(bet)
-      embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+      if bet.hide == 0:  
+        embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+      else:
+        embedd = create_bet_hidden_embedded(bet, f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       if self.hidden:
         inter = await interaction.response.send_message(embed=embedd, ephemeral = True)
       else:
@@ -603,11 +606,12 @@ class BetCreateModal(Modal):
 #bet edit modal start
 class BetEditModal(Modal):
   
-  def __init__(self, match: Match, user: User, bet: Bet, session, *args, **kwargs) -> None:
+  def __init__(self, hide, match: Match, user: User, bet: Bet, session, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
     self.bet = bet
+    self.hide = hide
     
     team_label = f"{match.t1} vs {match.t2}. Odds: {match.t1o} / {match.t2o}"
     if len(team_label) >= 45:
@@ -689,9 +693,15 @@ class BetEditModal(Modal):
       
       bet.amount_bet = int(amount)
       bet.team_num = int(team_num)
+      if self.hide != -1:
+        bet.hide = self.hide
 
       title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
-      embedd = create_bet_embedded(bet, title, session)
+      
+      if bet.hide == 0:
+        embedd = create_bet_embedded(bet, title, session)
+      else:
+        embedd = create_bet_hidden_embedded(bet, f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
@@ -723,7 +733,6 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #user bet list autocomplete start
 async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    print(get_open_user_bets(ctx.interaction.user, session))
     return filter_names(ctx.value, get_open_user_bets(ctx.interaction.user, session), session)
 #user bet list autocomplete end
 
@@ -768,7 +777,10 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
       
     
     user = bet.user
-    embedd = create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.", session)
+    if bet.hide == 0:
+      embedd = create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.", session)
+    else:
+      embedd = create_bet_hidden_embedded(bet, f"Cancelled Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
     await ctx.respond(content="", embed=embedd)
     
     await delete_from_db(bet, bot, session=session)
@@ -777,7 +789,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 
 #bet edit start
 @betscg.command(name = "edit", description = "Edit a bet.")
-async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
+async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=-1, required=False)):
   with Session.begin() as session:
     if (bet := await user_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
     
@@ -788,7 +800,7 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
     
     user = bet.user
 
-    bet_modal = BetEditModal(match, user, bet, session, title="Edit Bet")
+    bet_modal = BetEditModal(hide, match, user, bet, session, title="Edit Bet")
     await ctx.interaction.response.send_modal(bet_modal)
 #bet edit end
 
@@ -802,11 +814,15 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
         if (fbet := get_from_db("Bet", bet, session)) is None: return
     bet = fbet
     user = bet.user
-    embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
-    
-    inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
-    msg = await inter.original_message()
-    bet.message_ids.append((msg.id, msg.channel.id))
+    if bet.user_id == ctx.user.id or bet.hidden == False:
+      embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+      inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
+      if not bet.hidden:
+        msg = await inter.original_message()
+        bet.message_ids.append((msg.id, msg.channel.id))
+    else:
+      embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+      inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
 #bet find end
 
 
