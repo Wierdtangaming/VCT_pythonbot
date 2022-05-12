@@ -125,7 +125,7 @@ def create_bet_embedded(bet_ambig, title, session=None):
   return embed
 
 
-def create_bet_list_embedded(embed_title, bets_ambig, session=None):
+def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None):
   if session is None:
     with Session.begin() as session:
       create_bet_list_embedded(embed_title, bets_ambig, session)
@@ -138,7 +138,10 @@ def create_bet_list_embedded(embed_title, bets_ambig, session=None):
     return None
   bets_ambig.sort(key=lambda x: x.match_id)
   for bet in bets_ambig:
-    embed.add_field(name="\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline=False)
+    if (not bet.hidden) or show_hidden:
+      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team}" + bet.code, value = bet.short_to_string() + "\n", inline=False)
+    else:
+      embed.add_field(name=f"{bet.user.username}'s Bet: {bet.code}", value = bet.short_to_hidden_string() + "\n", inline=False)
   return embed
 
 
