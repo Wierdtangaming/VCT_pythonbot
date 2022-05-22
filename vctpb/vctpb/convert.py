@@ -222,6 +222,8 @@ def bets_to_names(bets, session=None):
 def matches_to_names(matches):
   return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches])]
 
+def get_current_bets(session=None):
+  return get_condition_db("Bet", Bet.winner == 0, session)
 
 def get_current_visible_bets(session=None):
   return get_condition_db("Bet", (Bet.winner == 0) & (Bet.hidden == False), session)

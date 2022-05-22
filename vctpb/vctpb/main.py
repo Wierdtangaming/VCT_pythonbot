@@ -26,7 +26,7 @@ from colorinterface import hex_to_tuple, get_color, add_color, remove_color, ren
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
-from convert import ambig_to_obj, get_user_from_id, get_user_from_ctx, user_from_autocomplete_tuple, usernames_to_users, get_member_from_id, get_open_user_bets, shorten_match_name, filter_names, get_user_visible_bets, get_user_visible_current_bets, get_current_visible_bets, get_open_matches, get_current_matches, get_closed_matches, get_user_hidden_current_bets
+from convert import *
 from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
@@ -715,8 +715,15 @@ class BetEditModal(Modal):
 async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    return filter_names(ctx.value, [shorten_match_name(match) for match in user.open_matches(session)], session)
+    return filter_names(ctx.value.lower(), [shorten_match_name(match) for match in user.open_matches(session)], session)
 #new match list autocomplete end
+
+
+#all bet list autocomplete start
+async def all_bet_list_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    return filter_names(ctx.value.lower(), get_current_bets(session), session)
+#all bet list autocomplete end
 
 
 #bet list autocomplete start
@@ -733,7 +740,7 @@ async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
 #user bet list autocomplete start
 async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
-    return filter_names(ctx.value, get_open_user_bets(ctx.interaction.user, session), session)
+    return filter_names(ctx.value.lower(), get_open_user_bets(ctx.interaction.user, session), session)
 #user bet list autocomplete end
 
 
@@ -826,10 +833,43 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 #bet find end
 
 
+#bet swap hide start
+@betscg.command(name = "swap", description = "Swaps bet between hidden and visible.")
+async def bet_swap(ctx, bet: Option(str, "Bet you want to swap.", autocomplete=all_bet_list_autocomplete)):
+  with Session.begin() as session:
+    if (bet := await user_from_autocomplete_tuple(ctx, get_current_bets(session), bet, "Bet", session)) is None: return
+    
+    match = bet.match
+    if (match is None) or (match.date_closed is not None):
+      await ctx.respond("Match betting has closed, you cannot swap the bet.", ephemeral=True)
+      return
+    
+    user = bet.user
+    if bet.hide == 0:
+      embedd = create_bet_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+      await ctx.respond(embed=embedd, ephemeral=bet.hidden)
+      bet.hide = 1
+    else:
+      embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+      msg = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
+      bet.hide = 0
+      bet.message_ids.append((msg.id, msg.channel.id))
+#bet swap hide end
+
 #bet list start
 @betscg.command(name = "list", description = "Sends embed with all undecided bets. If type is full it sends the whole embed of each bet.")
-async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
+async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False), debug: Option(int, "Show debug info? Defualt is No.", choices = yes_no_choices, default = 0, required = False)):
   with Session.begin() as session:
+    
+    if debug == 1:
+      bets = get_current_bets(session)
+      if (embedd := create_bet_list_embedded("Bets:", bets, session)) is not None:
+        await ctx.respond(embed=embedd)
+      else:
+        await ctx.respond("No bets found.")
+      return
+      
+    
     bets = get_current_visible_bets(session)
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
