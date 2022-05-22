@@ -139,8 +139,17 @@ class Bet():
     
     (team, payout) = self.get_team_and_payout(session)
 
-    return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
+    return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout on Win: {int(math.floor(payout))}"
   
+  def short_to_hidden_string(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.short_to_hidden_string(session)
+      
+    return f"User: {self.user.username}'s Hidden Bet on {self.t1} vs {self.t2}"
+    
+    
+    
   def balance_to_string(self, balances):
 
     (team, winner) = self.get_team_and_winner()

@@ -201,7 +201,6 @@ def shorten_bet_name(bet, session=None):
   return s
 
 def get_all_user_bets(user, session=None):
-  
   return get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session)
 
 def get_open_user_bets(user, session=None):

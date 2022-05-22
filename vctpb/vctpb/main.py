@@ -805,6 +805,10 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
       await ctx.respond("Match betting has closed, you cannot edit the bet.", ephemeral=True)
       return
     
+    if any(bet.user_id == ctx.interaction.user.id for bet in match.bets):
+      await ctx.respond("You have already bet on this match.", ephemeral=True)
+      return
+    
     user = bet.user
 
     bet_modal = BetEditModal(hide, match, user, bet, session, title="Edit Bet")
@@ -860,7 +864,6 @@ async def bet_swap(ctx, bet: Option(str, "Bet you want to swap.", autocomplete=a
 @betscg.command(name = "list", description = "Sends embed with all undecided bets. If type is full it sends the whole embed of each bet.")
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False), debug: Option(int, "Show debug info? Defualt is No.", choices = yes_no_choices, default = 0, required = False)):
   with Session.begin() as session:
-    
     if debug == 1:
       bets = get_current_bets(session)
       if (embedd := create_bet_list_embedded("Bets:", bets, session)) is not None:
@@ -877,16 +880,16 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     else:
       hidden_bets = []
           
-    if len(bets) == 0 and len(hidden_bets) == 0:
+    if len(bets) == 0:
       await ctx.respond("No undecided bets.", ephemeral=True)
       return
     
 
     if type == 0:
       #short
-      if (embedd := create_bet_list_embedded("Bets:", bets, session)) is not None:
+      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
         await ctx.respond(embed=embedd)
-      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, session)) is not None:
+      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
         await ctx.respond(embed=hidden_embedd, ephemeral=True)
           
     
@@ -1594,7 +1597,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
       return
     if type == 0:
       #short
-      embedd = create_bet_list_embedded(f"Bets on Match:", bets, session)
+      embedd = create_bet_list_embedded(f"Bets on Match:", bets, False, session)
       if embedd is None:
         await ctx.respond("No bets on match.", ephemeral=True)
       else:
@@ -1643,8 +1646,8 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
       if bet.hidden == True:
         hidden_bets.append(bet)
         bet.hidden = True
-    await ctx.respond(content=f"{match.t1} vs {match.t2} betting has closed.", embed=create_bet_list_embedded(f"Hidden bets on {match.t1} vs {match.t2}:", hidden_bets, session))
     embedd = create_match_embedded(match, "Placeholder", session)
+    await ctx.respond(content=f"{match.t1} vs {match.t2} betting has closed.", embeds=[create_bet_list_embedded(f"Hidden bets on {match.t1} vs {match.t2}:", hidden_bets, session), embedd])
   await edit_all_messages(match.message_ids, embedd)
 #match close end
 
