@@ -585,10 +585,10 @@ class BetCreateModal(Modal):
       
       session.flush([bet])
       session.expire(bet)
-      if bet.hide == 0:  
+      if bet.hidden:  
         embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
       else:
-        embedd = create_bet_hidden_embedded(bet, f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+        embedd = create_bet_hidden_embedded(bet, f"New Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       if self.hidden:
         inter = await interaction.response.send_message(embed=embedd, ephemeral = True)
       else:
@@ -600,7 +600,6 @@ class BetCreateModal(Modal):
           msg = await channel.send(embed=embedd)
 
         bet.message_ids.append((msg.id, msg.channel.id))
-      #add_to_db(bet, session)
 #bet create modal end
 
 #bet edit modal start
@@ -694,14 +693,14 @@ class BetEditModal(Modal):
       bet.amount_bet = int(amount)
       bet.team_num = int(team_num)
       if self.hide != -1:
-        bet.hide = self.hide
+        bet.hidden = self.hide
 
       title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
       
-      if bet.hide == 0:
+      if bet.hidden == 0:
         embedd = create_bet_embedded(bet, title, session)
       else:
-        embedd = create_bet_hidden_embedded(bet, f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+        embedd = create_bet_hidden_embedded(bet, f"{user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
@@ -784,7 +783,7 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
       
     
     user = bet.user
-    if bet.hide == 0:
+    if bet.hidden == 0:
       embedd = create_bet_embedded(bet, f"Cancelled Bet: {user.username} with {bet.amount_bet} on {bet.get_team()}.", session)
     else:
       embedd = create_bet_hidden_embedded(bet, f"Cancelled Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
@@ -849,14 +848,14 @@ async def bet_swap(ctx, bet: Option(str, "Bet you want to swap.", autocomplete=a
       return
     
     user = bet.user
-    if bet.hide == 0:
+    if bet.hidden == 0:
       embedd = create_bet_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       await ctx.respond(embed=embedd, ephemeral=bet.hidden)
-      bet.hide = 1
+      bet.hidden = 1
     else:
       embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
       msg = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
-      bet.hide = 0
+      bet.hidden = 0
       bet.message_ids.append((msg.id, msg.channel.id))
 #bet swap hide end
 
@@ -873,28 +872,32 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
       return
       
     
-    bets = get_current_visible_bets(session)
+    
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_user_hidden_current_bets(user, session)
     else:
       hidden_bets = []
-          
-    if len(bets) == 0:
-      await ctx.respond("No undecided bets.", ephemeral=True)
-      return
     
 
     if type == 0:
       #short
-      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
+      bets = get_current_bets(session)
+      if len(bets) == 0:
+        await ctx.respond("No undecided bets.", ephemeral=True)
+        return
+      if (embedd := create_bet_list_embedded("Bets:", bets, session)) is not None:
         await ctx.respond(embed=embedd)
-      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
+      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, session)) is not None:
         await ctx.respond(embed=hidden_embedd, ephemeral=True)
           
     
     elif type == 1:
       #full
+      bets = get_current_visible_bets(session)
+      if len(bets) == 0:
+        await ctx.respond("No undecided bets.", ephemeral=True)
+        return
       for i, bet in enumerate(bets):
         user = bet.user
         embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
@@ -1597,7 +1600,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
       return
     if type == 0:
       #short
-      embedd = create_bet_list_embedded(f"Bets on Match:", bets, False, session)
+      embedd = create_bet_list_embedded(f"Bets on Match:", bets, session)
       if embedd is None:
         await ctx.respond("No bets on match.", ephemeral=True)
       else:

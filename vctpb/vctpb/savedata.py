@@ -14,6 +14,7 @@ from savefiles import delete_folder
 BUFSIZE = 1024
 
 def backup_full():
+  print("-----------starting backup-----------")
   save_to_github("backup")
   
 atexit.register(backup_full)
