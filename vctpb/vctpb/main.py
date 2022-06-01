@@ -585,21 +585,22 @@ class BetCreateModal(Modal):
       
       session.flush([bet])
       session.expire(bet)
+      
       if bet.hidden:  
-        embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+        shown_embedd = create_bet_hidden_embedded(bet, f"New Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       else:
-        embedd = create_bet_hidden_embedded(bet, f"New Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+        shown_embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+        
+      if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
+        inter = await interaction.response.send_message(embed=shown_embedd)
+        msg = await inter.original_message()
+      else:
+        await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral=True)
+        msg = await channel.send(embed=shown_embedd)
+        
       if self.hidden:
-        inter = await interaction.response.send_message(embed=embedd, ephemeral = True)
-      else:
-        if (channel := await bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
-          inter = await interaction.response.send_message(embed=embedd)
-          msg = await inter.original_message()
-        else:
-          await interaction.response.send_message(f"Bet created in {channel.mention}.")
-          msg = await channel.send(embed=embedd)
-
-        bet.message_ids.append((msg.id, msg.channel.id))
+        inter = await interaction.followup(embed=create_bet_embedded(bet, f"Your Hidden Bet:, {amount} on {bet.get_team()}.", session), ephemeral = True)
+      bet.message_ids.append((msg.id, msg.channel.id))
 #bet create modal end
 
 #bet edit modal start
@@ -1920,10 +1921,13 @@ bot.add_application_command(matchscg)
 #match end
 
 
-#backup
-@bot.command()
-async def backup_db(ctx):
-  backup()
+#backup start
+@bot.slash_command(name = "backup", description = "Backup the database.")
+async def backup(ctx):
+  backup_full()
+  await ctx.respond("Backup complete.", ephemeral = True)
+#backup end
+
   
 #hidden command
 @bot.command()

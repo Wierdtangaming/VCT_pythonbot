@@ -8,12 +8,12 @@
         "loadNpmCommands":false, // Disables automatic generation of actions for npm commands.
         "reloadButton":"♻️", // Custom reload button text or icon (default ↻). null value enables automatic reload on configuration change
         "commands": [
-            {
-                "name": "Run main python3",
-                "singleInstance": true,
-                "color": "orange",
-                "command": "cd vctpb\npython3 -m poetry run python3 vctpb/main.py"
-            },
+            // {
+            //     "name": "Run main python3",
+            //     "singleInstance": true,
+            //     "color": "orange",
+            //     "command": "cd vctpb\npython3 -m poetry run python3 vctpb/main.py"
+            // },
             {
                 "name": "Run main poetry",
                 "singleInstance": true,
