@@ -4,5 +4,4 @@
 *.db-journal
 settings.ini
 */savedata
-*/settings
 __pycache__/

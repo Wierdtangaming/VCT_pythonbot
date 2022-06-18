@@ -37,11 +37,6 @@ from roleinterface import set_role, unset_role, edit_role, set_role_name
 
 from sqlaobjs import Session
 
-
-if not os.path.isfile("savedata/savedata.db"):
-  print("savedata.db does not exist.\nquitting")
-  atexit.unregister(backup_full)
-  quit()
   
 
 
