@@ -56,6 +56,11 @@ def pull_from_github():
 
 
 def save_to_github(message):
+  
+  if not os.path.exists("savedata"):
+    print("savedata folder does not exist")
+    return
+  
   token = get_setting("github_token")
   #print(f"github: {token}")
   g = Github(token)
