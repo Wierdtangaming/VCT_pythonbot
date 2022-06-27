@@ -70,7 +70,6 @@ def create_bet_hidden_embedded(bet_ambig, title, session=None):
   match = bet.match
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
-  embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
 
   if int(bet.winner) == 0:
     embed.add_field(name="Winner:", value="None", inline=True)
@@ -139,9 +138,9 @@ def create_bet_list_embedded(embed_title, bets_ambig, session=None):
   bets_ambig.sort(key=lambda x: x.match_id)
   for bet in bets_ambig:
     if bet.hidden:
-      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team()}", value = bet.short_to_string() + "\n", inline=False)
-    else:
       embed.add_field(name=f"{bet.user.username}'s Bet on {bet.t1} vs {bet.t2}", value = bet.short_to_hidden_string() + "\n", inline=False)
+    else:
+      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team()}", value = bet.short_to_string() + "\n", inline=False)
   return embed
 
 

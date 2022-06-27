@@ -186,8 +186,6 @@ def create_user(user_id, username, session=None):
   return user
 
 
-
-
 def add_balance_user(user_ambig, change, description, date, session=None):
   if session is None:
     with Session.begin() as session:
@@ -199,9 +197,6 @@ def add_balance_user(user_ambig, change, description, date, session=None):
   user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
   user.balances.sort(key=lambda x: x[2])
   return user
-
-
-  
 
 
 def roundup(x):
@@ -594,7 +589,8 @@ class BetCreateModal(Modal):
         msg = await channel.send(embed=shown_embedd)
         
       if self.hidden:
-        inter = await interaction.followup(embed=create_bet_embedded(bet, f"Your Hidden Bet:, {amount} on {bet.get_team()}.", session), ephemeral = True)
+        embedd = create_bet_embedded(bet, f"Your Hidden Bet:, {amount} on {bet.get_team()}.", session)
+        inter = await interaction.followup.send(embed = embedd, ephemeral = True)
       bet.message_ids.append((msg.id, msg.channel.id))
 #bet create modal end
 
@@ -693,10 +689,10 @@ class BetEditModal(Modal):
 
       title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
       
-      if bet.hidden == 0:
-        embedd = create_bet_embedded(bet, title, session)
-      else:
+      if bet.hidden:
         embedd = create_bet_hidden_embedded(bet, f"{user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+      else:
+        embedd = create_bet_embedded(bet, title, session)
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
@@ -890,29 +886,32 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     
     elif type == 1:
       #full
-      bets = get_current_visible_bets(session)
+      i = 0
+      bets = get_current_bets(session)
       if len(bets) == 0:
         await ctx.respond("No undecided bets.", ephemeral=True)
-        return
-      for i, bet in enumerate(bets):
-        user = bet.user
-        embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
-        if i == 0:
-          inter = await ctx.respond(embed=embedd)
-          msg = await inter.original_message()
-        else:
-          msg = await ctx.interaction.followup.send(embed=embedd)
-        bet.message_ids.append((msg.id, msg.channel.id))
-        
+      else:
+        for i, bet in enumerate(bets):
+          user = bet.user
+          if bet.hidden:
+            embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+          else:
+            embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          if i == 0:
+            inter = await ctx.respond(embed=embedd)
+            msg = await inter.original_message()
+          else:
+            msg = await ctx.interaction.followup.send(embed=embedd)
+          bet.message_ids.append((msg.id, msg.channel.id))
+      print(i)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
           embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
           if i == 0:
-            inter = await ctx.respond(embed=embedd, ephemeral=True)
-            msg = await inter.original_message()
+            await ctx.respond(embed=embedd, ephemeral=True)
           else:
-            msg = await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
+            await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
 #bet list end
 
 bot.add_application_command(betscg)
