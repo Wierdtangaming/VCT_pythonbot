@@ -78,10 +78,10 @@ async def get_user_from_ctx(ctx, user=None, session=None):
   return user
 
 
-async def user_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None):
+async def obj_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None):
   if len(ambig) == 0:
     if ctx is not None:
-      if prefix == "Matches":
+      if prefix == "Match":
         plural = "matches"
       else:
         plural = prefix.lower() + "s"
@@ -94,15 +94,17 @@ async def user_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None):
   if len(objs) >= 2:
     print("More than one of text found", objs)
     if ctx is not None:
-      await ctx.respond(f"Error please @pig. Try typing in code instead.")
+      await ctx.respond(f"2 with same name found please @pig. Try typing in code instead.")
       #2 with the same name
     return None
   if len(objs) == 0:
     obj = get_from_db(prefix, text, session)
   else:
     obj = objs[0]
-    
+  
   if obj == [] or obj is None:
+    if (len(obj) == 8) and obj.isdigit():
+      get_from_db(prefix, obj, session)
     if ctx is not None:
       await ctx.respond(f"{prefix.capitalize()} ID not found.", ephemeral = True)
     return None
@@ -182,10 +184,10 @@ def shorten_match_name(match):
           s = s[:95]
   return s
 
-def shorten_bet_name(bet, session=None):
+def shorten_bet_name(bet, user, session=None):
   if session is None:
     with Session() as session:
-      return shorten_bet_name(bet, session)
+      return shorten_bet_name(bet, user, session)
   if bet.winner != 0:
     prefix = "Paid out: "
     shortened_prefix = "Paid: "
@@ -193,11 +195,34 @@ def shorten_bet_name(bet, session=None):
     prefix = ""
     shortened_prefix = ""
   user = bet.user
-  s = f"{prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
-  if len(s) >= 100:
-    s = f"{shortened_prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
+  
+  if bet.hidden and not (user.code == bet.user_id):
+    s = f"{prefix}{user.username}: bet on {bet.t1} vs {bet.t2}"
     if len(s) >= 100:
-      s = s[:100]
+      s  = f"{shortened_prefix}{user.username}: bet on {bet.t1} vs {bet.t2}"
+      if len(s) >= 100:
+        s1 = f"{prefix}{user.username}: bet on {bet.t1.split(' ')[0]} vs {bet.t2}"
+        s2 = f"{prefix}{user.username}: bet on {bet.t1} vs {bet.t2.split(' ')[0]}"
+        if s1 > s2:
+          s = s2
+        else:
+          s = s1
+        if len(s) >= 100:
+          s = f"{prefix}{user.username}: bet on {bet.t1.split(' ')[0]} vs {bet.t2.split(' ')[0]}"
+          if len(s) >= 100:
+            s = f"{shortened_prefix}{user.username}: bet on {bet.t1.split(' ')[0]} vs {bet.t2.split(' ')[0]}"
+            if len(s) >= 100:
+              s = s[:100]
+  else:
+    s = f"{prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
+    if len(s) >= 100:
+      s = f"{shortened_prefix}{user.username}: {bet.amount_bet} on {bet.get_team()}"
+      if len(s) >= 100:
+        s = f"{prefix}{user.username}: {bet.amount_bet} on {bet.get_team().split(' ')[0]}"
+        if len(s) >= 100:
+          s = f"{shortened_prefix}{user.username}: {bet.amount_bet} on {bet.get_team().split(' ')[0]}"
+          if len(s) >= 100:
+            s = s[:100]
   return s
 
 def get_all_user_bets(user, session=None):

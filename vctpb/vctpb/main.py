@@ -742,7 +742,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     if (user := await get_user_from_ctx(ctx, session=session)) is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
     
-    if (match := await user_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session)) is None: return
       
     if match.date_closed is not None:
       await ctx.respond("Betting has closed.", ephemeral=True)
@@ -766,7 +766,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
 @betscg.command(name = "cancel", description = "Cancels a bet if betting is open on the match.")
 async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomplete=user_open_bet_list_autocomplete)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
+    if (bet := await obj_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
@@ -789,15 +789,11 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
 @betscg.command(name = "edit", description = "Edit a bet.")
 async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=user_open_bet_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=-1, required=False)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
+    if (bet := await obj_from_autocomplete_tuple(ctx, get_open_user_bets(ctx.interaction.user, session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
       await ctx.respond("Match betting has closed, you cannot edit the bet.", ephemeral=True)
-      return
-    
-    if any(bet.user_id == ctx.interaction.user.id for bet in match.bets):
-      await ctx.respond("You have already bet on this match.", ephemeral=True)
       return
     
     user = bet.user
@@ -811,8 +807,8 @@ async def bet_edit(ctx, bet: Option(str, "Bet you want to edit.", autocomplete=u
 @betscg.command(name = "find", description = "Sends the embed of the bet.")
 async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=bet_list_autocomplete)):
   with Session.begin() as session:
-    if (fbet := await user_from_autocomplete_tuple(None, get_user_visible_bets(ctx.user, session), bet, "Bet", session)) is None: 
-      if (fbet := await user_from_autocomplete_tuple(None, get_user_visible_current_bets(ctx.user, session), bet, "Bet", session)) is None: 
+    if (fbet := await obj_from_autocomplete_tuple(None, get_user_visible_current_bets(ctx.user, session), bet, "Bet", session)) is None: 
+      if (fbet := await obj_from_autocomplete_tuple(None, get_user_visible_bets(ctx.user, session), bet, "Bet", session)) is None: 
         if (fbet := get_from_db("Bet", bet, session)) is None: return
     bet = fbet
     user = bet.user
@@ -832,7 +828,7 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
 @betscg.command(name = "swap", description = "Swaps bet between hidden and visible.")
 async def bet_swap(ctx, bet: Option(str, "Bet you want to swap.", autocomplete=all_bet_list_autocomplete)):
   with Session.begin() as session:
-    if (bet := await user_from_autocomplete_tuple(ctx, get_current_bets(session), bet, "Bet", session)) is None: return
+    if (bet := await obj_from_autocomplete_tuple(ctx, get_current_bets(session), bet, "Bet", session)) is None: return
     
     match = bet.match
     if (match is None) or (match.date_closed is not None):
@@ -1561,7 +1557,7 @@ async def match_close_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
   if(match := ctx.options["match"]) is None: return []
   with Session() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_current_matches(), match, "Match", session)) is None: return []
+    if (match := await obj_from_autocomplete_tuple(ctx, get_current_matches(), match, "Match", session)) is None: return []
     return [match.t1, match.t2]
 #match match team autocomplete end
 
@@ -1570,7 +1566,7 @@ async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
 async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext):
   if(match := ctx.options["match"]) is None: return []
   with Session() as session:
-    if (match := await user_from_autocomplete_tuple(None, get_all_db("Match", session), match, "Match", session)) is None: return []
+    if (match := await obj_from_autocomplete_tuple(None, get_all_db("Match", session), match, "Match", session)) is None: return []
     
     strin = "None"
     if match.t1 == "None" or match.t2 == "None":
@@ -1583,8 +1579,8 @@ async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext)
 @matchscg.command(name = "bets", description = "What bets.")
 async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomplete=match_list_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
   with Session.begin() as session:
-    if (fmatch := await user_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
-      if (fmatch := await user_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
+    if (fmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
+      if (fmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     match = fmatch
     
     all_bets = match.bets
@@ -1619,7 +1615,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
 @matchscg.command(name = "open", description = "Open a match.")
 async def match_open(ctx, match: Option(str, "Match you want to open.", autocomplete=match_close_list_autocomplete)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_closed_matches(session), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, get_closed_matches(session), match, "Match", session)) is None: return
     if match.date_closed == None:
       await ctx.respond(f"Match {match.t1} vs {match.t2} is already open.", ephemeral=True)
       return
@@ -1634,7 +1630,7 @@ async def match_open(ctx, match: Option(str, "Match you want to open.", autocomp
 @matchscg.command(name = "close", description = "Close a match.")
 async def match_close(ctx, match: Option(str, "Match you want to close.", autocomplete=match_open_list_autocomplete)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_open_matches(session), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, get_open_matches(session), match, "Match", session)) is None: return
     if match.date_closed != None:
       await ctx.respond(f"Match {match.t1} vs {match.t2} is already closed.", ephemeral=True)
       return
@@ -1654,7 +1650,7 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
 #@matchscg.command(name = "betting", description = "Open and close betting.")
 #async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
 #  with Session.begin() as session:
-#    if (match := await user_from_autocomplete_tuple(ctx, current_matches_name_objs(session), match, "Match", session)) is None: return
+#    if (match := await obj_from_autocomplete_tuple(ctx, current_matches_name_objs(session), match, "Match", session)) is None: return
 #
 #    #if already on dont do anything complex
 #      
@@ -1682,7 +1678,7 @@ async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt
 @matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
 async def match_delete(ctx, match: Option(str, "Match you want to delete.", autocomplete=match_current_list_autocomplete)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_current_matches()(session), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, get_current_matches()(session), match, "Match", session)) is None: return
     if match.winner != 0:
       await ctx.respond(f"Match winner has already been decided, you cannot delete the match.", ephemeral = True)
       return
@@ -1698,8 +1694,8 @@ async def match_delete(ctx, match: Option(str, "Match you want to delete.", auto
 @matchscg.command(name = "find", description = "Sends the embed of the match.")
 async def match_find(ctx, match: Option(str, "Match you want embed of.", autocomplete=match_list_autocomplete)):
   with Session.begin() as session:
-    if (fmatch := await user_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
-      if (fmatch := await user_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
+    if (fmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
+      if (fmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     match = fmatch
     embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
     inter = await ctx.respond(embed=embedd)
@@ -1713,8 +1709,8 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 @matchscg.command(name = "edit", description = "Edit a match.")
 async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False), force: Option(int, "Force changes even if match already has winner.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
-    if (fmatch := await user_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
-      if (fmatch := await user_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
+    if (fmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
+      if (fmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     match = fmatch
     if not(match.date_closed is None or force == 0):
       await ctx.respond(f"Match must have betting open.", ephemeral = True)
@@ -1758,7 +1754,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 @matchscg.command(name = "winner", description = "Set winner of match.")
 async def match_winner(ctx, match: Option(str, "Match you want to set winner of.", autocomplete=match_current_list_autocomplete), team: Option(str, "Team to set to winner.", autocomplete=match_team_list_autocomplete)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_current_matches(), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, get_current_matches(), match, "Match", session)) is None: return
     team.strip()
     if (team == "1") or (team == match.t1):
       team = 1
@@ -1839,7 +1835,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
 @matchscg.command(name = "reset", description = "Change winner or go back to no winner.")
 async def match_winner(ctx, match: Option(str, "Match you want to reset winner of."), team: Option(str, "Team to set to winner.", autocomplete=match_reset_winner_list_autocomplete), new_date: Option(int, "Do you want to reset the winner set date?", choices = yes_no_choices)):
   with Session.begin() as session:
-    if (match := await user_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
+    if (match := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     new_date = new_date == 1
     
     team.strip()
