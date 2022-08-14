@@ -708,10 +708,10 @@ class BetEditModal(Modal):
 
   
 #new match list autocomplete start
-async def new_match_list_autocomplete(ctx: discord.AutocompleteContext):
+async def new_match_list_odds_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    return filter_names(ctx.value.lower(), [shorten_match_name(match) for match in user.open_matches(session)], session)
+    return filter_names(ctx.value.lower(), user.open_matches(session), session, naming_type=2)
 #new match list autocomplete end
 
 
@@ -756,12 +756,12 @@ async def users_hidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
-async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
+async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_odds_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, session=session)) is None:
       user = create_user(ctx.author.id, ctx.author.display_name, session)
     
-    if (nmatch := await obj_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session)) is None:
+    if (nmatch := await obj_from_autocomplete_tuple(ctx, user.open_matches(session), match, "Match", session, naming_type=2)) is None:
       await ctx.respond(f'Match "{match}" not found.', ephemeral = True)
       return
     match = nmatch

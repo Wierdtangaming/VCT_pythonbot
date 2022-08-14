@@ -28,17 +28,17 @@ def user_id_ambig(user):
   elif isinstance(user, discord.Member):
     return user.id
 
-def t_list_ambig_to_name_objs(ambig, session=None, user=None):
+def t_list_ambig_to_name_objs(ambig, session=None, user=None, naming_type=1):
   if len(ambig) == 0:
     return []
   elif isinstance(ambig[0], Bet):
     return bets_to_name_objs(ambig, session, user)
   elif isinstance(ambig[0], Match):
-    return matches_to_name_objs(ambig)
+    return matches_to_name_objs(ambig, naming_type)
   elif isinstance(ambig[0], tuple):
     return ambig
 
-def names_ambig_to_names(ambig, session=None, user=None):
+def names_ambig_to_names(ambig, session=None, user=None, naming_type=1):
   #gets the autocomplete names from the ambig list
   if len(ambig) == 0:
     return []
@@ -47,7 +47,7 @@ def names_ambig_to_names(ambig, session=None, user=None):
   elif isinstance(ambig[0], Bet):
     return bets_to_names(ambig, session, user)
   elif isinstance(ambig[0], Match):
-    return matches_to_names(ambig)
+    return matches_to_names(ambig, naming_type)
   elif isinstance(ambig[0], tuple):
     return [a[0] for a in ambig]
 
@@ -79,7 +79,7 @@ async def get_user_from_ctx(ctx, user=None, session=None):
   return user
 
 
-async def obj_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None, user=None):
+async def obj_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None, user=None, naming_type=1):
   if len(ambig) == 0:
     if ctx is not None:
       #response when no objs found
@@ -91,7 +91,7 @@ async def obj_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None, us
     return None
   else:
     #if objs found
-    t_list = t_list_ambig_to_name_objs(ambig, session, user)
+    t_list = t_list_ambig_to_name_objs(ambig, session, user, naming_type)
     #t_list is a list of tuples (name, obj)
     
   #if text is equal to name
@@ -133,16 +133,16 @@ def usernames_to_users(usernames, session=None):
   return get_condition_db("User", literal(usernames).contains(User.username), session)
 
 
-def filter_names(value, ambig, session=None, user=None):
+def filter_names(value, ambig, session=None, user=None, naming_type=1):
   if session is None:
     with Session() as session:
-      return filter_names(value, ambig, session, user)
+      return filter_names(value, ambig, session, user, naming_type)
     
   if len(ambig) == 0:
     return []
   else:
     #get all names from objs (ambig)
-    names = names_ambig_to_names(ambig, session, user)
+    names = names_ambig_to_names(ambig, session, user, naming_type)
     
   
   value = value.lower()
@@ -176,7 +176,7 @@ def add_time_name_objs(name_objs):
   return new_name_objs
 
 
-def shorten_match_name(match):
+def shorten_match_name(match, naming_type=1):
   if match.winner != 0:
     prefix = "Concluded: "
     shortened_prefix = "Con: "
@@ -184,17 +184,28 @@ def shorten_match_name(match):
     prefix = ""
     shortened_prefix = ""
   
-  
-  s = f"{prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
-  if len(s) >= 95:
-    s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
+  if naming_type == 1:
+    s = f"{prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
     if len(s) >= 95:
-      s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
+      s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.tournament_name}"
       if len(s) >= 95:
-        tsplit = match.tournament_name.split(" ")[0]
-        s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
+        s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
         if len(s) >= 95:
-          s = s[:95]
+          tsplit = match.tournament_name.split(" ")[0]
+          s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
+          if len(s) >= 95:
+            s = s[:95]
+  elif naming_type == 2:
+    s = f"{prefix}{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}, {match.tournament_name}"
+    if len(s) >= 95:
+      s = f"{shortened_prefix}{match.t1} vs {match.t2}, {match.t1o} / {match.t2o}, {match.tournament_name}"
+      if len(s) >= 95:
+        s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.t1o} / {match.t2o}, {match.tournament_name}"
+        if len(s) >= 95:
+          tsplit = match.tournament_name.split(" ")[0]
+          s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.t1o} / {match.t2o}, {tsplit}"
+          if len(s) >= 95:
+            s = s[:95]
   return s
 
 def shorten_bet_name(bet, user_id, session=None):
@@ -253,15 +264,15 @@ def bets_to_name_objs(bets, session=None, user=None):
   user_id = user_id_ambig(user)
   return add_time_name_objs([(shorten_bet_name(bet, user_id, session), bet) for bet in bets])
 
-def matches_to_name_objs(matches):
-  return add_time_name_objs([(shorten_match_name(match), match) for match in matches])
+def matches_to_name_objs(matches, naming_type=1):
+  return add_time_name_objs([(shorten_match_name(match, naming_type), match) for match in matches])
 
 def bets_to_names(bets, session=None, user=None):
   user_id = user_id_ambig(user)
   return [no[0] for no in add_time_name_objs([(shorten_bet_name(bet, user_id, session), bet) for bet in bets])]
 
-def matches_to_names(matches):
-  return [no[0] for no in add_time_name_objs([(shorten_match_name(match), match) for match in matches])]
+def matches_to_names(matches, naming_type):
+  return [no[0] for no in add_time_name_objs([(shorten_match_name(match, naming_type), match) for match in matches])]
 
 def get_current_bets(session=None):
   return get_condition_db("Bet", Bet.winner == 0, session)
