@@ -11,6 +11,10 @@ from sqlaobjs import Session
 
 
 def create_match_embedded(match_ambig, title, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return create_match_embedded(match_ambig, title, session)
+    
   match = ambig_to_obj(match_ambig, "Match", session)
   if match is None:
     return None
@@ -124,7 +128,7 @@ def create_bet_embedded(bet_ambig, title, session=None):
   return embed
 
 
-def create_bet_list_embedded(embed_title, bets_ambig, session=None):
+def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None):
   if session is None:
     with Session.begin() as session:
       create_bet_list_embedded(embed_title, bets_ambig, session)
@@ -137,7 +141,7 @@ def create_bet_list_embedded(embed_title, bets_ambig, session=None):
     return None
   bets_ambig.sort(key=lambda x: x.match_id)
   for bet in bets_ambig:
-    if bet.hidden:
+    if bet.hidden and (show_hidden == False):
       embed.add_field(name=f"{bet.user.username}'s Bet on {bet.t1} vs {bet.t2}", value = bet.short_to_hidden_string() + "\n", inline=False)
     else:
       embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team()}", value = bet.short_to_string() + "\n", inline=False)
