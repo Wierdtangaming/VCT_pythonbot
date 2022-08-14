@@ -124,6 +124,7 @@ def create_bet_embedded(bet_ambig, title, session=None):
   date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   embed.add_field(name="Created On:", value=date_formatted, inline=True)
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  embed.add_field(name="Visiblity:", value=("Hidden" if bet.hidden else "Shown"), inline=True)
   embed.add_field(name="Identifier:", value=bet.code, inline=False)
   return embed
 
