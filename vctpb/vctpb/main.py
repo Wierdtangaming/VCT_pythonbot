@@ -1658,7 +1658,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     match = nmatch
     
     all_bets = match.bets
-    bets = (bet for bet in all_bets if bet.hidden == False)
+    bets = [bet for bet in all_bets if bet.hidden == False]
     
     if len(bets) == 0:
       await ctx.respond(f"No bets on match {match.t1} vs {match.t2}.", ephemeral = True)
@@ -1889,7 +1889,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
       while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
         user.pay_loan(get_date())
       embedd = create_bet_embedded(bet, "Placeholder", session)
-      msg_ids.append((bet.message_ids, embedd))
+      msg_ids.append((bet, embedd))
       bet_user_payouts.append((bet, user, payout))
 
     new_leader = get_first_place(users)
@@ -1907,10 +1907,9 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
         print("winner_member", member, type(member))
         await edit_role(member, user.username, user.color_hex)
         print("3")
-    
 
   await edit_all_messages(match.message_ids, m_embedd)
-  [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+  [await edit_all_messages(tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
 #match winner end
 
 
