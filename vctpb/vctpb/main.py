@@ -923,15 +923,16 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
 
 #bet list start
 @betscg.command(name = "list", description = "Sends embed with all undecided bets. If type is full it sends the whole embed of each bet.")
-async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False), debug: Option(int, "Show debug info? Defualt is No.", choices = yes_no_choices, default = 0, required = False)):
+async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
   with Session.begin() as session:
-    if debug == 1:
-      bets = get_current_bets(session)
-      if (embedd := create_bet_list_embedded("Bets:", bets, True, session)) is not None:
-        await ctx.respond(embed=embedd)
-      else:
-        await ctx.respond("No bets found.")
-      return
+    #debug: Option(int, "Show debug info? Defualt is No.", choices = yes_no_choices, default = 0, required = False)
+    #if debug == 1:
+    #  bets = get_current_bets(session)
+    #  if (embedd := create_bet_list_embedded("Bets:", bets, True, session)) is not None:
+    #    await ctx.respond(embed=embedd)
+    #  else:
+    #    await ctx.respond("No bets found.")
+    #  return
       
     
     
@@ -1709,7 +1710,6 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
       await ctx.respond(f"Match {match.t1} vs {match.t2} is already closed.", ephemeral=True)
       return
     match.date_closed = get_date()
-    hidden_bets = []
     for bet in match.bets:
       if bet.hidden == True:
         bet.hidden = False
