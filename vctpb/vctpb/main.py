@@ -411,7 +411,7 @@ async def award_list(ctx, user: Option(discord.Member, "User you want to list aw
 
 #award rename start
 @award.command(name = "rename", description = """Renames an award.""")
-async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
+async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete), description: Option(str, "Unique description of why the award is given.")):
   
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, user, session)) is None: return
@@ -942,7 +942,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     else:
       hidden_bets = []
     
-
+    
     if type == 0:
       #short
       bets = get_current_bets(session)
@@ -974,7 +974,6 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
           else:
             msg = await ctx.interaction.followup.send(embed=embedd)
           bet.message_ids.append((msg.id, msg.channel.id))
-      print(i)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
@@ -983,6 +982,9 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
             await ctx.respond(embed=embedd, ephemeral=True)
           else:
             await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
+            
+            
+            
 #bet list end
 
 bot.add_application_command(betscg)
@@ -1652,37 +1654,59 @@ async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext)
 
 #match bets start
 @matchscg.command(name = "bets", description = "What bets.")
-async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomplete=match_list_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
+async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomplete=match_list_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
   with Session.begin() as session:
     if (nmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
       if (nmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     match = nmatch
     
-    all_bets = match.bets
-    bets = [bet for bet in all_bets if bet.hidden == False]
     
-    if len(bets) == 0:
-      await ctx.respond(f"No bets on match {match.t1} vs {match.t2}.", ephemeral = True)
-      return
+    if show_hidden == 1:
+      if (user := await get_user_from_ctx(ctx, session=session)) is not None:
+        hidden_bets = get_users_hidden_current_bets(user, session)
+    else:
+      hidden_bets = []
+    
+    
     if type == 0:
       #short
-      embedd = create_bet_list_embedded(f"Bets on Match:", bets, False, session)
-      if embedd is None:
-        await ctx.respond("No bets on match.", ephemeral=True)
-      else:
+      bets = match.bets
+      if len(bets) == 0:
+        await ctx.respond("No undecided bets.", ephemeral=True)
+        return
+      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
         await ctx.respond(embed=embedd)
-      
+      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
+        await ctx.respond(embed=hidden_embedd, ephemeral=True)
+          
+    
     elif type == 1:
       #full
-      for i, bet in enumerate(bets):
-        user = bet.user
-        embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
-        if i == 0:
-          inter = await ctx.respond(embed=embedd)
-          msg = await inter.original_message()
-        else:
-          msg = await ctx.interaction.followup.send(embed=embedd)
-        bet.message_ids.append((msg.id, msg.channel.id))
+      i = 0
+      bets = match.bets
+      if len(bets) == 0:
+        await ctx.respond("No undecided bets.", ephemeral=True)
+      else:
+        for i, bet in enumerate(bets):
+          user = bet.user
+          if bet.hidden:
+            embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+          else:
+            embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          if i == 0:
+            inter = await ctx.respond(embed=embedd)
+            msg = await inter.original_message()
+          else:
+            msg = await ctx.interaction.followup.send(embed=embedd)
+          bet.message_ids.append((msg.id, msg.channel.id))
+      if hidden_bets is not None:
+        for i, bet in enumerate(hidden_bets):
+          user = bet.user
+          embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          if i == 0:
+            await ctx.respond(embed=embedd, ephemeral=True)
+          else:
+            await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
 #match bets end
 
 
@@ -2014,11 +2038,28 @@ async def hide_from_leaderboard(ctx):
     print(user.hidden)
 
 
+#season start
+seasonsgc = SlashCommandGroup(
+  name = "season", 
+  description = "Start and rename season.",
+  guild_ids = gid,
+)
 
 
-#season reset command
-@bot.command()
-async def reset_season(ctx, name):
+#season autocomplete start
+async def seasons_autocomplete(ctx: discord.AutocompleteContext):
+  user = get_user_from_id(member)
+  
+  reset_labels = user.get_reset_strings()
+  reset_labels.reverse()
+  
+  return [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
+#season autocomplete end  
+
+
+#season start start
+@seasonsgc.command(name = "start", description = "Do not user command if not Pig, Start a new season.")
+async def season_start(ctx, name: Option(str, "Name of new season.")):
   # to do make the command also include season name
   with Session.begin() as session:
     users = get_all_db("User", session)
@@ -2031,6 +2072,53 @@ async def reset_season(ctx, name):
       for _ in user.get_open_loans():
         user.pay_loan(date)
     await ctx.send(f"Season reset. New season {name} has sarted.")
+#season start end
+
+
+#season rename start
+@seasonsgc.command(name = "rename", description = "Rename season.")
+async def season_rename(ctx, season: Option(str, "Description of award you want to rename.", autocomplete=seasons_autocomplete), name: Option(str, "Name of new season.")):
+  #async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
+  
+  with Session.begin() as session:
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
+    
+    award_labels = user.get_award_strings()
+    
+    if len(award) == 8:
+      if award_label.endswith(award):
+        award = award_label
+    else:
+      for award_label in award_labels:
+        if award_label == award:
+          award = award_label
+          break
+      else:
+        await ctx.respond("Award not found.", ephemeral = True)
+        return
+      
+    users = get_all_db("User")
+    
+    num = num_of_bal_with_name(award, users)
+    
+    if num > 1:
+      await ctx.respond("There are multiple awards with this name.", ephemeral = True)
+      return
+    
+    if user.change_award_name(award, description, session) is None:
+      print(f"change_award_name not found. {award}\n{num}\n{user.code}.")
+      await ctx.respond(f"Award not working {description}, {award}\n{num}\n{user.code}.", ephemeral = True)
+    
+    print(award)
+    award_t = award.split(", ")[:-2]
+    award = ", ".join(award_t)
+    
+    
+    await ctx.respond(f"Award {award} renamed to {description}.")
+#season rename end
+
+bot.add_application_command(seasonsgc)
+#season end
 
 
 #debug

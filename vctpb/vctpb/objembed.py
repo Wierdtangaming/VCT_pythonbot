@@ -207,3 +207,4 @@ def create_award_label_list_embedded(user, award_labels):
 
     embed.add_field(name=name, value=f"Balance changed by {award_t[-2]}, {award_t[-1]}", inline=False)
   return embed
+
