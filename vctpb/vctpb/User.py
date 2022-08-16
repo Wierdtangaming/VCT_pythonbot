@@ -256,18 +256,16 @@ class User():
     return award_labels
   
   def get_reset_strings(self):
-    last_amount = Decimal(0)
     resets_ids = []
     for balance_t in self.balances:
       if balance_t[0].startswith("reset"):
-        resets_ids.append((balance_t[0], balance_t[1]-last_amount))
-      last_amount = balance_t[1]
+        resets_ids.append(balance_t[0])
     
     award_labels = []
     for resets_id in resets_ids:
-      label = f"{resets_id[0][15:]}, {math.floor(resets_id[1])}, ID: {resets_id[0][6:14]}"
+      label = f"{resets_id[0][15:]}, ID: {resets_id[0][6:14]}"
       if len(label) >= 99:
-        label = f"{resets_id[0][15:80]}..., {math.floor(resets_id[1])}, ID: {resets_id[0][6:14]}"
+        label = f"{resets_id[0][15:80]}..., ID: {resets_id[0][6:14]}"
       award_labels.append(label)
       
     return award_labels
