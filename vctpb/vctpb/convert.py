@@ -8,16 +8,15 @@ from sqlalchemy import literal
 from sqlaobjs import Session
 
 
-def ambig_to_obj(ambig, prefix, session=None):
-  if isinstance(ambig, int) or isinstance(ambig, str):
+def ambig_to_obj(ambig, prefix=None, session=None):
+  if isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
+    obj = ambig
+  elif isinstance(ambig, int) or isinstance(ambig, str):
     obj = get_from_db(prefix, ambig, session)
   elif isinstance(ambig, discord.Member):
     obj = get_from_db(prefix, ambig.id, session)
-  elif isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
-    obj = ambig
   else:
     obj = None
-    print(ambig, type(ambig))
   return obj
 
 def user_id_ambig(user):
@@ -293,6 +292,9 @@ def get_users_visible_current_bets(user, session=None):
 
 def get_users_hidden_current_bets(user, session=None):
   return get_condition_db("Bet", (Bet.winner == 0) & (Bet.user_id == user_id_ambig(user)) & (Bet.hidden == True), session)
+
+def get_users_hidden_match_bets(user, match_code, session=None):
+  return get_condition_db("Bet", (Bet.match_id == match_code) & (Bet.user_id == user_id_ambig(user)) & (Bet.hidden == True), session)
 
 def get_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)

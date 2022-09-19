@@ -35,8 +35,8 @@ async def delete_all_messages(ids, bot):
 def get_all_db(table_name, session=None):
   if session is None:
     with Session.begin() as session:
-      return session.scalars(select(eval(table_name))).all()
-  return session.scalars(select(eval(table_name))).all()
+      return list(reversed(session.scalars(select(eval(table_name))).all()))
+  return list(reversed(session.scalars(select(eval(table_name))).all()))
   
   
 def get_from_db(table_name, code, session=None):

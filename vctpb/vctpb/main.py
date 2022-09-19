@@ -199,7 +199,6 @@ def add_balance_user(user_ambig, change, description, date, session=None):
   if user is None:
     return None
   user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
-  user.balances.sort(key=lambda x: x[2])
   return user
 
 
@@ -1477,6 +1476,7 @@ class MatchCreateModal(Modal):
     
       color = code[:6]
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
+      
 
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
 
@@ -1663,7 +1663,8 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
-        hidden_bets = get_users_hidden_current_bets(user, session)
+        hidden_bets = get_users_hidden_match_bets(user, match.code, session)
+        print(hidden_bets)
     else:
       hidden_bets = []
     
@@ -1803,7 +1804,7 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
     embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
     inter = await ctx.respond(embed=embedd)
     msg = await inter.original_message()
-    
+    print(match.date_created, match.date_winner)
     match.message_ids.append((msg.id, msg.channel.id))
 #match find end
 
@@ -1903,15 +1904,15 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     new_users = []
     for bet in match.bets:
       bet.winner = int(match.winner)
+      bet.hidden = False
       payout = -bet.amount_bet
       if bet.team_num == team:
         payout += bet.amount_bet * odds
       user = bet.user
       new_users.append(user)
       add_balance_user(user, payout, "id_" + str(bet.code), date, session)
-      date = get_date()
       while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
-        user.pay_loan(get_date())
+        user.pay_loan(date)
       embedd = create_bet_embedded(bet, "Placeholder", session)
       msg_ids.append((bet, embedd))
       bet_user_payouts.append((bet, user, payout))
@@ -1968,6 +1969,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
     match.winner = team
     if new_date:
       match.date_winner = get_date()
+      print(get_date(), match.date_winner)
     
     if match.date_closed is None:
       match.date_closed = match.date_winner
@@ -1979,6 +1981,8 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       user.remove_balance_id(f"id_{bet.code}", session)
 
     if match.winner == 0:
+      for bet in match.bets:
+        bet.winner = 0
       await gen_msg.edit_original_message(content="Winner has been set to None.")
       return
     
@@ -2048,12 +2052,12 @@ seasonsgc = SlashCommandGroup(
 
 #season autocomplete start
 async def seasons_autocomplete(ctx: discord.AutocompleteContext):
-  user = get_user_from_id(member)
+  user = ambig_to_obj(ctx.interaction.user, "User")
   
   reset_labels = user.get_reset_strings()
   reset_labels.reverse()
   
-  return [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
+  return [reset_label for reset_label in reset_labels if ctx.value.lower() in reset_label.lower()]
 #season autocomplete end  
 
 
@@ -2071,50 +2075,16 @@ async def season_start(ctx, name: Option(str, "Name of new season.")):
       user.balances.append((name, Decimal(500), date))
       for _ in user.get_open_loans():
         user.pay_loan(date)
-    await ctx.send(f"Season reset. New season {name} has sarted.")
+    await ctx.respond(f"New season {name} has sarted.")
 #season start end
 
 
 #season rename start
 @seasonsgc.command(name = "rename", description = "Rename season.")
 async def season_rename(ctx, season: Option(str, "Description of award you want to rename.", autocomplete=seasons_autocomplete), name: Option(str, "Name of new season.")):
-  #async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), description: Option(str, "Unique description of why the award is given."), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete)):
   
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
-    
-    award_labels = user.get_award_strings()
-    
-    if len(award) == 8:
-      if award_label.endswith(award):
-        award = award_label
-    else:
-      for award_label in award_labels:
-        if award_label == award:
-          award = award_label
-          break
-      else:
-        await ctx.respond("Award not found.", ephemeral = True)
-        return
-      
-    users = get_all_db("User")
-    
-    num = num_of_bal_with_name(award, users)
-    
-    if num > 1:
-      await ctx.respond("There are multiple awards with this name.", ephemeral = True)
-      return
-    
-    if user.change_award_name(award, description, session) is None:
-      print(f"change_award_name not found. {award}\n{num}\n{user.code}.")
-      await ctx.respond(f"Award not working {description}, {award}\n{num}\n{user.code}.", ephemeral = True)
-    
-    print(award)
-    award_t = award.split(", ")[:-2]
-    award = ", ".join(award_t)
-    
-    
-    await ctx.respond(f"Award {award} renamed to {description}.")
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return []
 #season rename end
 
 bot.add_application_command(seasonsgc)
