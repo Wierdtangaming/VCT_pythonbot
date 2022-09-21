@@ -429,7 +429,7 @@ async def award_rename(ctx, user: Option(discord.Member, "User you wannt to awar
         await ctx.respond("Award not found.", ephemeral = True)
         return
       
-    users = get_all_db("User")
+    users = get_all_db("User", session)
     
     num = num_of_bal_with_name(award, users)
     
@@ -1494,17 +1494,17 @@ class MatchCreateModal(Modal):
 #match edit modal start
 class MatchEditModal(Modal):
   
-  def __init__(self, match, has_bets, balance_odds=1, *args, **kwargs) -> None:
+  def __init__(self, match, locked, balance_odds=1, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     
     self.match = match
     self.balance_odds = balance_odds
-    self.has_bets = has_bets
+    self.locked = locked
     
     self.add_item(InputText(label="Enter team one name.", placeholder=match.t1, min_length=1, max_length=100, required=False))
     self.add_item(InputText(label="Enter team two name.", placeholder=match.t2, min_length=1, max_length=100, required=False))
     
-    if not has_bets:
+    if not locked:
       self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder=f"{match.t1oo}/{match.t2oo}", min_length=1, max_length=12, required=False))
     self.add_item(InputText(label="Enter tournament name.", placeholder=match.tournament_name, min_length=1, max_length=300, required=False))
     
@@ -1614,10 +1614,21 @@ async def match_list_autocomplete(ctx: discord.AutocompleteContext):
     return auto_completes
 #match list autocomplete end
   
+#match open all list autocomplete start
+async def match_open_all_list_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    lower_value = ctx.value.lower()
+    auto_completes = filter_names(lower_value, get_open_matches(session), session)
+    if auto_completes == []:
+      auto_completes = filter_names(lower_value, get_all_db("Match", session), session)
+    return auto_completes
+#match open all list autocomplete end  
+  
 #match current list autocomplete start
 async def match_current_list_autocomplete(ctx: discord.AutocompleteContext):
   return filter_names(ctx.value.lower(), get_current_matches())
 #match current list autocomplete end
+  
   
 #match open list autocomplete start
 async def match_open_list_autocomplete(ctx: discord.AutocompleteContext):
@@ -1664,7 +1675,6 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_users_hidden_match_bets(user, match.code, session)
-        print(hidden_bets)
     else:
       hidden_bets = []
     
@@ -1804,25 +1814,21 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
     embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
     inter = await ctx.respond(embed=embedd)
     msg = await inter.original_message()
-    print(match.date_created, match.date_winner)
     match.message_ids.append((msg.id, msg.channel.id))
 #match find end
 
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
-async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False), force: Option(int, "Force changes even if match already has winner.", choices = yes_no_choices, default=0, required=False)):
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_open_all_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
   with Session.begin() as session:
-    if (nmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
+    if (nmatch := await obj_from_autocomplete_tuple(None, get_open_matches(session), match, "Match", session)) is None:
       if (nmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: 
         await ctx.respond(f'Match "{match}" not found.', ephemeral = True)
         return
     match = nmatch
-    if not(match.date_closed is None or force == 0):
-      await ctx.respond(f"Match must have betting open.", ephemeral = True)
-      return
-    
-    match_modal = MatchEditModal(match, match.date_closed is None or match.bets != [], balance_odds, title="Edit Match")
+    print((match.date_closed is not None) and match.bets != [])
+    match_modal = MatchEditModal(match, (match.date_closed is not None) and match.bets != [], balance_odds, title="Edit Match")
     await ctx.interaction.response.send_modal(match_modal)
 #match edit end
 
@@ -2084,7 +2090,14 @@ async def season_start(ctx, name: Option(str, "Name of new season.")):
 async def season_rename(ctx, season: Option(str, "Description of award you want to rename.", autocomplete=seasons_autocomplete), name: Option(str, "Name of new season.")):
   
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, user, session)) is None: return []
+    found = False
+    for user in get_all_db("User", session):
+      if user.change_reset_name(season[-8:], name, session) != None:
+        found = True
+    if found:
+      await ctx.respond(f"Season {season.split(',')[0]} has been renamed to {name}.")
+    else:
+      await ctx.respond(f"Season {season} not found.", ephemeral = True)
 #season rename end
 
 bot.add_application_command(seasonsgc)

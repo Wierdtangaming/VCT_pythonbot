@@ -261,14 +261,27 @@ class User():
       if balance_t[0].startswith("reset"):
         resets_ids.append(balance_t[0])
     
-    award_labels = []
+    reset_labels = []
     for resets_id in resets_ids:
-      label = f"{resets_id[0][15:]}, ID: {resets_id[0][6:14]}"
+      label = f"{resets_id[15:]}, ID: {resets_id[6:14]}"
       if len(label) >= 99:
-        label = f"{resets_id[0][15:80]}..., ID: {resets_id[0][6:14]}"
-      award_labels.append(label)
+        label = f"{resets_id[15:80]}..., ID: {resets_id[6:14]}"
+      reset_labels.append(label)
       
-    return award_labels
+    return reset_labels
+  
+  def change_reset_name(self, reset_id, name, session=None):
+    if session is None:
+      with Session.begin() as session:
+        self.change_reset_name(reset_id, name, session=session)
+    for balance in self.balances:
+      if balance[0].startswith("reset_") and balance[0][6:14] == reset_id:
+        self.balances[self.balances.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
+        print("renaming")
+        break
+    else:
+      return None
+    return self
   
   def get_new_balance_changes_embeds(self, amount, session=None):
     if session is None:
