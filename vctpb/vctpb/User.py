@@ -25,12 +25,12 @@ class User():
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")
   color_hex = Column(String(6), nullable=False)
-  hidden = Column(BOOLEAN, nullable=False)
   balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
   loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
   active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
+  hidden = Column(BOOLEAN, nullable=False)
   
   def __init__(self, code, username, color, date_created):
     self.code = code
@@ -73,7 +73,7 @@ class User():
     self.color_name = color.name
     self.color_hex = color.hex
   
-  async def has_leader_profile(self):
+  def has_leader_profile(self):
     return self.color_hex == "dbb40c"
     
   
@@ -201,6 +201,14 @@ class User():
         return rrange
     return None
 
+  def get_bet_on_match(self, match, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.has_bet_on_match(match, session)
+    for bet in self.active_bets:
+      if bet.match_code == match.code:
+        return bet
+
   def get_to_reset_range(self, index):
     return range(index, self.get_reset_range(index).stop)
 
@@ -246,6 +254,34 @@ class User():
       award_labels.append(label)
       
     return award_labels
+  
+  def get_reset_strings(self):
+    resets_ids = []
+    for balance_t in self.balances:
+      if balance_t[0].startswith("reset"):
+        resets_ids.append(balance_t[0])
+    
+    reset_labels = []
+    for resets_id in resets_ids:
+      label = f"{resets_id[15:]}, ID: {resets_id[6:14]}"
+      if len(label) >= 99:
+        label = f"{resets_id[15:80]}..., ID: {resets_id[6:14]}"
+      reset_labels.append(label)
+      
+    return reset_labels
+  
+  def change_reset_name(self, reset_id, name, session=None):
+    if session is None:
+      with Session.begin() as session:
+        self.change_reset_name(reset_id, name, session=session)
+    for balance in self.balances:
+      if balance[0].startswith("reset_") and balance[0][6:14] == reset_id:
+        self.balances[self.balances.index(balance)] = (balance[0][:15] + name, balance[1], balance[2])
+        print("renaming")
+        break
+    else:
+      return None
+    return self
   
   def get_new_balance_changes_embeds(self, amount, session=None):
     if session is None:

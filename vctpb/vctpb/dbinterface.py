@@ -35,8 +35,8 @@ async def delete_all_messages(ids, bot):
 def get_all_db(table_name, session=None):
   if session is None:
     with Session.begin() as session:
-      return session.scalars(select(eval(table_name))).all()
-  return session.scalars(select(eval(table_name))).all()
+      return list(reversed(session.scalars(select(eval(table_name))).all()))
+  return list(reversed(session.scalars(select(eval(table_name))).all()))
   
   
 def get_from_db(table_name, code, session=None):
@@ -154,3 +154,10 @@ def get_setting(setting_name):
   if setting_name == "guild_ids":
     return jsonpickle.decode(val)
   return configur.get("settings", setting_name)
+
+def set_setting(setting_name, setting_value):
+  configur = ConfigParser()
+  configur.read('settings.ini')
+  configur.set('settings', setting_name, setting_value)
+  with open('settings.ini', 'w') as configfile:
+    configur.write(configfile)

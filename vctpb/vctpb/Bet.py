@@ -1,5 +1,5 @@
 import math
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, BOOLEAN
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from datetime import datetime
@@ -28,9 +28,10 @@ class Bet():
   user = relationship("User", back_populates="bets")
   date_created = Column(DateTime, nullable=False)
   message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False)
+  hidden = Column(BOOLEAN, nullable=False)
   
   
-  def __init__(self, code, t1, t2, tournament_name, amount_bet, team_num, color, match_id, user_id, date_created):
+  def __init__(self, code, t1, t2, tournament_name, amount_bet, team_num, color, match_id, user_id, date_created, hidden):
     
     self.code = code
     
@@ -51,6 +52,8 @@ class Bet():
 
     #team num of winner
     self.message_ids = []
+    
+    self.hidden = hidden
 
   def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
     self.code = code
@@ -136,8 +139,17 @@ class Bet():
     
     (team, payout) = self.get_team_and_payout(session)
 
-    return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout: {int(math.floor(payout))}"
+    return f"User: {self.user.username}, Team: {team}, Amount: {self.amount_bet}, Payout on Win: {int(math.floor(payout))}"
   
+  def short_to_hidden_string(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.short_to_hidden_string(session)
+      
+    return f"User: {self.user.username}'s Hidden Bet on {self.t1} vs {self.t2}"
+    
+    
+    
   def balance_to_string(self, balances):
 
     (team, winner) = self.get_team_and_winner()

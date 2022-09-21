@@ -11,9 +11,14 @@ from sqlaobjs import Session
 
 
 def create_match_embedded(match_ambig, title, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return create_match_embedded(match_ambig, title, session)
+    
   match = ambig_to_obj(match_ambig, "Match", session)
   if match is None:
     return None
+  
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
   embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
@@ -55,14 +60,49 @@ def create_match_list_embedded(embed_title, matches_ambig, session=None):
     embed.add_field(name="\n" + "Match: " + match.code, value=match.short_to_string() + "\n", inline=False)
   return embed
 
-
-def create_bet_embedded(bet_ambig, title, session=None):
+def create_bet_hidden_embedded(bet_ambig, title, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return create_bet_hidden_embedded(bet_ambig, title, session)
+    
   bet = ambig_to_obj(bet_ambig, "Bet", session)
   if bet is None:
     return None
-
+  
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
+  #when teams done this has to be diff color
+  match = bet.match
+  embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
+  embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
+
+  if int(bet.winner) == 0:
+    embed.add_field(name="Winner:", value="None", inline=True)
+  else:
+    winner_team = ""
+    if int(bet.winner) == 1:
+      winner_team = bet.t1
+    else:
+      winner_team = bet.t2
+
+    embed.add_field(name="Winner:", value=winner_team, inline=True)
+
+  date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
+  embed.add_field(name="Created On:", value=date_formatted, inline=True)
   embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  embed.add_field(name="Identifier:", value=bet.code, inline=False)
+  return embed
+
+
+def create_bet_embedded(bet_ambig, title, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return create_bet_embedded(bet_ambig, title, session)
+    
+  bet = ambig_to_obj(bet_ambig, "Bet", session)
+  if bet is None:
+    return None
+  
+  embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.amount_bet, inline=True)
   (team, payout) = bet.get_team_and_payout(session)
@@ -83,20 +123,29 @@ def create_bet_embedded(bet_ambig, title, session=None):
 
   date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   embed.add_field(name="Created On:", value=date_formatted, inline=True)
+  embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  embed.add_field(name="Visiblity:", value=("Hidden" if bet.hidden else "Shown"), inline=True)
   embed.add_field(name="Identifier:", value=bet.code, inline=False)
   return embed
 
 
-def create_bet_list_embedded(embed_title, bets_ambig, session=None):
+def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None):
   if session is None:
     with Session.begin() as session:
       create_bet_list_embedded(embed_title, bets_ambig, session)
+  if bets_ambig is None:
+    return None
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
     bets_ambig = get_mult_from_db("Bet", bets_ambig, session)
+  if len(bets_ambig) == 0:
+    return None
   bets_ambig.sort(key=lambda x: x.match_id)
   for bet in bets_ambig:
-    embed.add_field(name="\n" + "Bet: " + bet.code, value = bet.short_to_string() + "\n", inline=False)
+    if bet.hidden and (show_hidden == False):
+      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.t1} vs {bet.t2}", value = bet.short_to_hidden_string() + "\n", inline=False)
+    else:
+      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team()}", value = bet.short_to_string() + "\n", inline=False)
   return embed
 
 
@@ -158,3 +207,4 @@ def create_award_label_list_embedded(user, award_labels):
 
     embed.add_field(name=name, value=f"Balance changed by {award_t[-2]}, {award_t[-1]}", inline=False)
   return embed
+
