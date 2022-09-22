@@ -46,6 +46,7 @@ def pull_from_github():
   delete_folder("", "")
   #get savedata.fb from zip
   with open("gitbackup.zip", "wb") as f:
+    content._encoding.value = "base64"
     f.write(content.decoded_content)
   #unzip savedata.fb
   with ZipFile("gitbackup.zip", "r") as zf:
@@ -160,6 +161,7 @@ def save_savedata_from_github(content=None):
     content = repo.get_contents(all_files[0])
     
   with open("gitbackup.zip", "wb") as f:
+    content._encoding.value = "base64"
     f.write(content.decoded_content)
   
 
