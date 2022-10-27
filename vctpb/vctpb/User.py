@@ -151,7 +151,9 @@ class User():
   
   def is_in_first_place(self, users):
     for user in users:
-      if self.balances[-1][1] < user.balances[-1][1]:
+      if self.code == user.code:
+        continue
+      if self.balances[-1][1] <= user.balances[-1][1]:
         return False
     return True
   
@@ -845,4 +847,10 @@ def get_first_place(users):
     if user.balances[-1][1] > highest_bal:
       highest_bal = user.balances[-1][1]
       first_place = user
+  tied = 0
+  for user in users:
+    if user.balances[-1][1] == highest_bal:
+      tied += 1
+  if tied > 1:
+    return None
   return first_place

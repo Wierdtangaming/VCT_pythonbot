@@ -1160,7 +1160,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
         await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
         return
       user.set_color(color)
-      await ctx.respond(f"Profile color is now {user.color_hex}.")
+      await ctx.respond(f"Profile color is now {user.color_name}.")
     
     author = ctx.author
     username = user.username
