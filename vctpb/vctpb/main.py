@@ -1516,9 +1516,9 @@ class MatchEditModal(Modal):
       match = get_from_db("Match", self.match.code, session)
       vals = [child.value.strip() for child in self.children]
       
-      has_bets = match.has_bets
+      odds_locked = match.has_bets or match.date_closed != None
       
-      if has_bets:
+      if odds_locked:
         team_one, team_two, tournament_name, betting_site = vals
       else:
         team_one, team_two, odds_combined, tournament_name, betting_site = vals
@@ -1537,7 +1537,7 @@ class MatchEditModal(Modal):
       if betting_site == "":
         betting_site = match.odds_source
       
-      if not has_bets:
+      if not odds_locked:
         splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
         for spliter in splits:
           if odds_combined.count(spliter) == 1:
@@ -1572,7 +1572,7 @@ class MatchEditModal(Modal):
       
       match.t1 = team_one
       match.t2 = team_two
-      if not has_bets:
+      if not odds_locked:
         match.t1o = team_one_odds
         match.t2o = team_two_odds
         match.t1oo = team_one_old_odds
@@ -1583,7 +1583,7 @@ class MatchEditModal(Modal):
       match.tournament_name = tournament_name
       match.odds_source = betting_site
 
-      if has_bets:
+      if odds_locked:
         for bet in match.bets:
           bet.t1 = team_one
           bet.t2 = team_two
@@ -1613,17 +1613,7 @@ async def match_list_autocomplete(ctx: discord.AutocompleteContext):
       auto_completes = filter_names(lower_value, get_all_db("Match", session), session)
     return auto_completes
 #match list autocomplete end
-  
-#match open all list autocomplete start
-async def match_open_all_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    lower_value = ctx.value.lower()
-    auto_completes = filter_names(lower_value, get_open_matches(session), session)
-    if auto_completes == []:
-      auto_completes = filter_names(lower_value, get_all_db("Match", session), session)
-    return auto_completes
-#match open all list autocomplete end  
-  
+
 #match current list autocomplete start
 async def match_current_list_autocomplete(ctx: discord.AutocompleteContext):
   return filter_names(ctx.value.lower(), get_current_matches())
@@ -1820,7 +1810,7 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
-async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_open_all_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
+async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
   with Session.begin() as session:
     if (nmatch := await obj_from_autocomplete_tuple(None, get_open_matches(session), match, "Match", session)) is None:
       if (nmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: 
