@@ -1516,7 +1516,7 @@ class MatchEditModal(Modal):
       match = get_from_db("Match", self.match.code, session)
       vals = [child.value.strip() for child in self.children]
       
-      has_bets = self.has_bets
+      has_bets = match.has_bets
       
       if has_bets:
         team_one, team_two, tournament_name, betting_site = vals
