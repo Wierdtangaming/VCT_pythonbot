@@ -32,6 +32,10 @@ class Match():
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
   message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of int
   
+  @property
+  def has_bets(self):
+      return bool(self.bets)
+  
   def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color, creator_id, date_created):
 
 
@@ -58,7 +62,6 @@ class Match():
 
     self.date_winner = None
     self.date_closed = None
-    
     
     self.message_ids = []
   
