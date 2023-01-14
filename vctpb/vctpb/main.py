@@ -42,7 +42,7 @@ from sqlaobjs import Session
 
 intents = discord.Intents.all()
 
-bot = commands.Bot(intents=intents, command_prefix="$")
+bot = commands.Bot(intents=intents)
 
 gid = get_setting("guild_ids")
 
@@ -2030,7 +2030,7 @@ async def backup(ctx):
 
   
 #hidden command
-@bot.command()
+@bot.slash_command(name = "hide_from_leaderboard", description = "Do not user command if not Pig, Hides you from alot of interations.")
 async def hide_from_leaderboard(ctx):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(None, ctx.author, session)) is None: return
@@ -2094,14 +2094,21 @@ bot.add_application_command(seasonsgc)
 #season end
 
 
-#debug
-@bot.command()
-async def debug(ctx, *args):
-  await ctx.send("Not valid command.")
-  
+#update_bets start
+@bot.slash_command(name = "update_bets", description = "Do not user command if not Pig, Debugs some stuff.")
+async def update_bets(ctx):
+  with Session.begin() as session:
+    for bets in get_all_db("Bet", session):
+      match = bets.match
+      bets.t1 = match.t1
+      bets.t2 = match.t1
+      bets.tournament_name = match.tournament_name
+  await ctx.respond("Set all bets.", ephemeral = True)
+#update_bets end
+
 
 #debug command
-@bot.command()
+@bot.slash_command(name = "check_balance_order", description = "Do not user command if not Pig, Debugs some stuff.")
 async def check_balance_order(ctx):
   #check if the order of user balance and the order of timer in balances[2] are the same
   users = get_all_db("User")
@@ -2109,7 +2116,9 @@ async def check_balance_order(ctx):
     sorted = user.balances.copy()
     sorted.sort(key=lambda x: x[2])
     if sorted != user.balances:
+      await ctx.respond(f"{user.code} balance order is wrong", ephemeral = True)
       print(f"{user.code} balance order is wrong")
+  await ctx.respond("check order done.", ephemeral = True)
   print("check order done")
 
 token = get_setting("discord_token")
