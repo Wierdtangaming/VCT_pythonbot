@@ -199,7 +199,7 @@ class User():
   def get_clean_bal_loan(self):
     return self.balances[-1][1] + self.loan_bal()
 
-  def avaliable_nonloan_bal(self, session=None):
+  def available_nonloan_bal(self, session=None):
     return self.balances[-1][1] - self.unavailable(session)
 
   def get_resets(self):
@@ -857,8 +857,15 @@ def is_valid_user(code, username, color, hidden, balances, loans):
     errors[6] = True
   return errors
 
+def get_active_users(users, session=None):
+  if session is None:
+    with Session.begin() as session:
+      get_active_users(users, session)
+  
+  return [user for user in users if (not user.balances[-1][0].startswith("reset_")) or len(user.active_bets) > 0]
 
 def get_first_place(users):
+  users = get_active_users(users)
   if len(users) == 0:
     return None
   highest_bal = users[0].balances[-1][1]
