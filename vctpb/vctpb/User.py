@@ -169,10 +169,30 @@ class User():
       used += bet.amount_bet
 
     return used
+  
+  def visible_unavailable(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.unavailable(session)
+      
+    used = 0
+    bets = self.active_bets
+    
+    for bet in bets:
+      if not bet.hidden:
+        used += bet.amount_bet
+
+    return used
 
   def get_balance(self, session=None):
     bal = self.balances[-1][1]
     bal -= self.unavailable(session)
+    bal += self.loan_bal()
+    return bal
+  
+  def get_visible_balance(self, session=None):
+    bal = self.balances[-1][1]
+    bal -= self.visible_unavailable(session)
     bal += self.loan_bal()
     return bal
 
