@@ -149,7 +149,11 @@ class User():
     index = self.loans.index(loan)
     self.loans[index] = new_loan
   
-  def is_in_first_place(self, users):
+  def is_in_first_place(self, users, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.is_in_first_place(users, session)
+    users = get_active_users(users)
     for user in users:
       if self.code == user.code:
         continue
