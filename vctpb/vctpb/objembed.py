@@ -157,7 +157,7 @@ def create_user_embedded(user_ambig, session=None):
   embed = discord.Embed(title=f"{user.username}'s balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
   embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
   embed.add_field(name="Account balance:", value=math.floor(user.balances[-1][1]), inline=True)
-  embed.add_field(name="Balance Available:", value=math.floor(user.get_balance(session)), inline=True)
+  embed.add_field(name="Balance Available:", value=math.floor(user.get_visible_balance(session)), inline=True)
   embed.add_field(name="Loan balance:", value=math.floor(user.loan_bal()), inline=True)
   return embed
 

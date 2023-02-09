@@ -1918,16 +1918,21 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     embedd = create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
     await ctx.respond(content=winner_msg, embed=embedd)
     if new_leader != leader:
-      await ctx.interaction.followup.send(f"{new_leader.username} is now the leader.")
-      print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
-      if leader.has_leader_profile():
-        print("start")
-        leader.set_color(str(secrets.token_hex(3)))
-        print("2")
-        member = await get_member_from_id(ctx.interaction.guild, leader.code)
-        print("winner_member", member, type(member))
-        await edit_role(member, user.username, user.color_hex)
-        print("3")
+      if new_leader == None:
+        await ctx.interaction.followup.send(f"leader is now tied.")
+      else:
+        await ctx.interaction.followup.send(f"{new_leader.username} is now the leader.")
+        
+      if leader != None:
+        print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
+        if leader.has_leader_profile():
+          print("start")
+          leader.set_color(str(secrets.token_hex(3)))
+          print("2")
+          member = await get_member_from_id(ctx.interaction.guild, leader.code)
+          print("winner_member", member, type(member))
+          await edit_role(member, user.username, user.color_hex)
+          print("3")
 
   await edit_all_messages(match.message_ids, m_embedd)
   [await edit_all_messages(tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
