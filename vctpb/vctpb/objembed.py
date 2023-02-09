@@ -2,7 +2,7 @@ import discord
 from dbinterface import get_mult_from_db, get_condition_db
 from Match import Match
 from Bet import Bet
-from User import User
+from User import User, get_active_users
 from convert import ambig_to_obj, id_to_metion
 from colorinterface import hex_to_tuple
 import math
@@ -163,7 +163,11 @@ def create_user_embedded(user_ambig, session=None):
 
 
 def create_leaderboard_embedded(session=None):
+  if session is None:
+    with Session.begin() as session:
+      create_leaderboard_embedded(session)
   users = get_condition_db("User", User.hidden == False, session)
+  users = get_active_users(users, session)
   user_rankings = [(user, user.balances[-1][1]) for user in users]
   user_rankings.sort(key=lambda x: x[1], reverse=True)
   embed = discord.Embed(title="Leaderboard:", color=discord.Color.gold())
