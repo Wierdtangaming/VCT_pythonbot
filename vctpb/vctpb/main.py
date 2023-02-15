@@ -1634,7 +1634,7 @@ async def match_close_list_autocomplete(ctx: discord.AutocompleteContext):
 #match match team autocomplete start
 async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
   if(match := ctx.options["match"]) is None: return []
-  with Session() as session:
+  with Session.begin() as session:
     if (match := await obj_from_autocomplete_tuple(ctx, get_current_matches(session), match, "Match", session)) is None: return []
     return [match.t1, match.t2]
 #match match team autocomplete end
@@ -1643,7 +1643,7 @@ async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
 #match winner autocomplete start
 async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext):
   if(match := ctx.options["match"]) is None: return []
-  with Session() as session:
+  with Session.begin() as session:
     if (match := await obj_from_autocomplete_tuple(None, get_all_db("Match", session), match, "Match", session)) is None: return []
     
     strin = "None"
@@ -1743,26 +1743,6 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
   await edit_all_messages(match.message_ids, embedd)
 #match close end
 
-
-#match betting start
-#@matchscg.command(name = "betting", description = "Open and close betting.")
-#async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
-#  with Session.begin() as session:
-#    if (match := await obj_from_autocomplete_tuple(ctx, current_matches_name_objs(session), match, "Match", session)) is None: return
-#
-#    #if already on dont do anything complex
-#      
-#    if type == 0:
-#      match.date_closed = None
-#      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
-#    else:
-#      match.date_closed = get_date()
-#      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
-#    embedd = create_match_embedded(match, "Placeholder", session)
-#  await edit_all_messages(match.message_ids, embedd)
-#match betting end
-  
-  
 #match create start
 @matchscg.command(name = "create", description = "Create a match.")
 async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):

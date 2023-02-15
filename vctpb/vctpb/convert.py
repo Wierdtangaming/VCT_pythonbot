@@ -134,7 +134,7 @@ def usernames_to_users(usernames, session=None):
 
 def filter_names(value, ambig, session=None, user=None, naming_type=1):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return filter_names(value, ambig, session, user, naming_type)
     
   if len(ambig) == 0:
@@ -209,7 +209,7 @@ def shorten_match_name(match, naming_type=1):
 
 def shorten_bet_name(bet, user_id, session=None):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return shorten_bet_name(bet, user_id, session)
   if bet.winner != 0:
     prefix = "Paid out: "
@@ -255,7 +255,7 @@ def get_all_user_bets(user, session=None):
 
 def get_open_user_bets(user, session=None):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return get_open_user_bets(user, session)
   return [bet for bet in get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session) if bet.match.date_closed is None]
 
