@@ -73,12 +73,16 @@ def rename_color(old_name, new_name, session=None):
   color = get_from_db("Color", old_name, session)
   if color is None:
     return (f"{old_name} was not found in color list.", None)
+  teams = color.teams
+  tournaments = color.tournaments
+  users = color.users
+  
   color.name = new_name
-  for match in color.matches:
-    match.set_color(color)
-  for bet in color.bets:
-    bet.set_color(color)
-  for user in color.users:
+  for team in teams:
+    team.set_color(color)
+  for tournament in tournaments:
+    tournament.set_color(color)
+  for user in users:
     user.set_color(color)
   return (f"{old_name} has been renamed to {new_name}", color)
     
@@ -89,22 +93,19 @@ def recolor_color(name, hex, session=None):
       return recolor_color(name, hex, session)
     
   name = name.capitalize()
-  ohex = hex
+  old_hex = hex
   if (hex := valid_hex(hex)) is None:
-    return (f"{ohex} is not a valid hex code. Only include the 6 numbers/letters.", None)
+    return (f"{old_hex} is not a valid hex code. Only include the 6 numbers/letters.", None)
   
   color = get_from_db("Color", name, session)
   if color is None:
     return (f"{name} was not found in color list.", None)
   
   color.hex = hex
-  for match in color.matches:
-    print(f"Setting {match} to {hex}")
-    match.set_color(color)
-  for bet in color.bets:
-    print(f"Setting {bet} to {hex}")
-    bet.set_color(color)
+  for team in color.teams:
+    team.set_color(color)
+  for tournament in color.tournaments:
+    tournament.set_color(color)
   for user in color.users:
-    print(f"Setting {user}'s color to {hex}")
     user.set_color(color)
   return (f"{name} now has the hex {hex}", color)

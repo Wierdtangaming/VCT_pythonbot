@@ -21,6 +21,8 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
+from Team import Team
+from Tournament import Tournament
 from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
