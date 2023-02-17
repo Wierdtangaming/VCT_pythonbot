@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 
 from sqlaobjs import mapper_registry
+from Match import Match
 
 @mapper_registry.mapped
 class Team():
@@ -11,7 +12,7 @@ class Team():
   name = Column(String(50), primary_key=True, nullable=False)
   vlr_code = Column(Integer)
   color_name = Column(String(32), ForeignKey("color.name"))
-  color = relationship("Color", back_populates="teams")
+  matches = relationship("Match", foreign_keys=[Match.t1, Match.t2])
   color_hex = Column(String(6))
   
   

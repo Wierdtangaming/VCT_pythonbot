@@ -2,10 +2,29 @@
 from Match import Match
 from Bet import Bet
 from User import User
+from Tournament import Tournament
+from Team import Team
 import discord
 from dbinterface import get_from_db, get_condition_db
 from sqlalchemy import literal
 from sqlaobjs import Session
+import math
+
+
+def roundup(x):
+  return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
+
+def balance_odds(team_one_old_odds, team_two_old_odds):
+  odds1 = team_one_old_odds - 1
+  odds2 = team_two_old_odds - 1
+  
+  oneflip = 1 / odds1
+  
+  percentage1 = (math.sqrt(odds2/oneflip))
+  
+  team_one_odds = roundup(odds1 / percentage1) + 1
+  team_two_odds = roundup(odds2 / percentage1) + 1
+  return team_one_odds, team_two_odds
 
 
 def ambig_to_obj(ambig, prefix=None, session=None):
@@ -304,3 +323,7 @@ def get_open_matches(session=None):
 
 def get_closed_matches(session=None):
   return get_condition_db("Match", (Match.winner == 0) & (Match.date_closed != None), session)
+
+
+def get_current_tournaments(session=None):
+  return get_condition_db("Tournament", Tournament.active == True, session)

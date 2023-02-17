@@ -14,6 +14,7 @@ class Tournament():
   color = relationship("Color", back_populates="tournaments")
   color_hex = Column(String(6))
   active = Column(Boolean, default=1)
+  matches = relationship("Match", back_populates="tournament")
   
   def __init__(self, name, color):
     self.name = name

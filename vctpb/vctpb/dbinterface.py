@@ -8,6 +8,8 @@ from sqlalchemy import select, desc
 from Match import Match
 from User import User
 from Bet import Bet
+from Team import Team
+from Tournament import Tournament
 from Color import Color
 from Channels import Channels
 

@@ -6,7 +6,7 @@ Create Date: 2023-02-14 15:32:48.837761
 
 """
 from alembic import op
-from sqlalchemy import Column, String, ForeignKey, Integer
+from sqlalchemy import Column, String, ForeignKey, Integer, Boolean
 
 
 # revision identifiers, used by Alembic.
@@ -37,6 +37,7 @@ def upgrade():
     Column('vlr_code', Integer, unique=True),
     Column('color_name', String(32), ForeignKey('color.name')),
     Column('color_hex', String(6), nullable=False),
+    Column("active", Boolean, default=1),
   )
   
   # remove color_name from match and bet
