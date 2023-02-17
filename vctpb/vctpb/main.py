@@ -1146,8 +1146,9 @@ async def color_profile_autocomplete(ctx: discord.AutocompleteContext):
 
 
 #profile color start
+# old sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete)):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if color_name == "First place gold":
@@ -1166,7 +1167,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     
     author = ctx.author
     username = user.username
-    
+    sync = 0
     if sync == 1:
       await set_role(ctx.interaction.guild, author, username, user.color_hex, bot)
     elif sync == 0:

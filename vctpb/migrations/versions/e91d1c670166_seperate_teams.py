@@ -6,7 +6,7 @@ Create Date: 2023-02-14 15:32:48.837761
 
 """
 from alembic import op
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import Column, String, ForeignKey, Integer
 
 
 # revision identifiers, used by Alembic.
@@ -23,6 +23,7 @@ def upgrade():
   op.create_table(
     'team',
     Column('name', String(50), primary_key=True, nullable=False),
+    Column('vlr_code', Integer, unique=True),
     Column('color_name', String(32), ForeignKey('color.name')),
     Column('color_hex', String(6), nullable=False),
   )
@@ -33,6 +34,7 @@ def upgrade():
   op.create_table(
     'tournament',
     Column('name', String(100), primary_key=True, nullable=False),
+    Column('vlr_code', Integer, unique=True),
     Column('color_name', String(32), ForeignKey('color.name')),
     Column('color_hex', String(6), nullable=False),
   )
@@ -40,6 +42,10 @@ def upgrade():
   # remove color_name from match and bet
   with op.batch_alter_table('match') as batch_op:
     batch_op.drop_column('color_name')
+    #add vlr_code to match but it has to be unique
+    batch_op.add_column(Column('vlr_code', Integer))
+    batch_op.create_unique_constraint('u1_vlr_code', ['vlr_code'])
+    
   with op.batch_alter_table('bet') as batch_op:
     batch_op.drop_column('color_name')
     

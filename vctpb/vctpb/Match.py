@@ -12,6 +12,7 @@ class Match():
   __tablename__ = "match"
   
   code = Column(String(8), primary_key = True, nullable=False)
+  vlr_code = Column(Integer)
   t1 = Column(String(50), nullable=False)
   t2 = Column(String(50), nullable=False)
   t1o = Column(DECIMAL(5, 3), nullable=False)

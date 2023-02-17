@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey
+from sqlalchemy import Column, String, ForeignKey, Integer
 from sqlalchemy.orm import relationship
 
 from sqlaobjs import mapper_registry
@@ -9,6 +9,7 @@ class Team():
   __tablename__ = "team"
   
   name = Column(String(50), primary_key=True, nullable=False)
+  vlr_code = Column(Integer)
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="teams")
   color_hex = Column(String(6))
@@ -20,7 +21,7 @@ class Team():
     
     
   def __repr__(self):
-    return f"<Team {self.name}>"
+    return f"<Team {self.name}, code: {self.vlr_code}>"
         
   def set_color(self, color):
     if isinstance(color, str):
