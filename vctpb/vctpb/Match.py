@@ -41,10 +41,10 @@ class Match():
   def has_bets(self):
       return bool(self.bets)
   
-  def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color_hex, creator_id, date_created):
-    self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, creator_id, date_created, None, None, [])
+  def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color_hex, creator_id, date_created, vlr_code=None):
+    self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, creator_id, date_created, None, None, [], vlr_code)
   
-  def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color_hex, creator_id, date_created, date_winner, date_closed, message_ids):
+  def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color_hex, creator_id, date_created, date_winner, date_closed, message_ids, vlr_code=None):
     self.code = code
     self.t1 = t1
     self.t2 = t2
@@ -61,6 +61,7 @@ class Match():
     self.date_winner = date_winner
     self.date_closed = date_closed
     self.message_ids = message_ids
+    self.vlr_code = vlr_code
   
   
   def __repr__(self):
