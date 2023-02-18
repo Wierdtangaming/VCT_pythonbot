@@ -23,13 +23,13 @@ from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
 from Team import Team
 from Tournament import Tournament
-from dbinterface import get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting
+from dbinterface import get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting, get_unique_code
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 from convert import *
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded, create_tournament_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import secrets
@@ -37,7 +37,10 @@ import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
 
+from vlrinterface import generate_matches, get_code, generate_tournament
+
 from sqlaobjs import Session
+from utils import *
 
   
 
@@ -99,7 +102,7 @@ def get_last_odds_source(amount, session=None):
         return list(name_set)[0]
       return list(name_set)
 
-def get_current_tournament_odds(session=None):
+def get_last_tournament_and_odds(session=None):
   match = get_new_db("Match", session)
   return (match.tournament_name, match.odds_source)
 
@@ -147,39 +150,6 @@ async def edit_all_messages(ids, embedd, new_title=None):
       await msg.edit(embed=embedd)
     except Exception:
       print(id, "no msg found")
-      
-
-def is_digit(str):
-  try:
-    int(str)
-    return True
-  except ValueError:
-    return False
-
-def to_float(str):
-  try:
-    f = float(str)
-    return f
-  except ValueError:
-    return None
-
-def get_unique_code(prefix, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return get_unique_code(prefix, session)
-  all_objs = get_all_db(prefix, session)
-  codes = [str(k.code) for k in all_objs]
-  code = ""
-  copy = True
-  while copy:
-    copy = False
-
-    random.seed()
-    code = str(secrets.token_hex(4))
-    for k in codes:
-      if k == code:
-        copy = True
-  return code
 
 
 def create_user(user_id, username, session=None):
@@ -1260,6 +1230,19 @@ matchscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
+#match generate start
+@matchscg.command(name = "generate", description = "Generates matches for the current tournament.")
+async def match_generate(ctx):
+  with Session.begin() as session:
+    if (len(get_current_tournaments(session)) == 0):
+      await ctx.respond("There is no current tournament.", ephemeral = True)
+      return
+    
+    await ctx.respond("Matches are being generated.", ephemeral = True)
+    
+    await generate_matches(bot, session)
+#match generate end
+
 #match create modal start
 class MatchCreateModal(Modal):
   
@@ -1267,7 +1250,7 @@ class MatchCreateModal(Modal):
     
     super().__init__(*args, **kwargs)
     self.balance_odds = balance_odds
-    leaderboard, odds_source = get_current_tournament_odds(session)
+    leaderboard, odds_source = get_last_tournament_and_odds(session)
     self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
     self.add_item(InputText(label="Enter team two name.", placeholder='Get from VLR', min_length=1, max_length=100))
     
@@ -1320,7 +1303,7 @@ class MatchCreateModal(Modal):
       color = code[:6]
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
       
-
+      
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
 
       if (channel := await bot.fetch_channel(get_channel_from_db("match", session))) == interaction.channel:
@@ -1812,6 +1795,34 @@ async def hide_from_leaderboard(ctx):
     user.hidden = not user.hidden
     print(user.hidden)
 
+#tournament start
+tournamentsgc = SlashCommandGroup(
+  name = "tournament", 
+  description = "Start, color, and rename tournaments.",
+  guild_ids = gid,
+)
+
+
+#tournament start start
+@tournamentsgc.command(name = "start", description = "Startes a tournament.")
+async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")):
+  code = get_code(vlr_link)
+  if code is None:
+    await ctx.respond("Invalid VLR link.", ephemeral = True)
+    return
+  print(code)
+  with Session.begin() as session:
+    if (tournament := generate_tournament(code, session)) is None:
+      await ctx.respond(f'Tournament already exists.', ephemeral = True)
+      return
+    await ctx.respond(f'Tournament "{tournament.name}" has been created.')
+    embedd = create_tournament_embedded(f"New Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament start end
+
+
+bot.add_application_command(tournamentsgc)
+#tournament end
 
 #season start
 seasonsgc = SlashCommandGroup(

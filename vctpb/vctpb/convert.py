@@ -1,30 +1,13 @@
+import discord
+from dbinterface import get_from_db, get_condition_db
+from sqlalchemy import literal
+from sqlaobjs import Session
 
 from Match import Match
 from Bet import Bet
 from User import User
 from Tournament import Tournament
 from Team import Team
-import discord
-from dbinterface import get_from_db, get_condition_db
-from sqlalchemy import literal
-from sqlaobjs import Session
-import math
-
-
-def roundup(x):
-  return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
-
-def balance_odds(team_one_old_odds, team_two_old_odds):
-  odds1 = team_one_old_odds - 1
-  odds2 = team_two_old_odds - 1
-  
-  oneflip = 1 / odds1
-  
-  percentage1 = (math.sqrt(odds2/oneflip))
-  
-  team_one_odds = roundup(odds1 / percentage1) + 1
-  team_two_odds = roundup(odds2 / percentage1) + 1
-  return team_one_odds, team_two_odds
 
 
 def ambig_to_obj(ambig, prefix=None, session=None):
@@ -84,6 +67,8 @@ def get_user_from_id(id, session=None):
   
 
 def id_to_metion(id):
+  if id is None:
+    return "Bot"
   return f"<@!{id}>"
 
 
@@ -324,6 +309,24 @@ def get_open_matches(session=None):
 def get_closed_matches(session=None):
   return get_condition_db("Match", (Match.winner == 0) & (Match.date_closed != None), session)
 
-
 def get_current_tournaments(session=None):
   return get_condition_db("Tournament", Tournament.active == True, session)
+
+
+def get_match_from_vrl_code(vlr_code, session=None):
+  matches = get_condition_db("Match", Match.vlr_code == vlr_code, session)
+  if len(matches) != 1:
+    return None
+  return matches[0]
+
+def get_team_from_vrl_code(vlr_code, session=None):
+  teams = get_condition_db("Team", Team.vlr_code == vlr_code, session)
+  if len(teams) != 1:
+    return None
+  return teams[0]
+
+def get_tournament_from_vrl_code(vlr_code, session=None):
+  tournament =  get_condition_db("Tournament", Tournament.vlr_code == vlr_code, session)
+  if len(tournament) != 1:
+    return None
+  return tournament[0]

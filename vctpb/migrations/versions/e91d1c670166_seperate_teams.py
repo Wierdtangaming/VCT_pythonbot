@@ -8,6 +8,7 @@ Create Date: 2023-02-14 15:32:48.837761
 from alembic import op
 from sqlalchemy import Column, String, ForeignKey, Integer, Boolean
 
+import secrets
 
 # revision identifiers, used by Alembic.
 revision = 'e91d1c670166'
@@ -37,7 +38,7 @@ def upgrade():
     Column('vlr_code', Integer, unique=True),
     Column('color_name', String(32), ForeignKey('color.name')),
     Column('color_hex', String(6), nullable=False),
-    Column("active", Boolean, default=1),
+    Column("active", Boolean),
   )
   
   # remove color_name from match and bet
@@ -60,7 +61,7 @@ def upgrade():
   print(teams)
   # insert all teams into team table
   for team in teams:
-    op.execute(f'INSERT INTO team (name, color_hex) VALUES (\'{team}\', \'000000\')')
+    op.execute(f'INSERT INTO team (name, color_hex) VALUES (\'{team}\', \'{str(secrets.token_hex(3))}\')')
   
   # get all tournaments in matches and bets and add to array
   tournaments = []
@@ -76,7 +77,7 @@ def upgrade():
   
   # insert all tournaments into tournament table
   for tournament in tournaments:
-    op.execute(f'INSERT INTO tournament (name, color_hex) VALUES (\'{tournament}\', \'000000\')')
+    op.execute(f'INSERT INTO tournament (name, color_hex, active) VALUES (\'{tournament}\', \'{str(secrets.token_hex(3))}\', \'0\')')
   
   with op.batch_alter_table('match') as batch_op:
     batch_op.create_foreign_key("fk_t1_name", 'team', ['t1'], ['name'])

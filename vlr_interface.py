@@ -62,16 +62,24 @@ def vlr_get_match_info(match_code):
   match_link = get_match_link(match_code)
   html = urlopen(match_link)
   soup = BeautifulSoup(html, 'html.parser')
+  t1_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-1")
+  t2_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-2")
+  if t1_link_div is None or t2_link_div is None:
+    print("team link not found for match code {match_code}")
+    return None, None, None, None
+  t1_vlr_code = t1_link_div.get("href").split("/")[2]
+  t2_vlr_code = t2_link_div.get("href").split("/")[2]
   
-  t1_vlr_code = soup.find("a", class_="match-header-link wf-link-hover mod-1").get("href").split("/")[2]
-  t2_vlr_code = soup.find("a", class_="match-header-link wf-link-hover mod-2").get("href").split("/")[2]
-  
-  t1_vlr_odds = soup.find("span", class_="match-bet-item-odds mod- mod-1").get_text()
-  t2_vlr_odds = soup.find("span", class_="match-bet-item-odds mod- mod-2").get_text()
+  t1_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-1")
+  t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
+  if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
+    print("odds not found for match code {match_code}")
+    return None, None, None, None
+  t1_vlr_odds = t1_vlr_odds_label.get_text()
+  t2_vlr_odds = t2_vlr_odds_label.get_text()
   
   return t1_vlr_code, t2_vlr_code, t1_vlr_odds, t2_vlr_odds
   
-
 
 
 #get codes
@@ -82,4 +90,4 @@ match_codes = vlr_get_today_matches(tournament_code)
 print(match_codes)
 
 for match_code in match_codes:
-  print(vlr_get_match_info(match_code))
+    print(vlr_get_match_info(match_code))

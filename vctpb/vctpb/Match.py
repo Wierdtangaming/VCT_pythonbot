@@ -5,8 +5,7 @@ from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry
-from convert import balance_odds
-from colorinterface import mix_colors
+from utils import balance_odds, mix_colors
 
 @mapper_registry.mapped
 class Match():
@@ -15,16 +14,16 @@ class Match():
   
   code = Column(String(8), primary_key = True, nullable=False)
   vlr_code = Column(Integer)
-  t1 = Column(String(50), ForeignKey("team.vlr_code"), nullable=False)
+  t1 = Column(String(50), ForeignKey("team.name"), nullable=False)
   team1 = relationship("Team", foreign_keys=[t1])
-  t2 = Column(String(50), ForeignKey("team.vlr_code"), nullable=False)
+  t2 = Column(String(50), ForeignKey("team.name"), nullable=False)
   team2 = relationship("Team", foreign_keys=[t2])
   t1o = Column(DECIMAL(5, 3), nullable=False)
   t2o = Column(DECIMAL(5, 3), nullable=False)
   t1oo = Column(DECIMAL(5, 3), nullable=False)
   t2oo = Column(DECIMAL(5, 3), nullable=False)
-  tournament_name = Column(String(100), ForeignKey("tournament.vlr_code"), nullable=False)
-  tournament = relationship("Team", back_populates="matches")
+  tournament_name = Column(String(100), ForeignKey("tournament.name"), nullable=False)
+  tournament = relationship("Tournament", back_populates="matches")
   
   creator = relationship("User", back_populates="matches")
   odds_source = Column(String(50), nullable=False)
@@ -41,20 +40,8 @@ class Match():
   @property
   def has_bets(self):
       return bool(self.bets)
-    
-  # creating from generation
-  def __init__(self, code, team1, team2, t1oo, t2oo, tournament):
-    t1 = team1.name
-    t2 = team2.name
-    t1o, t2o = balance_odds(t1oo, t2oo)
-    tournament_name = tournament.name
-    odds_source = "vlr"
-    color_hex = mix_colors(team1.color_hex, team2.color_hex)
-    date_created = datetime.now()
-    self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, None, date_created, None, None, [])
   
   def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color_hex, creator_id, date_created):
-
     self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, creator_id, date_created, None, None, [])
   
   def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color_hex, creator_id, date_created, date_winner, date_closed, message_ids):

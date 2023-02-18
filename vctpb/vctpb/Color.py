@@ -1,6 +1,5 @@
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
-
 from sqlaobjs import mapper_registry
 
 @mapper_registry.mapped

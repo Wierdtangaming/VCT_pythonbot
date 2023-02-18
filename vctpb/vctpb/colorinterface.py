@@ -1,17 +1,10 @@
 from dbinterface import get_from_db, is_key_in_db, add_to_db, delete_from_db
 from sqlaobjs import Session
 from Color import Color
+from utils import hex_to_tuple
 
+import secrets
 
-# hex is a string
-def mix_colors(hex1, hex2):
-  r1, g1, b1 = hex_to_tuple(hex1)
-  r2, g2, b2 = hex_to_tuple(hex2)
-  r = (r1 + r2) // 2
-  g = (g1 + g2) // 2
-  b = (b1 + b2) // 2
-  return f"#{r:02x}{g:02x}{b:02x}"
-  
 
 def valid_hex(hex):
   if len(hex) != 6 and len(hex) != 7:
@@ -27,13 +20,6 @@ def valid_hex(hex):
     return hex
   except ValueError:
     return None
-
-
-def hex_to_tuple(hex):
-  if len(hex) != 6:
-    return None
-    
-  return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
   
   
 def get_color(name, session=None):
