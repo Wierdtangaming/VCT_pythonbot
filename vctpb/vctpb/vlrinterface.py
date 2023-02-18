@@ -149,7 +149,7 @@ def vlr_create_match(match_code, tournament, session=None):
   date_created = get_date()
   code = get_unique_code("Match", session)
     
-  return Match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament.name, odds_source, color_hex, None, date_created)
+  return Match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament.name, odds_source, color_hex, None, date_created, match_code)
   
 
 async def generate_matches(bot, session=None):
