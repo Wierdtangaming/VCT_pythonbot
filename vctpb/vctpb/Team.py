@@ -31,6 +31,12 @@ class Team():
     return f"<Team {self.name}, code: {self.vlr_code}>"
         
   def set_color(self, color):
+    if color is None:
+      self.color = None
+      self.color_name = None
+      self.color_hex = get_random_hex_color()
+      return
+    
     if isinstance(color, str):
       self.color = None
       self.color_name = None

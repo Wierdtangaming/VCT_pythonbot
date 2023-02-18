@@ -37,7 +37,7 @@ import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
 
-from vlrinterface import generate_matches, get_code, generate_tournament
+from vlrinterface import generate_matches, get_code, generate_tournament, get_or_create_team, get_or_create_tournament
 
 from sqlaobjs import Session
 from utils import *
@@ -1264,8 +1264,13 @@ class MatchCreateModal(Modal):
     with Session.begin() as session:
       team_one = self.children[0].value.strip()
       team_two = self.children[1].value.strip()
+      
+      get_or_create_team(team_one, None, session)
+      get_or_create_team(team_two, None, session)
+      
       odds_combined = self.children[2].value.strip()
       tournament_name = self.children[3].value.strip()
+      get_or_create_tournament(tournament_name, None, session)
       betting_site = self.children[4].value.strip()
       
       
