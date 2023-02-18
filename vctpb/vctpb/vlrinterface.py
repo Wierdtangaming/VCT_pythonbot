@@ -85,10 +85,10 @@ def get_or_create_team(team_name, team_vrl_code, session=None):
       return team
     team.vlr_code = team_vrl_code
     return team
-  
-  team = get_team_from_vrl_code(team_vrl_code, session)
-  if team is not None:
-    return team
+  if team_vrl_code is not None:
+    team = get_team_from_vrl_code(team_vrl_code, session)
+    if team is not None:
+      return team
   team = Team(team_name, team, get_random_hex_color())
   add_to_db(team, session)
   return team
@@ -182,7 +182,26 @@ async def generate_matches(bot, session=None):
   if match_channel is not None:
     embedd = create_match_list_embedded("Generated Matches:", matches, session)
     await match_channel.send(embed=embedd)
+
+def get_or_create_tournament(tournament_name, tournament_vrl_code, session=None):
+  if session is None:
+    with Session.begin() as session:
+      get_or_create_tournament(tournament_name, tournament_vrl_code, session)
+      
+  tournament = get_from_db("Tournament", tournament_name, session)
+  if tournament is not None:
+    if tournament.vlr_code is not None:
+      return tournament
+    tournament.vlr_code = tournament_vrl_code
+    return tournament
   
+  if tournament_vrl_code is not None:
+    tournament = get_tournament_from_vrl_code(tournament_vrl_code, session)
+    if tournament is not None:
+      return tournament
+  tournament = Tournament(tournament_name, tournament_vrl_code, get_random_hex_color())
+  add_to_db(tournament, session)
+  return tournament
   
 def generate_tournament(vlr_code, session=None):
   if session is None:
