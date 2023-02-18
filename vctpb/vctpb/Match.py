@@ -5,6 +5,7 @@ from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry
+from utils import balance_odds, mix_colors
 
 @mapper_registry.mapped
 class Match():
@@ -12,17 +13,21 @@ class Match():
   __tablename__ = "match"
   
   code = Column(String(8), primary_key = True, nullable=False)
-  t1 = Column(String(50), nullable=False)
-  t2 = Column(String(50), nullable=False)
+  vlr_code = Column(Integer)
+  t1 = Column(String(50), ForeignKey("team.name"), nullable=False)
+  team1 = relationship("Team", foreign_keys=[t1])
+  t2 = Column(String(50), ForeignKey("team.name"), nullable=False)
+  team2 = relationship("Team", foreign_keys=[t2])
   t1o = Column(DECIMAL(5, 3), nullable=False)
   t2o = Column(DECIMAL(5, 3), nullable=False)
   t1oo = Column(DECIMAL(5, 3), nullable=False)
   t2oo = Column(DECIMAL(5, 3), nullable=False)
-  tournament_name = Column(String(100), nullable=False)
+  tournament_name = Column(String(100), ForeignKey("tournament.name"), nullable=False)
+  tournament = relationship("Tournament", back_populates="matches")
+  
+  creator = relationship("User", back_populates="matches")
   odds_source = Column(String(50), nullable=False)
   winner = Column(Integer, nullable=False)
-  color_name = Column(String(32), ForeignKey("color.name"))
-  color = relationship("Color", back_populates="matches")
   color_hex = Column(String(6), nullable=False)
   creator_id = Column(Integer, ForeignKey("user.code"))
   creator = relationship("User", back_populates="matches")
@@ -36,36 +41,10 @@ class Match():
   def has_bets(self):
       return bool(self.bets)
   
-  def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color, creator_id, date_created):
-
-
-    self.code = code
-    self.t1 = t1
-    self.t2 = t2
-    self.t1o = t1o
-    self.t2o = t2o
-    self.t1oo = t1oo
-    self.t2oo = t2oo
-
-    self.tournament_name = tournament_name
-    
-    self.odds_source = odds_source
-    
-    self.winner = 0
-
-    self.set_color(color)
-    
-    #id of user that created match
-    self.creator_id = creator_id
-
-    self.date_created = date_created
-
-    self.date_winner = None
-    self.date_closed = None
-    
-    self.message_ids = []
+  def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color_hex, creator_id, date_created):
+    self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, creator_id, date_created, None, None, [])
   
-  def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color, creator_id, date_created, date_winner, date_closed, message_ids):
+  def full__init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, winner, odds_source, color_hex, creator_id, date_created, date_winner, date_closed, message_ids):
     self.code = code
     self.t1 = t1
     self.t2 = t2
@@ -76,23 +55,12 @@ class Match():
     self.tournament_name = tournament_name
     self.winner = winner
     self.odds_source = odds_source
-    self.set_color(color)
+    self.color_hex = color_hex
     self.creator_id = creator_id
     self.date_created = date_created
     self.date_winner = date_winner
     self.date_closed = date_closed
     self.message_ids = message_ids
-  
-  def set_color(self, color):
-    if isinstance(color, str):
-      self.color = None
-      self.color_name = None
-      self.color_hex = color
-      return
-    
-    self.color = color
-    self.color_name = color.name
-    self.color_hex = color.hex
   
   
   def __repr__(self):

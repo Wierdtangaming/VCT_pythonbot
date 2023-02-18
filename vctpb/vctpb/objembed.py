@@ -2,6 +2,7 @@ import discord
 from dbinterface import get_mult_from_db, get_condition_db
 from Match import Match
 from Bet import Bet
+from Tournament import Tournament
 from User import User, get_active_users
 from convert import ambig_to_obj, id_to_metion
 from colorinterface import hex_to_tuple
@@ -212,3 +213,11 @@ def create_award_label_list_embedded(user, award_labels):
     embed.add_field(name=name, value=f"Balance changed by {award_t[-2]}, {award_t[-1]}", inline=False)
   return embed
 
+def create_tournament_embedded(embed_title, tournament):
+  embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(tournament.color_hex)))
+  embed.add_field(name="Name:", value=tournament.name, inline=True)
+  active_str = "No"
+  if tournament.active:
+    active_str = "Yes"
+  embed.add_field(name="Active:", value=active_str, inline=True)
+  return embed

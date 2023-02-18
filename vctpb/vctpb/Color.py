@@ -1,6 +1,5 @@
 from sqlalchemy import Column, String
 from sqlalchemy.orm import relationship
-
 from sqlaobjs import mapper_registry
 
 @mapper_registry.mapped
@@ -10,9 +9,9 @@ class Color():
   
   name = Column(String(32), primary_key=True, nullable=False)
   hex = Column(String(6), nullable=False)
-  matches = relationship("Match", back_populates="color")
-  bets = relationship("Bet", back_populates="color")
   users = relationship("User", back_populates="color")
+  tournaments = relationship("Tournament", back_populates="color")
+  teams = relationship("Team", back_populates="color")
   
   
   def __init__(self, name, hex):

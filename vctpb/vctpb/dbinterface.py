@@ -1,5 +1,3 @@
-from datetime import datetime
-from pytz import timezone
 import jsonpickle
 
 from sqlaobjs import Session 
@@ -8,20 +6,16 @@ from sqlalchemy import select, desc
 from Match import Match
 from User import User
 from Bet import Bet
+from Team import Team
+from Tournament import Tournament
 from Color import Color
 from Channels import Channels
 
 from configparser import ConfigParser
 
-
-def get_date():
-  central = timezone('US/Central')
-  return datetime.now(central)
-
-def get_date_string(date=None):
-  if date is None:
-    date = get_date()
-  return date.strftime("%Y-%m-%d-%H-%M-%S")
+import random
+import secrets
+from utils import get_date_string, get_date
 
 async def delete_all_messages(ids, bot):
   for id in ids:
@@ -161,3 +155,22 @@ def set_setting(setting_name, setting_value):
   configur.set('settings', setting_name, setting_value)
   with open('settings.ini', 'w') as configfile:
     configur.write(configfile)
+    
+    
+def get_unique_code(prefix, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return get_unique_code(prefix, session)
+  all_objs = get_all_db(prefix, session)
+  codes = [str(k.code) for k in all_objs]
+  code = ""
+  copy = True
+  while copy:
+    copy = False
+
+    random.seed()
+    code = str(secrets.token_hex(4))
+    for k in codes:
+      if k == code:
+        copy = True
+  return code

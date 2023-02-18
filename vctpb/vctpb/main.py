@@ -21,21 +21,26 @@ import jsonpickle
 from Match import Match
 from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
-from dbinterface import  get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting
+from Team import Team
+from Tournament import Tournament
+from dbinterface import get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting, get_unique_code
 from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 from convert import *
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded
+from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded, create_tournament_embedded
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
-import matplotlib.colors as mcolors
 import secrets
 import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
+from autocompletes import *
+
+from vlrinterface import generate_matches, get_code, generate_tournament
 
 from sqlaobjs import Session
+from utils import *
 
   
 
@@ -45,7 +50,6 @@ intents = discord.Intents.all()
 bot = commands.Bot(intents=intents)
 
 gid = get_setting("guild_ids")
-
 
 
 #current is no winner
@@ -98,7 +102,7 @@ def get_last_odds_source(amount, session=None):
         return list(name_set)[0]
       return list(name_set)
 
-def get_current_tournament_odds(session=None):
+def get_last_tournament_and_odds(session=None):
   match = get_new_db("Match", session)
   return (match.tournament_name, match.odds_source)
 
@@ -146,39 +150,6 @@ async def edit_all_messages(ids, embedd, new_title=None):
       await msg.edit(embed=embedd)
     except Exception:
       print(id, "no msg found")
-      
-
-def is_digit(str):
-  try:
-    int(str)
-    return True
-  except ValueError:
-    return False
-
-def to_float(str):
-  try:
-    f = float(str)
-    return f
-  except ValueError:
-    return None
-
-def get_unique_code(prefix, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return get_unique_code(prefix, session)
-  all_objs = get_all_db(prefix, session)
-  codes = [str(k.code) for k in all_objs]
-  code = ""
-  copy = True
-  while copy:
-    copy = False
-
-    random.seed()
-    code = str(secrets.token_hex(4))
-    for k in codes:
-      if k == code:
-        copy = True
-  return code
 
 
 def create_user(user_id, username, session=None):
@@ -200,10 +171,6 @@ def add_balance_user(user_ambig, change, description, date, session=None):
     return None
   user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
   return user
-
-
-def roundup(x):
-  return math.ceil(Decimal(x) * Decimal(1000)) / Decimal(1000)
 
 
 @bot.event
@@ -243,44 +210,6 @@ async def on_ready():
 @tasks.loop(minutes=20)
 async def auto_backup_timer():
   backup_full()
-  
-  
-#autocomplete start
-
-#color picker autocomplete start
-async def color_picker_autocomplete(ctx: discord.AutocompleteContext):
-  lower = ctx.value.lower()
-  return [color.name.capitalize() for color in get_all_db("Color") if lower in color.name.lower()]
-#color picker autocomplete end
-
-#multi user autocomplete start
-async def multi_user_list_autocomplete(ctx: discord.AutocompleteContext):
-  value = ctx.value.strip()
-  users = get_condition_db("User", User.hidden == False)
-  usernames_t = [(user.username, user.username.replace(" ", "-_-")) for user in users]
-  clean_usernames = [username_t[0] for username_t in usernames_t]
-  no_break_usernames = [username_t[1] for username_t in usernames_t]
-  for username_t in usernames_t:
-    value = value.replace(username_t[0], username_t[1])
-  combined_values = value
-  values = value.split(" ")
-  if len(values) == 0:
-    return clean_usernames
-  last_value = values[-1]
-  all_but = " ".join(values[:-1]).replace("-_-", " ")
-  all = " ".join(values).replace("-_-", " ")
-  if last_value not in no_break_usernames:
-    auto_completes = []
-    for username_t in usernames_t:
-      if username_t[1] in combined_values:
-        continue
-      if username_t[1].startswith(last_value):
-        auto_completes.append(f"{all_but} {username_t[0]}")
-    return auto_completes
-  return [f"{all} {username_t[0]}" for username_t in usernames_t if username_t[1] not in combined_values]
-#multi user autocomplete end
-
-#autocomplete end
 
 
   
@@ -335,19 +264,6 @@ award = SlashCommandGroup(
   description = "Awards the money to someone's account. DON'T USE WITHOUT PERMISSION!",
   guild_ids = gid,
 )
-
-#user award autocomplete start
-async def user_awards_autocomplete(ctx: discord.AutocompleteContext):
-  if(member := ctx.options["user"]) is None: return []
-  
-  user = get_user_from_id(member)
-  
-  award_labels = user.get_award_strings()
-  award_labels.reverse()
-  
-  return [award_label for award_label in award_labels if ctx.value.lower() in award_label.lower()]
-#user award autocomplete end  
-
 
 
 #award give start
@@ -706,53 +622,6 @@ class BetEditModal(Modal):
 #bet edit modal end
 
   
-#new match list autocomplete start
-async def new_match_list_odds_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    return filter_names(ctx.value.lower(), user.open_matches(session), session, naming_type=2)
-#new match list autocomplete end
-
-
-#all bet list autocomplete start
-async def all_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    return filter_names(ctx.value.lower(), get_current_bets(session), session, ctx.interaction.user)
-#all bet list autocomplete end
-
-
-#bet list autocomplete start
-async def bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    lower_value = ctx.value.lower()
-    auto_completes = filter_names(lower_value, get_current_bets(session), session, ctx.interaction.user)
-    if auto_completes == []:
-      auto_completes = filter_names(lower_value, get_user_visible_bets(ctx.interaction.user, session), ctx.interaction.user)
-    return auto_completes
-#bet list autocomplete end
-
-
-#user bet list autocomplete start
-async def user_open_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    return filter_names(ctx.value.lower(), get_open_user_bets(ctx.interaction.user, session), session)
-#user bet list autocomplete end
-
-
-#user's visible bet list autocomplete start
-async def users_visible_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    return filter_names(ctx.value.lower(), get_users_visible_current_bets(ctx.interaction.user, session), session)
-#user's visible bet list autocomplete end
-  
-  
-#user's hidden bet list autocomplete start
-async def users_hidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    return filter_names(ctx.value.lower(), get_users_hidden_current_bets(ctx.interaction.user, session), session)
-#user's hidden bet list autocomplete end
-
-
 #bet create start
 @betscg.command(name = "create", description = "Create a bet.")
 async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autocomplete=new_match_list_odds_autocomplete), hide: Option(int, "Hide bet from other users? Defualt is No.", choices = yes_no_choices, default=0, required=False)):
@@ -999,44 +868,6 @@ colorscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-xkcd_colors = mcolors.XKCD_COLORS
-#color xkcd autocomplete start
-async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
-  val = ctx.value.lower()
-  colors = [x[5:].lower() for x in xkcd_colors.keys() if val in x]
-  
-  colors = colors[::-1]
-  same = []
-  start = []
-  half_start = []
-  contain = []
-  val_words = val.split(" ")
-  for color in colors:
-    color_words = color.split(" ")
-    if color.startswith(val):
-      start.append(color)
-    else:
-      half = True
-      for word in val_words:
-        word_in = False
-        for color_word in color_words:
-          if color_word.startswith(word):
-            word_in = True
-        if not word_in:
-          half = False
-          break
-      if half:
-        half_start.append(color)
-      elif color == val:
-        same.append(color)
-      else:
-        contain.append(color)
-    
-  colors = same + start + half_start + contain
-  colors = [color.capitalize() for color in colors]
-  return colors
-#color xkcd autocomplete end
-
   
 #color list start
 @colorscg.command(name = "list", description = "Lists all colors.")
@@ -1131,21 +962,10 @@ profile = SlashCommandGroup(
 )
 
 
-#color profile autocomplete start
-async def color_profile_autocomplete(ctx: discord.AutocompleteContext):  
-  with Session.begin() as session:
-    if (user := get_from_db("User", ctx.interaction.user.id, session)) is None: return ["No user found."]
-    if user.is_in_first_place(get_all_db("User", session)):
-      val = ["First place gold"]
-    else:
-      val = []
-    return val + [color.name.capitalize() for color in get_all_db("Color", session) if ctx.value.lower() in color.name.lower()]
-#color profile autocomplete end
-
-
 #profile color start
+# old sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete), sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)):
+async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete)):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if color_name == "First place gold":
@@ -1164,7 +984,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     
     author = ctx.author
     username = user.username
-    
+    sync = 0
     if sync == 1:
       await set_role(ctx.interaction.guild, author, username, user.color_hex, bot)
     elif sync == 0:
@@ -1410,6 +1230,19 @@ matchscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
+#match generate start
+@matchscg.command(name = "generate", description = "Generates matches for the current tournament.")
+async def match_generate(ctx):
+  with Session.begin() as session:
+    if (len(get_current_tournaments(session)) == 0):
+      await ctx.respond("There is no current tournament.", ephemeral = True)
+      return
+    
+    await ctx.respond("Matches are being generated.", ephemeral = True)
+    
+    await generate_matches(bot, session)
+#match generate end
+
 #match create modal start
 class MatchCreateModal(Modal):
   
@@ -1417,7 +1250,7 @@ class MatchCreateModal(Modal):
     
     super().__init__(*args, **kwargs)
     self.balance_odds = balance_odds
-    leaderboard, odds_source = get_current_tournament_odds(session)
+    leaderboard, odds_source = get_last_tournament_and_odds(session)
     self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
     self.add_item(InputText(label="Enter team two name.", placeholder='Get from VLR', min_length=1, max_length=100))
     
@@ -1458,16 +1291,9 @@ class MatchCreateModal(Modal):
       if team_one_old_odds <= 1 or team_two_old_odds <= 1:
         await interaction.response.send_message(f"Odds must be greater than 1.", ephemeral=True)
         return
+      
       if self.balance_odds == 1:
-        odds1 = team_one_old_odds - 1
-        odds2 = team_two_old_odds - 1
-        
-        oneflip = 1 / odds1
-        
-        percentage1 = (math.sqrt(odds2/oneflip))
-        
-        team_one_odds = roundup(odds1 / percentage1) + 1
-        team_two_odds = roundup(odds2 / percentage1) + 1
+        team_one_odds, team_two_odds = balance_odds(team_one_old_odds, team_two_old_odds)
       else:
         team_one_odds = team_one_old_odds
         team_two_odds = team_two_old_odds
@@ -1477,7 +1303,7 @@ class MatchCreateModal(Modal):
       color = code[:6]
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
       
-
+      
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
 
       if (channel := await bot.fetch_channel(get_channel_from_db("match", session))) == interaction.channel:
@@ -1598,60 +1424,7 @@ class MatchEditModal(Modal):
       match.message_ids.append((msg.id, msg.channel.id))
 #match edit modal end
 
-    
-#tournament autocomplete start (unused)
-async def tournament_list_autocomplete(ctx: discord.AutocompleteContext):
-  return get_last_tournament_name(5)
-#tournament autocomplete end (unused)
 
-#match list autocomplete start
-async def match_list_autocomplete(ctx: discord.AutocompleteContext):
-  with Session.begin() as session:
-    lower_value = ctx.value.lower()
-    auto_completes = filter_names(lower_value, get_current_matches(session), session)
-    if auto_completes == []:
-      auto_completes = filter_names(lower_value, get_all_db("Match", session), session)
-    return auto_completes
-#match list autocomplete end
-
-#match current list autocomplete start
-async def match_current_list_autocomplete(ctx: discord.AutocompleteContext):
-  return filter_names(ctx.value.lower(), get_current_matches())
-#match current list autocomplete end
-  
-  
-#match open list autocomplete start
-async def match_open_list_autocomplete(ctx: discord.AutocompleteContext):
-  return filter_names(ctx.value.lower(), get_open_matches())
-#match open list autocomplete end
-
-#match close list autocomplete start
-async def match_close_list_autocomplete(ctx: discord.AutocompleteContext):
-  return filter_names(ctx.value.lower(), get_closed_matches())
-#match close list autocomplete end
-
-  
-#match match team autocomplete start
-async def match_team_list_autocomplete(ctx: discord.AutocompleteContext):
-  if(match := ctx.options["match"]) is None: return []
-  with Session() as session:
-    if (match := await obj_from_autocomplete_tuple(ctx, get_current_matches(session), match, "Match", session)) is None: return []
-    return [match.t1, match.t2]
-#match match team autocomplete end
-
-  
-#match winner autocomplete start
-async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext):
-  if(match := ctx.options["match"]) is None: return []
-  with Session() as session:
-    if (match := await obj_from_autocomplete_tuple(None, get_all_db("Match", session), match, "Match", session)) is None: return []
-    
-    strin = "None"
-    if match.t1 == "None" or match.t2 == "None":
-      strin = "Set winner to none"
-    return ["Dont do this command", match.t1, match.t2, strin, "This command can break the bot and its save data"]
-#match winner autocomplete end
-  
 
 #match bets start
 @matchscg.command(name = "bets", description = "What bets.")
@@ -1743,26 +1516,6 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
   await edit_all_messages(match.message_ids, embedd)
 #match close end
 
-
-#match betting start
-#@matchscg.command(name = "betting", description = "Open and close betting.")
-#async def match_betting(ctx, type: Option(int, "Set to open or close", choices = open_close_choices), match: Option(str, "Match you want to open/close.", autocomplete=match_open_close_list_autocomplete)):
-#  with Session.begin() as session:
-#    if (match := await obj_from_autocomplete_tuple(ctx, current_matches_name_objs(session), match, "Match", session)) is None: return
-#
-#    #if already on dont do anything complex
-#      
-#    if type == 0:
-#      match.date_closed = None
-#      await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
-#    else:
-#      match.date_closed = get_date()
-#      await ctx.respond(f"{match.t1} vs {match.t2} betting has closed.")
-#    embedd = create_match_embedded(match, "Placeholder", session)
-#  await edit_all_messages(match.message_ids, embedd)
-#match betting end
-  
-  
 #match create start
 @matchscg.command(name = "create", description = "Create a match.")
 async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
@@ -2042,6 +1795,34 @@ async def hide_from_leaderboard(ctx):
     user.hidden = not user.hidden
     print(user.hidden)
 
+#tournament start
+tournamentsgc = SlashCommandGroup(
+  name = "tournament", 
+  description = "Start, color, and rename tournaments.",
+  guild_ids = gid,
+)
+
+
+#tournament start start
+@tournamentsgc.command(name = "start", description = "Startes a tournament.")
+async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")):
+  code = get_code(vlr_link)
+  if code is None:
+    await ctx.respond("Invalid VLR link.", ephemeral = True)
+    return
+  print(code)
+  with Session.begin() as session:
+    if (tournament := generate_tournament(code, session)) is None:
+      await ctx.respond(f'Tournament already exists.', ephemeral = True)
+      return
+    await ctx.respond(f'Tournament "{tournament.name}" has been created.')
+    embedd = create_tournament_embedded(f"New Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament start end
+
+
+bot.add_application_command(tournamentsgc)
+#tournament end
 
 #season start
 seasonsgc = SlashCommandGroup(
@@ -2049,17 +1830,6 @@ seasonsgc = SlashCommandGroup(
   description = "Start and rename season.",
   guild_ids = gid,
 )
-
-
-#season autocomplete start
-async def seasons_autocomplete(ctx: discord.AutocompleteContext):
-  user = ambig_to_obj(ctx.interaction.user, "User")
-  
-  reset_labels = user.get_reset_strings()
-  reset_labels.reverse()
-  
-  return [reset_label for reset_label in reset_labels if ctx.value.lower() in reset_label.lower()]
-#season autocomplete end  
 
 
 #season start start

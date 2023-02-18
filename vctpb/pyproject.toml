@@ -17,6 +17,7 @@ matplotlib = "^3.5.1"
 SQLAlchemy = "^1.4.32"
 ujson = "^5.1.0"
 alembic = "^1.7.7"
+bs4 = "^0.0.1"
 
 [tool.poetry.dev-dependencies]
 

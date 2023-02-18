@@ -1,11 +1,13 @@
-
-from Match import Match
-from Bet import Bet
-from User import User
 import discord
 from dbinterface import get_from_db, get_condition_db
 from sqlalchemy import literal
 from sqlaobjs import Session
+
+from Match import Match
+from Bet import Bet
+from User import User
+from Tournament import Tournament
+from Team import Team
 
 
 def ambig_to_obj(ambig, prefix=None, session=None):
@@ -65,6 +67,8 @@ def get_user_from_id(id, session=None):
   
 
 def id_to_metion(id):
+  if id is None:
+    return "Bot"
   return f"<@!{id}>"
 
 
@@ -134,7 +138,7 @@ def usernames_to_users(usernames, session=None):
 
 def filter_names(value, ambig, session=None, user=None, naming_type=1):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return filter_names(value, ambig, session, user, naming_type)
     
   if len(ambig) == 0:
@@ -209,7 +213,7 @@ def shorten_match_name(match, naming_type=1):
 
 def shorten_bet_name(bet, user_id, session=None):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return shorten_bet_name(bet, user_id, session)
   if bet.winner != 0:
     prefix = "Paid out: "
@@ -255,7 +259,7 @@ def get_all_user_bets(user, session=None):
 
 def get_open_user_bets(user, session=None):
   if session is None:
-    with Session() as session:
+    with Session.begin() as session:
       return get_open_user_bets(user, session)
   return [bet for bet in get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session) if bet.match.date_closed is None]
 
@@ -304,3 +308,25 @@ def get_open_matches(session=None):
 
 def get_closed_matches(session=None):
   return get_condition_db("Match", (Match.winner == 0) & (Match.date_closed != None), session)
+
+def get_current_tournaments(session=None):
+  return get_condition_db("Tournament", Tournament.active == True, session)
+
+
+def get_match_from_vrl_code(vlr_code, session=None):
+  matches = get_condition_db("Match", Match.vlr_code == vlr_code, session)
+  if len(matches) != 1:
+    return None
+  return matches[0]
+
+def get_team_from_vrl_code(vlr_code, session=None):
+  teams = get_condition_db("Team", Team.vlr_code == vlr_code, session)
+  if len(teams) != 1:
+    return None
+  return teams[0]
+
+def get_tournament_from_vrl_code(vlr_code, session=None):
+  tournament =  get_condition_db("Tournament", Tournament.vlr_code == vlr_code, session)
+  if len(tournament) != 1:
+    return None
+  return tournament[0]

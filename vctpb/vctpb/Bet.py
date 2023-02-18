@@ -19,8 +19,6 @@ class Bet():
   winner = Column(Integer, nullable=False)
   amount_bet = Column(Integer, nullable=False)
   team_num = Column(Integer, nullable=False)
-  color_name = Column(String(32), ForeignKey("color.name"))
-  color = relationship("Color", back_populates="bets")
   color_hex = Column(String(6), nullable=False)
   match_id = Column(String(8), ForeignKey("match.code"), nullable=False)
   match = relationship("Match", back_populates="bets")
@@ -55,7 +53,7 @@ class Bet():
     
     self.hidden = hidden
 
-  def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
+  def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color_hex, match_id, user_id, date_created, message_ids):
     self.code = code
     self.t1 = t1
     self.t2 = t2
@@ -63,20 +61,12 @@ class Bet():
     self.winner = winner
     self.amount_bet = amount_bet
     self.team_num = team_num
-    self.set_color(color)
+    self.color_hex = color_hex
     self.match_id = match_id
     self.user_id = user_id
     self.date_created = date_created
     self.message_ids = message_ids
   
-  def set_color(self, color):
-    if isinstance(color, str):
-      self.color_name = None
-      self.color_hex = color
-      return
-    
-    self.color_name = color.name
-    self.color_hex = color.hex
   
   def __repr__(self):
     return f"<Bet {self.code}>"
