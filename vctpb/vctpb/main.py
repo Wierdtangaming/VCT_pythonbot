@@ -1827,11 +1827,9 @@ async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")
 
 #tournament matches start
 @tournamentsgc.command(name = "matches", description = "What matches.")
-async def tournament_matches(ctx, tournament: Option(str, "Tournament you want matches of.", autocomplete=tournament_name_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
+async def tournament_matches(ctx, tournament: Option(str, "Tournament you want matches of.", autocomplete=tournament_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
   with Session.begin() as session:
-    if (ntournament := await obj_from_autocomplete_tuple(ctx, get_active_tournaments(session), tournament, "Tournament", session)) is None:
-      if (ntournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), tournament, "Tournament", session)) is None: return
-    tournament = ntournament
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), tournament, "Tournament", session)) is None: return
     
     matches = tournament.matches
     if len(matches) == 0:
@@ -1856,14 +1854,12 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
 
 #tournament recolor start
 @tournamentsgc.command(name = "recolor", description = "Changes the color of a tournament.")
-async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete),
                            xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
                            color_name:Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
                            hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), name, "Tournament", session)) is None: return
     color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
     if color is None:
       return
@@ -1876,12 +1872,10 @@ async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autoc
 
 #tournament rename start
 @tournamentsgc.command(name = "rename", description = "Renames a tournament.")
-async def tournament_rename(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+async def tournament_rename(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete),
                             new_name: Option(str, "New name of tournament.")):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), name, "Tournament", session)) is None: return
     for match in tournament.matches:
       match.tournament_name = new_name
     for bet in tournament.bets:
@@ -1893,22 +1887,18 @@ async def tournament_rename(ctx, name: Option(str, "Name of tournament.", autoco
 
 #tournament find start
 @tournamentsgc.command(name = "find", description = "Finds a tournament.")
-async def tournament_find(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+async def tournament_find(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete)):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), name, "Tournament", session)) is None: return
     embedd = create_tournament_embedded(f"Found Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament find end
 
 #tournament activate start
 @tournamentsgc.command(name = "activate", description = "Activates a tournament.")
-async def tournament_activate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+async def tournament_activate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_inactive_autocomplete)):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_inactive_tournaments(session), name, "Tournament", session)) is None: return
     if tournament.active:
       await ctx.respond("Tournament already active.", ephemeral = True)
       return
@@ -1919,11 +1909,9 @@ async def tournament_activate(ctx, name: Option(str, "Name of tournament.", auto
 
 #tournament deactivate start
 @tournamentsgc.command(name = "deactivate", description = "Deactivates a tournament.")
-async def tournament_deactivate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+async def tournament_deactivate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_active_autocomplete)):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_active_tournaments(session), name, "Tournament", session)) is None: return
     if not tournament.active:
       await ctx.respond("Tournament already inactive.", ephemeral = True)
       return
@@ -1934,12 +1922,10 @@ async def tournament_deactivate(ctx, name: Option(str, "Name of tournament.", au
 
 #tournament link start
 @tournamentsgc.command(name = "link", description = "Links a tournament to a vlr code.")
-async def tournament_link(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+async def tournament_link(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete),
                           vlr_link: Option(str, "VLR link of tournament.")):
   with Session.begin() as session:
-    if (tournament := get_from_db("Tournament", name, session)) is None:
-      await ctx.respond("Tournament does not exist.", ephemeral = True)
-      return
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), name, "Tournament", session)) is None: return
     code = get_code(vlr_link)
     if code is None:
       await ctx.respond("Not a valid team link.", ephemeral = True)

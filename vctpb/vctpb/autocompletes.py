@@ -205,15 +205,27 @@ async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext)
     return ["Dont do this command", match.t1, match.t2, strin, "This command can break the bot and its save data"]
 #match winner autocomplete end
 
-#tournament name autocomplete start
-async def tournament_name_autocomplete(ctx: discord.AutocompleteContext):
+#tournament autocomplete start
+async def tournament_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     lower_value = ctx.value.lower()
     auto_completes = filter_names(lower_value, get_active_tournaments(session), session)
     if auto_completes == []:
       auto_completes = filter_names(lower_value, get_all_db("Tournament", session), session)
     return auto_completes
-#tournament name autocomplete end
+#tournament autocomplete end
+
+#tournament active autocomplete start
+async def tournament_active_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    return filter_names(ctx.value.lower(), get_active_tournaments(session), session)
+#tournament active autocomplete end
+
+#tournament inactive autocomplete start
+async def tournament_inactive_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    return filter_names(ctx.value.lower(), get_inactive_tournaments(session), session)
+  #tournament inactive autocomplete end
 
 #season autocomplete start
 async def seasons_autocomplete(ctx: discord.AutocompleteContext):
