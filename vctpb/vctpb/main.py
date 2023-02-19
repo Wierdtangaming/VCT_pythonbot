@@ -1882,13 +1882,13 @@ async def tournament_rename(ctx, name: Option(str, "Name of tournament.", autoco
     if (tournament := get_from_db("Tournament", name, session)) is None:
       await ctx.respond("Tournament does not exist.", ephemeral = True)
       return
-    tournament.name = new_name
-    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
-    await ctx.respond(embed=embedd)
     for match in tournament.matches:
       match.tournament_name = new_name
     for bet in tournament.bets:
       bet.tournament_name = new_name
+    tournament.name = new_name
+    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
 #tournament rename end
 
 #tournament find start
@@ -1902,6 +1902,52 @@ async def tournament_find(ctx, name: Option(str, "Name of tournament.", autocomp
     await ctx.respond(embed=embedd)
 #tournament find end
 
+#tournament activate start
+@tournamentsgc.command(name = "activate", description = "Activates a tournament.")
+async def tournament_activate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    if tournament.active:
+      await ctx.respond("Tournament already active.", ephemeral = True)
+      return
+    tournament.active = True
+    embedd = create_tournament_embedded(f"Activated Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament activate end
+
+#tournament deactivate start
+@tournamentsgc.command(name = "deactivate", description = "Deactivates a tournament.")
+async def tournament_deactivate(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    if not tournament.active:
+      await ctx.respond("Tournament already inactive.", ephemeral = True)
+      return
+    tournament.active = False
+    embedd = create_tournament_embedded(f"Deactivated Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament deactivate end
+
+#tournament link start
+@tournamentsgc.command(name = "link", description = "Links a tournament to a vlr code.")
+async def tournament_link(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+                          vlr_link: Option(str, "VLR link of tournament.")):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    code = get_code(vlr_link)
+    if code is None:
+      await ctx.respond("Not a valid team link.", ephemeral = True)
+      return
+    tournament.vlr_code = code
+    embedd = create_tournament_embedded(f"Linked Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament link end
 
 bot.add_application_command(tournamentsgc)
 #tournament end
