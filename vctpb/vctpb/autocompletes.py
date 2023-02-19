@@ -2,14 +2,12 @@
 import discord
 from dbinterface import get_all_db, get_condition_db
 from User import User
-from Match import Match
-from Bet import Bet
-from Team import Team
-from Tournament import Tournament
-import matplotlib.colors as mcolors
+from Color import Color
 from convert import *
 
 from sqlaobjs import Session
+
+from utils import *
 
 
 #color picker autocomplete start
@@ -108,7 +106,6 @@ async def users_hidden_bet_list_autocomplete(ctx: discord.AutocompleteContext):
 
 
 
-xkcd_colors = mcolors.XKCD_COLORS
 #color xkcd autocomplete start
 async def xkcd_picker_autocomplete(ctx: discord.AutocompleteContext): 
   val = ctx.value.lower()
@@ -207,7 +204,16 @@ async def match_reset_winner_list_autocomplete(ctx: discord.AutocompleteContext)
       strin = "Set winner to none"
     return ["Dont do this command", match.t1, match.t2, strin, "This command can break the bot and its save data"]
 #match winner autocomplete end
-  
+
+#tournament name autocomplete start
+async def tournament_name_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    lower_value = ctx.value.lower()
+    auto_completes = filter_names(lower_value, get_active_tournaments(session), session)
+    if auto_completes == []:
+      auto_completes = filter_names(lower_value, get_all_db("Tournament", session), session)
+    return auto_completes
+#tournament name autocomplete end
 
 #season autocomplete start
 async def seasons_autocomplete(ctx: discord.AutocompleteContext):

@@ -1,8 +1,7 @@
 from sqlalchemy import Column, String, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import relationship
-
-from sqlaobjs import mapper_registry
-from utils import get_random_hex_color
+from sqlaobjs import mapper_registry, Session
+from utils import get_random_hex_color, mix_colors
 
 @mapper_registry.mapped
 class Tournament():
@@ -16,6 +15,7 @@ class Tournament():
   color_hex = Column(String(6))
   active = Column(Boolean)
   matches = relationship("Match", back_populates="tournament")
+  bets = relationship("Bet", back_populates="tournament")
   
   def __init__(self, name, vlr_code, color):
     self.name = name
@@ -26,19 +26,24 @@ class Tournament():
   def __repr__(self):
     return f"<Tournament {self.name}>"
         
-  def set_color(self, color):
+  def set_color(self, color, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.set_color(color, session)
+      
     if color is None:
       self.color = None
       self.color_name = None
       self.color_hex = get_random_hex_color()
-      return
-      
-    if isinstance(color, str):
+    elif isinstance(color, str):
       self.color = None
       self.color_name = None
       self.color_hex = color
-      return
+    else:
+      self.color = color
+      self.color_name = color.name
+      self.color_hex = color.hex
     
-    self.color = color
-    self.color_name = color.name
-    self.color_hex = color.hex
+    for match in self.matches:
+      match.set_color(session)
+      

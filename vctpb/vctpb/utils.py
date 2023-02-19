@@ -4,6 +4,13 @@ import secrets
 from datetime import datetime
 from pytz import timezone
 
+import matplotlib.colors as mcolors
+
+xkcd_colors = mcolors.XKCD_COLORS
+
+def get_xkcd_color(name):
+  return xkcd_colors.get(f"xkcd:{name.lower()}")[-6:]
+
 def get_date():
   central = timezone('US/Central')
   return datetime.now(central)

@@ -23,13 +23,13 @@ from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
 from Team import Team
 from Tournament import Tournament
-from dbinterface import get_date, get_setting, get_channel_from_db, set_channel_in_db, get_all_db, get_from_db, add_to_db, delete_from_db, get_condition_db, get_new_db, is_condition_in_db, set_setting, get_unique_code
-from colorinterface import hex_to_tuple, get_color, add_color, remove_color, rename_color, recolor_color
+from dbinterface import *
+from colorinterface import *
 import math
 from decimal import Decimal
 from PIL import Image, ImageDraw, ImageFont
 from convert import *
-from objembed import create_match_embedded, create_match_list_embedded, create_bet_list_embedded, create_bet_embedded, create_user_embedded, create_leaderboard_embedded, create_payout_list_embedded, create_award_label_list_embedded, create_bet_hidden_embedded, create_tournament_embedded
+from objembed import *
 from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import secrets
@@ -207,7 +207,7 @@ async def on_ready():
   print("\n-----------Bot Starting-----------\n")
 
 
-@tasks.loop(minutes=20)
+@tasks.loop(hours=1)
 async def auto_backup_timer():
   backup_full()
 
@@ -850,9 +850,6 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
             await ctx.respond(embed=embedd, ephemeral=True)
           else:
             await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
-            
-            
-            
 #bet list end
 
 bot.add_application_command(betscg)
@@ -901,7 +898,7 @@ async def color_add(ctx, custom_color_name:Option(str, "Name of color you want t
       await ctx.respond("You can't add a hex code and a xkcd color name.", ephemeral=True)
       return
     
-    hex = xkcd_colors.get(f"xkcd:{xkcd_color_name.lower()}")
+    hex = get_xkcd_color(xkcd_color_name)
     if hex is None:
       await ctx.respond("Invalid xkcd color.", ephemeral=True)
       return
@@ -1234,7 +1231,7 @@ matchscg = SlashCommandGroup(
 @matchscg.command(name = "generate", description = "Generates matches for the current tournament.")
 async def match_generate(ctx):
   with Session.begin() as session:
-    if (len(get_current_tournaments(session)) == 0):
+    if (len(get_active_tournaments(session)) == 0):
       await ctx.respond("There is no current tournament.", ephemeral = True)
       return
     
@@ -1265,12 +1262,12 @@ class MatchCreateModal(Modal):
       team_one = self.children[0].value.strip()
       team_two = self.children[1].value.strip()
       
-      get_or_create_team(team_one, None, session)
-      get_or_create_team(team_two, None, session)
+      team1 = get_or_create_team(team_one, None, session)
+      team2 =get_or_create_team(team_two, None, session)
       
       odds_combined = self.children[2].value.strip()
       tournament_name = self.children[3].value.strip()
-      get_or_create_tournament(tournament_name, None, session)
+      tournament = get_or_create_tournament(tournament_name, None, session)
       betting_site = self.children[4].value.strip()
       
       
@@ -1305,7 +1302,7 @@ class MatchCreateModal(Modal):
         
       code = get_unique_code("Match", session)
     
-      color = code[:6]
+      color = mix_colors([team1.color_hex, team2.color_hex, tournament.color_hex])
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
       
       
@@ -1575,7 +1572,6 @@ async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomp
         await ctx.respond(f'Match "{match}" not found.', ephemeral = True)
         return
     match = nmatch
-    print((match.date_closed is not None) and match.bets != [])
     match_modal = MatchEditModal(match, (match.date_closed is not None) and match.bets != [], balance_odds, title="Edit Match")
     await ctx.interaction.response.send_modal(match_modal)
 #match edit end
@@ -1594,9 +1590,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 
     if type == 0:
       #short
-      embedd = create_match_list_embedded("Matches:", matches, session)
-      await ctx.respond(content = "", embed=embedd)
-      
+      await respond_send_match_list_embedded(ctx, "Matches: ", matches, session)
     elif type == 1:
       #full
       for i, match in enumerate(matches):
@@ -1773,7 +1767,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
     [no_same_list_user.append(x) for x in users if x not in no_same_list_user]
     for user in no_same_list_user:
       embedd = create_user_embedded(user, session)
-      await ctx.send(embed=embedd)
+      await ctx.respond(embed=embedd)
 
     await edit_all_messages(match.message_ids, m_embedd)
     [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
@@ -1807,27 +1801,112 @@ tournamentsgc = SlashCommandGroup(
   guild_ids = gid,
 )
 
-
 #tournament start start
-@tournamentsgc.command(name = "start", description = "Startes a tournament.")
-async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")):
+@tournamentsgc.command(name = "start", description = "Startes a tournament. Pick one color to fill")
+async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament."),
+                           xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
+                           color_name:Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
+                           hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
   code = get_code(vlr_link)
   if code is None:
     await ctx.respond("Invalid VLR link.", ephemeral = True)
     return
-  print(code)
+  
   with Session.begin() as session:
-    if (tournament := generate_tournament(code, session)) is None:
+    color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
+    if color is None:
+      return
+    
+    if (tournament := generate_tournament(code, color, session)) is None:
       await ctx.respond(f'Tournament already exists.', ephemeral = True)
       return
-    await ctx.respond(f'Tournament "{tournament.name}" has been created.')
+    
     embedd = create_tournament_embedded(f"New Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament start end
 
+#tournament matches start
+@tournamentsgc.command(name = "matches", description = "What matches.")
+async def tournament_matches(ctx, tournament: Option(str, "Tournament you want matches of.", autocomplete=tournament_name_autocomplete), type: Option(int, "If type is full it sends the whole embed of each match.", choices = list_choices, default = 0, required = False)):
+  with Session.begin() as session:
+    if (ntournament := await obj_from_autocomplete_tuple(ctx, get_active_tournaments(session), tournament, "Tournament", session)) is None:
+      if (ntournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), tournament, "Tournament", session)) is None: return
+    tournament = ntournament
+    
+    matches = tournament.matches
+    if len(matches) == 0:
+      await ctx.respond("No matches in tournament.", ephemeral=True)
+      return
+    
+    if type == 0:
+      #short
+      await respond_send_match_list_embedded(ctx, f"Matches in {tournament.name}: ", matches, session)
+    elif type == 1:
+      #full
+      for i, match in enumerate(matches):
+        embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
+        if i == 0:
+          inter = await ctx.respond(embed=embedd)
+          msg = await inter.original_message()
+        else:
+          msg = await ctx.interaction.followup.send(embed=embedd)
+          match.message_ids.append((msg.id, msg.channel.id))
+#tournament matches end
+
+
+#tournament recolor start
+@tournamentsgc.command(name = "recolor", description = "Changes the color of a tournament.")
+async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+                           xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
+                           color_name:Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
+                           hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
+    if color is None:
+      return
+    
+    tournament.set_color(color)
+    await ctx.respond(f'Tournament "{tournament.name}" color changed.')
+    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament recolor end
+
+#tournament rename start
+@tournamentsgc.command(name = "rename", description = "Renames a tournament.")
+async def tournament_rename(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete),
+                            new_name: Option(str, "New name of tournament.")):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    tournament.name = new_name
+    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+    for match in tournament.matches:
+      match.tournament_name = new_name
+    for bet in tournament.bets:
+      bet.tournament_name = new_name
+#tournament rename end
+
+#tournament find start
+@tournamentsgc.command(name = "find", description = "Finds a tournament.")
+async def tournament_find(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_name_autocomplete)):
+  with Session.begin() as session:
+    if (tournament := get_from_db("Tournament", name, session)) is None:
+      await ctx.respond("Tournament does not exist.", ephemeral = True)
+      return
+    embedd = create_tournament_embedded(f"Found Tournament: {tournament.name}", tournament)
+    await ctx.respond(embed=embedd)
+#tournament find end
+
 
 bot.add_application_command(tournamentsgc)
 #tournament end
+
+
 
 #season start
 seasonsgc = SlashCommandGroup(
@@ -1835,7 +1914,6 @@ seasonsgc = SlashCommandGroup(
   description = "Start and rename season.",
   guild_ids = gid,
 )
-
 
 #season start start
 @seasonsgc.command(name = "start", description = "Do not user command if not Pig, Start a new season.")
@@ -1869,6 +1947,7 @@ async def season_rename(ctx, season: Option(str, "Description of award you want 
     else:
       await ctx.respond(f"Season {season} not found.", ephemeral = True)
 #season rename end
+
 
 bot.add_application_command(seasonsgc)
 #season end

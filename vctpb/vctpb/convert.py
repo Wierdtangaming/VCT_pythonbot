@@ -36,6 +36,8 @@ def t_list_ambig_to_name_objs(ambig, session=None, user=None, naming_type=1):
     return bets_to_name_objs(ambig, session, user)
   elif isinstance(ambig[0], Match):
     return matches_to_name_objs(ambig, naming_type)
+  elif isinstance(ambig[0], Tournament):
+    return tournaments_to_name_objs(ambig)
   elif isinstance(ambig[0], tuple):
     return ambig
 
@@ -49,6 +51,8 @@ def names_ambig_to_names(ambig, session=None, user=None, naming_type=1):
     return bets_to_names(ambig, session, user)
   elif isinstance(ambig[0], Match):
     return matches_to_names(ambig, naming_type)
+  elif isinstance(ambig[0], Tournament):
+    return tournaments_to_names(ambig)
   elif isinstance(ambig[0], tuple):
     return [a[0] for a in ambig]
 
@@ -178,7 +182,7 @@ def add_time_name_objs(name_objs):
       new_name_objs.append(name_obj)
   return new_name_objs
 
-
+#naming_type 1 normal, 2 odds
 def shorten_match_name(match, naming_type=1):
   if match.winner != 0:
     prefix = "Concluded: "
@@ -194,7 +198,7 @@ def shorten_match_name(match, naming_type=1):
       if len(s) >= 95:
         s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.tournament_name}"
         if len(s) >= 95:
-          tsplit = match.tournament_name.split(" ")[0]
+          tsplit = ":".join(match.tournament_name.split(":")[1:])
           s = f"{shortened_prefix}{match.t1}/{match.t2}, {tsplit}"
           if len(s) >= 95:
             s = s[:95]
@@ -205,7 +209,7 @@ def shorten_match_name(match, naming_type=1):
       if len(s) >= 95:
         s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.t1o} / {match.t2o}, {match.tournament_name}"
         if len(s) >= 95:
-          tsplit = match.tournament_name.split(" ")[0]
+          tsplit = ":".join(match.tournament_name.split(":")[1:])
           s = f"{shortened_prefix}{match.t1}/{match.t2}, {match.t1o} / {match.t2o}, {tsplit}"
           if len(s) >= 95:
             s = s[:95]
@@ -254,6 +258,20 @@ def shorten_bet_name(bet, user_id, session=None):
               s = s[:100]
   return s
 
+def shorten_tournament_name(tournament):
+  if not tournament.active:
+    prefix = "Finished: "
+    shortened_prefix = "Fin: "
+  else:
+    prefix = ""
+    shortened_prefix = ""
+  s = f"{prefix}{tournament.name}"
+  if len(s) >= 95:
+    s = f"{shortened_prefix}{tournament.name}"
+    if len(s) >= 95:
+      s = s[:95]
+  return s
+
 def get_all_user_bets(user, session=None):
   return get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session)
 
@@ -264,18 +282,29 @@ def get_open_user_bets(user, session=None):
   return [bet for bet in get_condition_db("Bet", Bet.user_id == user_id_ambig(user), session) if bet.match.date_closed is None]
 
 def bets_to_name_objs(bets, session=None, user=None):
+  if session is None:
+    with Session.begin() as session:
+      bets_to_name_objs(bets, session, user)
   user_id = user_id_ambig(user)
   return add_time_name_objs([(shorten_bet_name(bet, user_id, session), bet) for bet in bets])
 
 def matches_to_name_objs(matches, naming_type=1):
   return add_time_name_objs([(shorten_match_name(match, naming_type), match) for match in matches])
 
+def tournaments_to_name_objs(tournaments):
+  return [(shorten_tournament_name(tournament), tournament) for tournament in tournaments]
+
 def bets_to_names(bets, session=None, user=None):
-  user_id = user_id_ambig(user)
-  return [no[0] for no in add_time_name_objs([(shorten_bet_name(bet, user_id, session), bet) for bet in bets])]
+  if session is None:
+    with Session.begin() as session:
+      bets_to_names(bets, session, user)
+  return [no[0] for no in bets_to_name_objs(bets, session, user)]
 
 def matches_to_names(matches, naming_type):
-  return [no[0] for no in add_time_name_objs([(shorten_match_name(match, naming_type), match) for match in matches])]
+  return [no[0] for no in matches_to_name_objs(matches, naming_type)]
+
+def tournaments_to_names(tournaments):
+  return [no[0] for no in tournaments_to_name_objs(tournaments)]
 
 def get_current_bets(session=None):
   return get_condition_db("Bet", Bet.winner == 0, session)
@@ -309,23 +338,23 @@ def get_open_matches(session=None):
 def get_closed_matches(session=None):
   return get_condition_db("Match", (Match.winner == 0) & (Match.date_closed != None), session)
 
-def get_current_tournaments(session=None):
+def get_active_tournaments(session=None):
   return get_condition_db("Tournament", Tournament.active == True, session)
 
 
-def get_match_from_vrl_code(vlr_code, session=None):
+def get_match_from_vlr_code(vlr_code, session=None):
   matches = get_condition_db("Match", Match.vlr_code == vlr_code, session)
   if len(matches) != 1:
     return None
   return matches[0]
 
-def get_team_from_vrl_code(vlr_code, session=None):
+def get_team_from_vlr_code(vlr_code, session=None):
   teams = get_condition_db("Team", Team.vlr_code == vlr_code, session)
   if len(teams) != 1:
     return None
   return teams[0]
 
-def get_tournament_from_vrl_code(vlr_code, session=None):
+def get_tournament_from_vlr_code(vlr_code, session=None):
   tournament =  get_condition_db("Tournament", Tournament.vlr_code == vlr_code, session)
   if len(tournament) != 1:
     return None
