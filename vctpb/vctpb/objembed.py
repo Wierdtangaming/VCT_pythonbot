@@ -258,4 +258,5 @@ def create_tournament_embedded(embed_title, tournament):
   if tournament.active:
     active_str = "Yes"
   embed.add_field(name="Active:", value=active_str, inline=True)
+  embed.add_field(name="VLR Code:", value=tournament.vlr_code, inline=True)
   return embed
