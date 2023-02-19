@@ -1,12 +1,14 @@
 from dbinterface import get_from_db, is_key_in_db, add_to_db, delete_from_db
 from sqlaobjs import Session
 from Color import Color
-from utils import hex_to_tuple
+from utils import hex_to_tuple, get_xkcd_color, get_random_hex_color
 
 import secrets
 
 
 def valid_hex(hex):
+  if hex is None:
+    return None
   if len(hex) != 6 and len(hex) != 7:
     return None
 
@@ -78,7 +80,7 @@ def rename_color(old_name, new_name, session=None):
   for team in teams:
     team.set_color(color)
   for tournament in tournaments:
-    tournament.set_color(color)
+    tournament.set_color(color, session)
   for user in users:
     user.set_color(color)
   return (f"{old_name} has been renamed to {new_name}", color)
@@ -106,3 +108,53 @@ def recolor_color(name, hex, session=None):
   for user in color.users:
     user.set_color(color)
   return (f"{name} now has the hex {hex}", color)
+
+async def get_color_from_options(ctx, color=None, xkcd_color_name=None, color_name=None, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return await get_color_from_options(ctx, color, xkcd_color_name, color_name, session)
+
+  count = 0
+  if xkcd_color_name is not None:
+    count += 1
+  if color_name is not None:
+    count += 1
+  if color is not None:
+    count += 1
+  if count == 0:
+    return get_random_hex_color()
+  
+  if count != 1:
+    await ctx.respond("Please only enter one color.", ephemeral = True)
+    return None
+  
+  if color is not None:
+    color = valid_hex(color)
+    if color is None:
+      await ctx.respond("Invalid hex color.", ephemeral=True)
+      return None
+  elif xkcd_color_name is not None:
+    color = get_xkcd_color(xkcd_color_name)
+    if color is None:
+      await ctx.respond("Invalid xkcd color.", ephemeral=True)
+      return None
+  elif color_name is not None:
+    color_name = color_name.capitalize()
+    color = get_from_db("Color", color_name, session)
+    if color is None:
+      await ctx.respond("Invalid color name.", ephemeral=True)
+      return None
+  return color
+
+async def get_hex_from_options(ctx, hex=None, xkcd_color_name=None, color_name=None, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return await get_hex_from_options(ctx, hex, xkcd_color_name, color_name, session)
+
+  color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
+  if color is None:
+    return None
+  if isinstance(color, Color):
+    return color.hex
+  else:
+    return color

@@ -19,9 +19,9 @@ class Team():
   color_hex = Column(String(6))
   
   
-  def __init__(self, name, vrl_code, color = None):
+  def __init__(self, name, vlr_code, color = None):
     self.name = name
-    self.vrl_code = vrl_code
+    self.vlr_code = vlr_code
     if color is None:
       color = get_random_hex_color()
     self.set_color(color)

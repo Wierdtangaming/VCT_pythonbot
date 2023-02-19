@@ -72,7 +72,6 @@ def save_to_github(message):
   contents = repo.get_contents("")
   #shutil.make_archive("backup", 'zip', "savedata/")
   d = "backup"
-  
   try:
     os.remove("backup.zip")
   except:
@@ -101,14 +100,12 @@ def save_to_github(message):
     
   content = repo.get_contents(all_files[0])
   save_savedata_from_github(content)
-
   
   if are_equivalent("backup.zip", "gitbackup.zip") and not is_new_day(): 
     print("Local and github are the same.")
     return
   
   print("\n-----------Backing Up-----------\n")
-
   
   backup()
   

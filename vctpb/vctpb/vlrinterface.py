@@ -6,14 +6,14 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
 from sqlaobjs import Session
-from convert import get_current_tournaments
+from convert import get_active_tournaments
 
 from Tournament import Tournament
 from Team import Team
 from Match import Match
-from objembed import create_match_embedded, create_match_list_embedded
+from objembed import create_match_embedded, channel_send_match_list_embedded
 from dbinterface import get_channel_from_db, get_from_db, add_to_db, get_unique_code
-from autocompletes import get_team_from_vrl_code, get_match_from_vrl_code, get_tournament_from_vrl_code
+from autocompletes import get_team_from_vlr_code, get_match_from_vlr_code, get_tournament_from_vlr_code
 from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit
 
 
@@ -74,31 +74,30 @@ def vlr_get_today_matches(tournament_code) -> list:
       match_codes.append((int)(match_code.split("/")[1]))
   return match_codes
 
-def get_or_create_team(team_name, team_vrl_code, session=None):
+def get_or_create_team(team_name, team_vlr_code, session=None):
   if session is None:
     with Session.begin() as session:
-      get_or_create_team(team_name, team_vrl_code, session)
-      
+      get_or_create_team(team_name, team_vlr_code, session)
   team = get_from_db("Team", team_name, session)
   if team is not None:
-    if team.vlr_code is not None:
-      return team
-    team.vlr_code = team_vrl_code
+    if team.vlr_code is None:
+      print(f"team {team_name} has no vlr code, setting to {team_vlr_code}")
+      team.vlr_code = team_vlr_code
     return team
-  if team_vrl_code is not None:
-    team = get_team_from_vrl_code(team_vrl_code, session)
+  if team_vlr_code is not None:
+    team = get_team_from_vlr_code(team_vlr_code, session)
     if team is not None:
       return team
-  team = Team(team_name, team, get_random_hex_color())
+  team = Team(team_name, team_vlr_code, get_random_hex_color())
   add_to_db(team, session)
   return team
 
 def vlr_create_match(match_code, tournament, session=None):
   if session is None:
     with Session.begin() as session:
-      vlr_create_match(match_code, session)
+      vlr_create_match(match_code, tournament, session)
       
-  if get_match_from_vrl_code(match_code, session) is not None:
+  if get_match_from_vlr_code(match_code, session) is not None:
     return None
       
   match_link = get_match_link(match_code)
@@ -107,42 +106,50 @@ def vlr_create_match(match_code, tournament, session=None):
   t1_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-1")
   t2_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-2")
   if t1_link_div is None or t2_link_div is None:
-    print("team link not found for match code {match_code}")
+    print(f"team link not found for match https://www.vlr.gg/{match_code}")
     return None
   
   t1_vlr_code = t1_link_div.get("href").split("/")[2]
   t2_vlr_code = t2_link_div.get("href").split("/")[2]
   
-  names = soup.find_all("span", class_="match-bet-item-team")
-  if len(names) != 2:
-    print(f"team names not found for match code {match_code}, names: {names}")
-    return None
-  
-  t1_name = names[0].get_text().strip()
-  t2_name = names[1].get_text().strip()
-  
   t1_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-1")
   t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
+  
   if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
-    print("odds not found for match code {match_code}")
+    print(f"odds not found for https://www.vlr.gg/{match_code}")
     return None
   
   t1oo = to_float(t1_vlr_odds_label.get_text().strip())
   t2oo = to_float(t2_vlr_odds_label.get_text().strip())
   
   if t1oo is None or t2oo is None:
-    print("odds not found for match code {match_code}")
+    print(f"odds not found for match https://www.vlr.gg/{match_code}")
     return None
   if t1oo <= 1 or t2oo <= 1:
-    print("odds not found for match code {match_code}")
+    print(f"odds not found for match https://www.vlr.gg/{match_code}")
     return None
+  
+  t1o, t2o = balance_odds(t1oo, t2oo)
+  
+  names = soup.find_all("span", class_="match-bet-item-team")
+  if len(names) != 2:
+    names = soup.find_all("div", class_="wf-title-med")
+    if len(names) != 2:
+      names = soup.find_all("div", class_="wf-title-med ")
+      if len(names) != 2:
+        names = soup.find_all("div", class_="wf-title-med mod-single")
+        if len(names) != 2:
+          print(f"team names not found for match https://www.vlr.gg/{match_code}, names: {names}")
+          return None
+  
+  t1_name = names[0].get_text().strip()
+  t2_name = names[1].get_text().strip()
   
   team1 = get_or_create_team(t1_name, t1_vlr_code, session)
   team2 = get_or_create_team(t2_name, t2_vlr_code, session)
   
   t1 = team1.name
   t2 = team2.name
-  t1o, t2o = balance_odds(t1oo, t2oo)
   
   odds_source = "VLR.gg"
   color_hex = mix_colors([team1.color_hex, team2.color_hex, tournament.color_hex])
@@ -157,7 +164,7 @@ async def generate_matches(bot, session=None):
     with Session.begin() as session:
       generate_matches(bot, session)
   
-  tournaments = get_current_tournaments(session)
+  tournaments = get_active_tournaments(session)
   
   matches = []
   
@@ -180,35 +187,35 @@ async def generate_matches(bot, session=None):
       matches.append(match)
   
   if match_channel is not None:
-    embedd = create_match_list_embedded("Generated Matches:", matches, session)
-    await match_channel.send(embed=embedd)
+    if len(matches) != 1:
+      await channel_send_match_list_embedded(match_channel, "Generated Matches:", matches, session)
 
-def get_or_create_tournament(tournament_name, tournament_vrl_code, session=None):
+def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None):
   if session is None:
     with Session.begin() as session:
-      get_or_create_tournament(tournament_name, tournament_vrl_code, session)
+      get_or_create_tournament(tournament_name, tournament_vlr_code, session)
       
   tournament = get_from_db("Tournament", tournament_name, session)
   if tournament is not None:
     if tournament.vlr_code is not None:
       return tournament
-    tournament.vlr_code = tournament_vrl_code
+    tournament.vlr_code = tournament_vlr_code
     return tournament
   
-  if tournament_vrl_code is not None:
-    tournament = get_tournament_from_vrl_code(tournament_vrl_code, session)
+  if tournament_vlr_code is not None:
+    tournament = get_tournament_from_vlr_code(tournament_vlr_code, session)
     if tournament is not None:
       return tournament
-  tournament = Tournament(tournament_name, tournament_vrl_code, get_random_hex_color())
+  tournament = Tournament(tournament_name, tournament_vlr_code, get_random_hex_color())
   add_to_db(tournament, session)
   return tournament
   
-def generate_tournament(vlr_code, session=None):
+def generate_tournament(vlr_code, color, session=None):
   if session is None:
     with Session.begin() as session:
       generate_tournament(vlr_code, session)
       
-  if get_tournament_from_vrl_code(vlr_code, session) is not None:
+  if get_tournament_from_vlr_code(vlr_code, session) is not None:
     return None
   
   tournament_link = get_tournament_link(vlr_code)
@@ -216,7 +223,7 @@ def generate_tournament(vlr_code, session=None):
   html = urlopen(tournament_link)
   soup = BeautifulSoup(html, 'html.parser')
   tournament_name = soup.find("h1", class_="wf-title").get_text().strip()
-  tournament_color = get_random_hex_color()
+  tournament_color = color
   tournament = Tournament(tournament_name, vlr_code, tournament_color)
   add_to_db(tournament, session)
   return tournament

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 import shutil
-from dbinterface import get_date_string
+from utils import get_date_string
 
 
 #year, month, day, hour, min, sec = date_string_to_vars(date_sting)
@@ -24,6 +24,9 @@ def get_all_names(path, ext=False):
   return [os.path.splitext(name)[0] for name in names]
 
 def copy_db_to(path):
+  #check if file exists
+  if os.path.exists(f"{path}savedata.db"):
+    os.remove(f"{path}savedata.db")
   shutil.copy("savedata/savedata.db", path)
   
 

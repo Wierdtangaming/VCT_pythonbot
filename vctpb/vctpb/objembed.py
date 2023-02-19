@@ -54,12 +54,50 @@ def create_match_embedded(match_ambig, title, session=None):
 
 
 def create_match_list_embedded(embed_title, matches_ambig, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return create_match_list_embedded(embed_title, matches_ambig, session)
+    
+  if len(matches_ambig) > 24:
+    embeds = []
+    while len(matches_ambig) > 0:
+      embeds.append(create_match_list_embedded(embed_title, matches_ambig[:24], session))
+      matches_ambig = matches_ambig[24:]
+    return embeds
+  
   embed = discord.Embed(title=embed_title, color=discord.Color.red())
   if all(isinstance(s, str) for s in matches_ambig):
     matches_ambig = get_mult_from_db("Match", matches_ambig, session)
   for match in matches_ambig:
     embed.add_field(name="\n" + "Match: " + match.code, value=match.short_to_string() + "\n", inline=False)
   return embed
+
+async def channel_send_match_list_embedded(channel, embed_title, matches_ambig, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return await channel_send_match_list_embedded(channel, embed_title, matches_ambig, session)
+    
+  embeds = create_match_list_embedded(embed_title, matches_ambig, session)
+  if isinstance(embeds, list):
+    for embed in embeds:
+      await channel.send(embed=embed)
+  else:
+    await channel.send(embed=embeds)
+
+async def respond_send_match_list_embedded(ctx, embed_title, matches_ambig, session=None):
+  if session is None:
+    with Session.begin() as session:
+      return await channel_send_match_list_embedded(ctx, embed_title, matches_ambig, session)
+    
+  embeds = create_match_list_embedded(embed_title, matches_ambig, session)
+  if isinstance(embeds, list):
+    for i, embedd in enumerate(embeds):
+      if i == 0:
+        await ctx.respond(embed=embedd)
+      else:
+        await ctx.interaction.followup.send(embed=embedd)
+  else:
+    await ctx.respond(embed=embeds)
 
 def create_bet_hidden_embedded(bet_ambig, title, session=None):
   if session is None:

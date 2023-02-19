@@ -73,6 +73,9 @@ class User():
     self.color_name = color.name
     self.color_hex = color.hex
     
+    for bet in self.bets:
+      bet.set_color()
+    
   
   def has_leader_profile(self):
     return self.color_hex == "dbb40c"

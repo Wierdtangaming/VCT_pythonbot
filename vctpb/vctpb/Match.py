@@ -4,8 +4,8 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
 from sqlalchemy.ext.mutable import MutableList
-from sqlaobjs import mapper_registry
-from utils import balance_odds, mix_colors
+from sqlaobjs import mapper_registry, Session
+from utils import mix_colors
 
 @mapper_registry.mapped
 class Match():
@@ -67,6 +67,18 @@ class Match():
   def __repr__(self):
     return f"<Match {self.code}>"
   
+  def set_color(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.set_color(hex, session)
+
+    team1 = self.team1
+    team2 = self.team2
+    hex = mix_colors([team1.color_hex, team2.color_hex, self.tournament.color_hex])
+    self.color_hex = hex
+    
+    for bet in self.bets:
+      bet.set_color(session)
   
   def to_string(self):
     date_formatted = self.date_created.strftime("%d/%m/%Y at %H:%M:%S")

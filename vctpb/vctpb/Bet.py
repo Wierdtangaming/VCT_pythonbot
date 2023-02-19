@@ -5,6 +5,7 @@ from sqltypes import JSONLIST
 from datetime import datetime
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
+from utils import mix_colors
 
 
 @mapper_registry.mapped
@@ -13,9 +14,13 @@ class Bet():
   __tablename__ = "bet"
   
   code = Column(String(8), primary_key = True, nullable=False)
-  t1 = Column(String(50), nullable=False)
-  t2 = Column(String(50), nullable=False)
-  tournament_name = Column(String(100), nullable=False)
+  t1 = Column(String(50), ForeignKey("team.name"), nullable=False)
+  team1 = relationship("Team", foreign_keys=[t1])
+  t2 = Column(String(50), ForeignKey("team.name"), nullable=False)
+  team2 = relationship("Team", foreign_keys=[t2])
+  tournament_name = Column(String(100), ForeignKey("tournament.name"), nullable=False)
+  tournament = relationship("Tournament", back_populates="bets")
+  
   winner = Column(Integer, nullable=False)
   amount_bet = Column(Integer, nullable=False)
   team_num = Column(Integer, nullable=False)
@@ -42,7 +47,7 @@ class Bet():
     self.amount_bet = amount_bet
     self.team_num = team_num
     
-    self.set_color(color)
+    self.color_hex = color
     
     self.match_id = match_id
     self.user_id = user_id
@@ -71,12 +76,20 @@ class Bet():
   def __repr__(self):
     return f"<Bet {self.code}>"
 
+  def set_color(self, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return self.set_color(session)
+    team_hex = self.team1.color_hex if self.team_num == 1 else self.team2.color_hex
+    hex = mix_colors([team_hex, self.user.color_hex, self.match.color_hex])
+    self.color_hex = hex
+  
+  
   def to_string(self):
     date_formatted = self.date_created.strftime("%d/%m/%Y at %H:%M:%S")
     return "Match ID: " + str(self.match_id) + ", User ID: " + str(self.user_id) + ", Amount Bet: " + str(self.amount_bet) + ", Team Bet On: " + str(self.team_num) + ", Date Created: " + str(date_formatted) + ", Date Closed: " + str(self.date_closed) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
-
-  
-  
+    
+    
   def get_team(self):
     if self.team_num == 1:
       return self.t1
