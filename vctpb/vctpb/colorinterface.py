@@ -78,11 +78,11 @@ def rename_color(old_name, new_name, session=None):
   
   color.name = new_name
   for team in teams:
-    team.set_color(color)
+    team.set_color(color, session)
   for tournament in tournaments:
     tournament.set_color(color, session)
   for user in users:
-    user.set_color(color)
+    user.set_color(color, session)
   return (f"{old_name} has been renamed to {new_name}", color)
     
   
@@ -102,11 +102,11 @@ def recolor_color(name, hex, session=None):
   
   color.hex = hex
   for team in color.teams:
-    team.set_color(color)
+    team.set_color(color, session)
   for tournament in color.tournaments:
-    tournament.set_color(color)
+    tournament.set_color(color, session)
   for user in color.users:
-    user.set_color(color)
+    user.set_color(color, session)
   return (f"{name} now has the hex {hex}", color)
 
 async def get_color_from_options(ctx, color=None, xkcd_color_name=None, color_name=None, session=None):

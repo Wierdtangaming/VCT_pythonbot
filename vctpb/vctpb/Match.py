@@ -15,9 +15,9 @@ class Match():
   code = Column(String(8), primary_key = True, nullable=False)
   vlr_code = Column(Integer)
   t1 = Column(String(50), ForeignKey("team.name"), nullable=False)
-  team1 = relationship("Team", foreign_keys=[t1])
+  team1 = relationship("Team", foreign_keys=[t1], back_populates="matches_as_t1")
   t2 = Column(String(50), ForeignKey("team.name"), nullable=False)
-  team2 = relationship("Team", foreign_keys=[t2])
+  team2 = relationship("Team", foreign_keys=[t2], back_populates="matches_as_t2")
   t1o = Column(DECIMAL(5, 3), nullable=False)
   t2o = Column(DECIMAL(5, 3), nullable=False)
   t1oo = Column(DECIMAL(5, 3), nullable=False)
@@ -74,8 +74,8 @@ class Match():
 
     team1 = self.team1
     team2 = self.team2
-    hex = mix_colors([team1.color_hex, team2.color_hex, self.tournament.color_hex])
-    self.color_hex = hex
+    color = mix_colors([(team1.color_hex, 3), (team2.color_hex, 3), (self.tournament.color_hex, 1)])
+    self.color_hex = color
     
     for bet in self.bets:
       bet.set_color(session)

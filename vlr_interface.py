@@ -2,18 +2,36 @@
 
 #import libraries
 import re
+from PIL import Image
+from collections import Counter
+import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 from urllib.request import urlopen
 
-entered_tournament_link = "https://www.vlr.gg/event/1188/champions-tour-2023-lock-in-s-o-paulo"
+#entered_tournament_link = "https://www.vlr.gg/event/1188/champions-tour-2023-lock-in-s-o-paulo"
 
 #entered_match_link = "https://www.vlr.gg/167356/nrg-esports-vs-giants-gaming-champions-tour-2023-lock-in-s-o-paulo-alpha-qf"
 
-#entered_team_link = "https://www.vlr.gg/team/1034/nrg-esports"
+entered_team_link = "https://www.vlr.gg/team/1034/nrg-esports"
+entered_team_link = "https://www.vlr.gg/team/6961/loud/"
 
+def to_digit(str):
+  try:
+    i = int(str)
+    return i
+  except ValueError:
+    return None
+  
 def get_code(link):
-  code = link.split("/")[-2]
-  return code
+  split_link = link.split("/")
+  if len(split_link) == 0:
+    return None
+  if len(split_link) >= 2:
+    if (code := to_digit(split_link[-2])) is not None:
+      return code
+  for part in split_link:
+    if (code := to_digit(part)) is not None:
+      return code
 
 def get_tournament_link(code):
   link = "https://www.vlr.gg/event/matches/" + str(code) + "/?group=upcoming&series_id=all"
@@ -27,67 +45,63 @@ def get_team_link(code):
   link = "https://www.vlr.gg/team/" + str(code)
   return link
 
-def vlr_get_today_matches(tournament_code) -> list:
-  tournament_link = get_tournament_link(tournament_code)
-  html = urlopen(tournament_link)
-  soup = BeautifulSoup(html, 'html.parser')
-  
-  date_labels = soup.find_all("div", class_="wf-label mod-large")
-  
-  # top is not a matches card
-  day_matches_cards = soup.find_all("div", class_="wf-card")
-  day_matches_cards.pop(0)
-  
-  index = 0;
-  for date_label in date_labels:
-    date = date_label.get_text()
-    if date.__contains__("Today"):
-      break;
-    index += 1
-  
-  # no games today
-  if index == len(date_labels):
-    return []
-  
-  match_cards = day_matches_cards[index].find_all("a", class_="wf-module-item")
-  match_codes = []
-  for match_card in match_cards:
-    match_code = match_card.get("href")
-    if match_code is not None:
-      match_codes.append((int)(match_code.split("/")[1]))
-  return match_codes
+def load_img(img_link):
+  response = requests.get(img_link, stream=True)
+  img = Image.open(response.raw)
+  return img.convert("RGBA")
 
-
-def vlr_get_match_info(match_code):
-  match_link = get_match_link(match_code)
-  html = urlopen(match_link)
-  soup = BeautifulSoup(html, 'html.parser')
-  t1_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-1")
-  t2_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-2")
-  if t1_link_div is None or t2_link_div is None:
-    print("team link not found for match code {match_code}")
-    return None, None, None, None
-  t1_vlr_code = t1_link_div.get("href").split("/")[2]
-  t2_vlr_code = t2_link_div.get("href").split("/")[2]
-  
-  t1_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-1")
-  t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
-  if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
-    print("odds not found for match code {match_code}")
-    return None, None, None, None
-  t1_vlr_odds = t1_vlr_odds_label.get_text()
-  t2_vlr_odds = t2_vlr_odds_label.get_text()
-  
-  return t1_vlr_code, t2_vlr_code, t1_vlr_odds, t2_vlr_odds
+def get_color_count(img):
+  pixels = [p[:3] for p in img.getdata() if p[3] < 255]
+  counts = Counter(pixels)
+  return counts
   
 
+#finds the most common pixel in the image image is a link to the image
+#clears colorless pixels
+def get_most_common_color(img_link):
+  
+  threshold = 0.8
+  
+  img = load_img(img_link)
+  
+  # Get a list of all the non-transparent pixel values in the image
+  pixels = [p[:3] for p in img.getdata() if p[3] != 0]
+      
+  # Get the total number of pixels in the image
+  total_pixels = len(pixels)
 
-#get codes
-tournament_code = get_code(entered_tournament_link)
+  # Get the number of "colorless" pixels (i.e. pixels where the RGB values are all within 50 of each other)
+  colorless_pixels = [p for p in pixels if max(p) - min(p) <= 50]
+  colorless_count = len(colorless_pixels)
 
-match_codes = vlr_get_today_matches(tournament_code)
+  # Remove the "colorless" pixels if their total count is less than 90% of the total number of pixels
+  if colorless_count / total_pixels < threshold:
+      pixels = [p for p in pixels if max(p) - min(p) > 50]
 
-print(match_codes)
+  # Recount the frequency of each pixel value
+  counts = Counter(pixels)
 
-for match_code in match_codes:
-    print(vlr_get_match_info(match_code))
+  # Get the most common pixel value (which will be a tuple of RGB values)
+  most_common = counts.most_common(1)[0][0]
+
+  return most_common
+  
+  
+def get_img_link(soup, team_name):
+  img = soup.find("img", alt=f"{team_name} team logo")
+  if img is None:
+    return None
+  return "http:" + img.get("src")
+
+def get_color_from_vlr_page(soup, team_name):
+  img_link = get_img_link(soup, team_name)
+  color = get_most_common_color(img_link)
+
+team_code = get_code(entered_team_link)
+team_link = get_team_link(team_code)
+print(team_link)
+html = urlopen(team_link)
+soup = BeautifulSoup(html, 'html.parser')
+
+name = soup.find("h1", class_="wf-title").get_text()
+get_color_from_vlr_page(soup, name)

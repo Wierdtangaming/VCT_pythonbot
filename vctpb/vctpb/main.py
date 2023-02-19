@@ -967,7 +967,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if color_name == "First place gold":
       if user.is_in_first_place(get_all_db("User", session)):
-        user.set_color(xkcd_colors["xkcd:gold"][1:])
+        user.set_color(xkcd_colors["xkcd:gold"][1:], session)
         await ctx.respond(f"Profile color is now GOLD.")
       else:
         await ctx.respond("You are not in the first place.", ephemeral=True)
@@ -976,7 +976,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
       if (color := get_color(color_name, session)) is None:
         await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
         return
-      user.set_color(color)
+      user.set_color(color, session)
       await ctx.respond(f"Profile color is now {user.color_name}.")
     
     author = ctx.author
@@ -1263,7 +1263,7 @@ class MatchCreateModal(Modal):
       team_two = self.children[1].value.strip()
       
       team1 = get_or_create_team(team_one, None, session)
-      team2 =get_or_create_team(team_two, None, session)
+      team2 = get_or_create_team(team_two, None, session)
       
       odds_combined = self.children[2].value.strip()
       tournament_name = self.children[3].value.strip()
@@ -1302,7 +1302,7 @@ class MatchCreateModal(Modal):
         
       code = get_unique_code("Match", session)
     
-      color = mix_colors([team1.color_hex, team2.color_hex, tournament.color_hex])
+      color = mix_colors([(team1.color_hex, 3), (team2.color_hex, 3), (tournament.color_hex, 1)])
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
       
       
@@ -1679,7 +1679,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
         print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
         if leader.has_leader_profile():
           print("start")
-          leader.set_color(str(secrets.token_hex(3)))
+          leader.set_color(str(secrets.token_hex(3)), session)
           print("2")
           member = await get_member_from_id(ctx.interaction.guild, leader.code)
           print("winner_member", member, type(member))
@@ -1864,7 +1864,7 @@ async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autoc
     if color is None:
       return
     
-    tournament.set_color(color)
+    tournament.set_color(color, session)
     await ctx.respond(f'Tournament "{tournament.name}" color changed.')
     embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
@@ -1938,6 +1938,19 @@ async def tournament_link(ctx, name: Option(str, "Name of tournament.", autocomp
 bot.add_application_command(tournamentsgc)
 #tournament end
 
+#team start
+teamsgc = SlashCommandGroup(
+  name = "team", 
+  description = "Create and manage teams.",
+  guild_ids = gid,
+)
+
+#team generate start
+#team generate end
+
+
+bot.add_application_command(teamsgc)
+#team end
 
 
 #season start
