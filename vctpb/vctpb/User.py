@@ -50,19 +50,11 @@ class User():
     #a tuple (balances, date created, date paid)
     
     self.loans = []
-
-  def full__init__(self, code, username, color, hidden, balances, loans):
-    self.code = code
-    self.username = username
-    self.set_color(color)
-    self.hidden = hidden
-    self.balances = balances
-    self.loans = loans
     
   def __repr__(self):
     return f"<User {self.code}, {self.username}>"
         
-  def set_color(self, color):
+  def set_color(self, color, session=None):
     if isinstance(color, str):
       self.color = None
       self.color_name = None
@@ -73,8 +65,9 @@ class User():
     self.color_name = color.name
     self.color_hex = color.hex
     
-    for bet in self.bets:
-      bet.set_color()
+    if session is not None:
+      for bet in self.bets:
+        bet.set_color(session)
     
   
   def has_leader_profile(self):
@@ -531,7 +524,7 @@ class User():
       ax.set_xlabel(xlabel)
 
       for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
-        ticklabel.set_color(tickcolor)
+        ticklabel.set_color(tickcolor, session)
 
       ax.xaxis.grid(linestyle=':')
 
@@ -763,7 +756,7 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
     ax.set_xlabel(xlabel)
 
     for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
-      ticklabel.set_color(tickcolor)
+      ticklabel.set_color(tickcolor, session)
 
     ax.xaxis.grid(linestyle=':')
     ax.margins(x=1/((x_length-0.8)*6))

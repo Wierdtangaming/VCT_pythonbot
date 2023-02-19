@@ -3,6 +3,8 @@ from decimal import Decimal
 import secrets
 from datetime import datetime
 from pytz import timezone
+import colorsys
+import mixbox
 
 import matplotlib.colors as mcolors
 
@@ -35,19 +37,16 @@ def balance_odds(team_one_old_odds, team_two_old_odds):
   team_two_odds = roundup(odds2 / percentage1) + 1
   return team_one_odds, team_two_odds
 
-
-# hexs are string
-def mix_colors(hexs):
-  r, g, b = 0, 0, 0
-  for hex in hexs:
-    r1, g1, b1 = hex_to_tuple(hex)
-    r += r1
-    g += g1
-    b += b1
-  r = r // len(hexs)
-  g = g // len(hexs)
-  b = b // len(hexs)
-  return f"{r:02x}{g:02x}{b:02x}"
+def mix_colors(colors):
+  rgb_tuples = [(hex_to_tuple(hex), weight) for hex, weight in colors]
+  total_weight = sum(weight for _, weight in rgb_tuples)
+  latent_tuples = [(mixbox.rgb_to_latent(rgb), weight / total_weight) for rgb, weight in rgb_tuples]
+  
+  latent_mix = [0] * mixbox.LATENT_SIZE
+  for i in range(len(latent_mix)):
+    latent_mix[i] = sum(weight * latent[i] for latent, weight in latent_tuples)
+  
+  return tuple_to_hex(mixbox.latent_to_rgb(latent_mix))
 
 def get_random_hex_color():
   return str(secrets.token_hex(3))
@@ -57,6 +56,13 @@ def hex_to_tuple(hex):
     return None
     
   return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
+
+def tuple_to_hex(tup):
+  if len(tup) != 3:
+    return None
+    
+  return f"{tup[0]:02x}{tup[1]:02x}{tup[2]:02x}"
+  
 
 def is_digit(str):
   try:

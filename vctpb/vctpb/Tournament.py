@@ -27,10 +27,6 @@ class Tournament():
     return f"<Tournament {self.name}>"
         
   def set_color(self, color, session=None):
-    if session is None:
-      with Session.begin() as session:
-        return self.set_color(color, session)
-      
     if color is None:
       self.color = None
       self.color_name = None
@@ -44,6 +40,7 @@ class Tournament():
       self.color_name = color.name
       self.color_hex = color.hex
     
-    for match in self.matches:
-      match.set_color(session)
+    if session is not None:
+      for match in self.matches:
+        match.set_color(session)
       

@@ -15,9 +15,9 @@ class Bet():
   
   code = Column(String(8), primary_key = True, nullable=False)
   t1 = Column(String(50), ForeignKey("team.name"), nullable=False)
-  team1 = relationship("Team", foreign_keys=[t1])
+  team1 = relationship("Team", foreign_keys=[t1], back_populates="bets_as_t1")
   t2 = Column(String(50), ForeignKey("team.name"), nullable=False)
-  team2 = relationship("Team", foreign_keys=[t2])
+  team2 = relationship("Team", foreign_keys=[t2], back_populates="bets_as_t2")
   tournament_name = Column(String(100), ForeignKey("tournament.name"), nullable=False)
   tournament = relationship("Tournament", back_populates="bets")
   
@@ -81,7 +81,7 @@ class Bet():
       with Session.begin() as session:
         return self.set_color(session)
     team_hex = self.team1.color_hex if self.team_num == 1 else self.team2.color_hex
-    hex = mix_colors([team_hex, self.user.color_hex, self.match.color_hex])
+    hex = mix_colors([(team_hex, 3), (self.user.color_hex, 3), (self.match.color_hex, 1)])
     self.color_hex = hex
   
   

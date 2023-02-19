@@ -260,3 +260,9 @@ def create_tournament_embedded(embed_title, tournament):
   embed.add_field(name="Active:", value=active_str, inline=True)
   embed.add_field(name="VLR Code:", value=tournament.vlr_code, inline=True)
   return embed
+
+def create_team_embedded(embed_title, team):
+  embed = discord.Embed(title=embed_title, color=discord.Color.from_rgb(*hex_to_tuple(team.color_hex)))
+  embed.add_field(name="Name:", value=team.name, inline=True)
+  embed.add_field(name="VLR Code:", value=team.vlr_code, inline=True)
+  return embed

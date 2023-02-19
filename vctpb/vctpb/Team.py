@@ -18,6 +18,19 @@ class Team():
   color = relationship("Color", back_populates="teams")
   color_hex = Column(String(6))
   
+  bets_as_t1 = relationship("Bet", foreign_keys="Bet.t1", back_populates="team1")
+  bets_as_t2 = relationship("Bet", foreign_keys="Bet.t2", back_populates="team2")
+  @property
+  def bets(self):
+    return self.bets_as_t1 + self.bets_as_t2
+  
+  matches_as_t1 = relationship("Match", foreign_keys="Match.t1", back_populates="team1")
+  matches_as_t2 = relationship("Match", foreign_keys="Match.t2", back_populates="team2")
+  @property
+  def matches(self):
+    return self.matches_as_t1 + self.matches_as_t2
+  
+  
   
   def __init__(self, name, vlr_code, color = None):
     self.name = name
@@ -30,7 +43,7 @@ class Team():
   def __repr__(self):
     return f"<Team {self.name}, code: {self.vlr_code}>"
         
-  def set_color(self, color):
+  def set_color(self, color, session=None):
     if color is None:
       self.color = None
       self.color_name = None
@@ -46,3 +59,9 @@ class Team():
     self.color = color
     self.color_name = color.name
     self.color_hex = color.hex
+    
+    if session is not None:
+      for bet in self.bets:
+        bet.set_color(session)
+      for match in self.matches:
+        match.set_color(session)

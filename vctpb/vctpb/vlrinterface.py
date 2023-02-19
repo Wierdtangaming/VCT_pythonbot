@@ -4,6 +4,9 @@
 import re
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+from PIL import Image
+from collections import Counter
+import requests
 
 from sqlaobjs import Session
 from convert import get_active_tournaments
@@ -14,7 +17,7 @@ from Match import Match
 from objembed import create_match_embedded, channel_send_match_list_embedded
 from dbinterface import get_channel_from_db, get_from_db, add_to_db, get_unique_code
 from autocompletes import get_team_from_vlr_code, get_match_from_vlr_code, get_tournament_from_vlr_code
-from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit
+from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit, tuple_to_hex
 
 
 def get_code(link):
@@ -41,6 +44,67 @@ def get_team_link(code):
   return link
 
 
+def load_img(img_link):
+  response = requests.get(img_link, stream=True)
+  img = Image.open(response.raw)
+  return img.convert("RGBA")
+
+def get_color_count(img):
+  pixels = [p[:3] for p in img.getdata() if p[3] < 255]
+  counts = Counter(pixels)
+  return counts
+
+#finds the most common pixel in the image image is a link to the image
+#clears colorless pixels
+def get_most_common_color(img_link):
+  
+  threshold = 0.85
+  
+  img = load_img(img_link)
+  
+  # Get a list of all the non-transparent pixel values in the image
+  pixels = [p[:3] for p in img.getdata() if p[3] != 0]
+      
+  # Get the total number of pixels in the image
+  total_pixels = len(pixels)
+
+  # Get the number of "colored" pixels (i.e. pixels where the RGB values are all not within 30 of each other)
+  colored_pixels = [p for p in pixels if max(p) - min(p) > 30]
+  colored_count = len(colored_pixels)
+
+  
+  if colored_count / total_pixels > 1 - threshold:
+      pixels = colored_pixels
+
+  # Recount the frequency of each pixel value
+  counts = Counter(pixels)
+
+  # Get the most common pixel value (which will be a tuple of RGB values)
+  most_common = counts.most_common(1)[0][0]
+
+  return most_common
+  
+def get_img_link(soup, team_name):
+  img = soup.find("img", alt=f"{team_name} team logo")
+  if img is None:
+    return None
+  return "http:" + img.get("src")
+
+def get_color_from_vlr_page(soup, team_name):
+  img_link = get_img_link(soup, team_name)
+  color = get_most_common_color(img_link)
+  return tuple_to_hex(color)
+
+def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
+  if team.vlr_code is None:
+    if team_vlr_code is None:
+      return
+    team.vlr_code = team_vlr_code
+    if soup is None:
+      html = urlopen(get_team_link(team_vlr_code))
+      soup = BeautifulSoup(html, 'html.parser')
+    team.set_color(get_color_from_vlr_page(soup, team.name), session)
+
 def vlr_get_today_matches(tournament_code) -> list:
   tournament_link = get_tournament_link(tournament_code)
   html = urlopen(tournament_link)
@@ -62,6 +126,8 @@ def vlr_get_today_matches(tournament_code) -> list:
       break;
     index += 1
   
+  index = 2;
+  
   # no games today
   if index == len(date_labels):
     return []
@@ -74,63 +140,65 @@ def vlr_get_today_matches(tournament_code) -> list:
       match_codes.append((int)(match_code.split("/")[1]))
   return match_codes
 
-def get_or_create_team(team_name, team_vlr_code, session=None):
+def get_or_create_team(team_name, team_vlr_code, session=None, soup=None):
   if session is None:
     with Session.begin() as session:
-      get_or_create_team(team_name, team_vlr_code, session)
+      get_or_create_team(team_name, team_vlr_code, soup, session)
+      
   team = get_from_db("Team", team_name, session)
   if team is not None:
-    if team.vlr_code is None:
-      print(f"team {team_name} has no vlr code, setting to {team_vlr_code}")
-      team.vlr_code = team_vlr_code
+    update_team_with_vlr_code(team, team_vlr_code, soup, session)
     return team
+  
   if team_vlr_code is not None:
     team = get_team_from_vlr_code(team_vlr_code, session)
     if team is not None:
+      team.name = team_name
       return team
-  team = Team(team_name, team_vlr_code, get_random_hex_color())
+    if soup is None:
+      html = urlopen(get_team_link(team_vlr_code))
+      soup = BeautifulSoup(html, 'html.parser')
+    color = get_color_from_vlr_page(soup, team_name)
+  else:
+    color = get_random_hex_color()
+    
+  team = Team(team_name, team_vlr_code, color)
   add_to_db(team, session)
   return team
 
-def vlr_create_match(match_code, tournament, session=None):
-  if session is None:
-    with Session.begin() as session:
-      vlr_create_match(match_code, tournament, session)
-      
-  if get_match_from_vlr_code(match_code, session) is not None:
-    return None
-      
-  match_link = get_match_link(match_code)
-  html = urlopen(match_link)
-  soup = BeautifulSoup(html, 'html.parser')
+
+def get_team_codes_from_match_page(soup):
   t1_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-1")
   t2_link_div = soup.find("a", class_="match-header-link wf-link-hover mod-2")
   if t1_link_div is None or t2_link_div is None:
-    print(f"team link not found for match https://www.vlr.gg/{match_code}")
-    return None
+    print(f"team link not found")
+    return None, None
   
   t1_vlr_code = t1_link_div.get("href").split("/")[2]
   t2_vlr_code = t2_link_div.get("href").split("/")[2]
-  
+  return t1_vlr_code, t2_vlr_code
+
+def get_odds_from_match_page(soup):
   t1_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-1")
   t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
   
   if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
-    print(f"odds not found for https://www.vlr.gg/{match_code}")
-    return None
+    print(f"1 odds not found")
+    return None, None
   
   t1oo = to_float(t1_vlr_odds_label.get_text().strip())
   t2oo = to_float(t2_vlr_odds_label.get_text().strip())
   
   if t1oo is None or t2oo is None:
-    print(f"odds not found for match https://www.vlr.gg/{match_code}")
-    return None
+    print(f"2 odds not found")
+    return None, None
   if t1oo <= 1 or t2oo <= 1:
-    print(f"odds not found for match https://www.vlr.gg/{match_code}")
-    return None
+    print(f"3 odds not found")
+    return None, None
   
-  t1o, t2o = balance_odds(t1oo, t2oo)
-  
+  return t1oo, t2oo
+
+def get_team_names_from_match_page(soup):
   names = soup.find_all("span", class_="match-bet-item-team")
   if len(names) != 2:
     names = soup.find_all("div", class_="wf-title-med")
@@ -139,25 +207,56 @@ def vlr_create_match(match_code, tournament, session=None):
       if len(names) != 2:
         names = soup.find_all("div", class_="wf-title-med mod-single")
         if len(names) != 2:
-          print(f"team names not found for match https://www.vlr.gg/{match_code}, names: {names}")
-          return None
+          print(f"team names not found, names: {names}")
+          return None, None
   
   t1_name = names[0].get_text().strip()
   t2_name = names[1].get_text().strip()
   
-  team1 = get_or_create_team(t1_name, t1_vlr_code, session)
-  team2 = get_or_create_team(t2_name, t2_vlr_code, session)
+  return t1_name, t2_name
+
+def get_teams_from_match_page(soup, session):
+  t1_vlr_code, t2_vlr_code = get_team_codes_from_match_page(soup)
+  t1_name, t2_name = get_team_names_from_match_page(soup)
+  if t1_vlr_code is None or t1_name is None:
+    return None, None
+  
+  team1 = get_or_create_team(t1_name, t1_vlr_code, session, soup)
+  team2 = get_or_create_team(t2_name, t2_vlr_code, session, soup)
+  return team1, team2
+  
+def vlr_create_match(match_code, tournament, session=None):
+  if session is None:
+    with Session.begin() as session:
+      vlr_create_match(match_code, tournament, session)
+  
+  if get_match_from_vlr_code(match_code, session) is not None:
+    print("match already exists")
+    return None
+      
+  match_link = get_match_link(match_code)
+  html = urlopen(match_link)
+  soup = BeautifulSoup(html, 'html.parser')
+  
+  t1oo, t2oo = get_odds_from_match_page(soup)
+  if t1oo is None:
+    return None
+  t1o, t2o = balance_odds(t1oo, t2oo)
+  
+  team1, team2 = get_teams_from_match_page(soup, session)
+  if team1 is None:
+    return None
   
   t1 = team1.name
   t2 = team2.name
   
   odds_source = "VLR.gg"
-  color_hex = mix_colors([team1.color_hex, team2.color_hex, tournament.color_hex])
+  color_hex = mix_colors([(team1.color_hex, 3), (team2.color_hex, 3), (tournament.color_hex, 1)])
   date_created = get_date()
   code = get_unique_code("Match", session)
     
   return Match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament.name, odds_source, color_hex, None, date_created, match_code)
-  
+
 
 async def generate_matches(bot, session=None):
   if session is None:
