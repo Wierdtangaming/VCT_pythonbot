@@ -185,8 +185,8 @@ def add_time_name_objs(name_objs):
 #naming_type 1 normal, 2 odds
 def shorten_match_name(match, naming_type=1):
   if match.winner != 0:
-    prefix = "Concluded: "
-    shortened_prefix = "Con: "
+    prefix = "Finished: "
+    shortened_prefix = "Fin: "
   else:
     prefix = ""
     shortened_prefix = ""
@@ -220,8 +220,8 @@ def shorten_bet_name(bet, user_id, session=None):
     with Session.begin() as session:
       return shorten_bet_name(bet, user_id, session)
   if bet.winner != 0:
-    prefix = "Paid out: "
-    shortened_prefix = "Paid: "
+    prefix = "Finished: "
+    shortened_prefix = "Fin: "
   else:
     prefix = ""
     shortened_prefix = ""
@@ -340,6 +340,11 @@ def get_closed_matches(session=None):
 
 def get_active_tournaments(session=None):
   return get_condition_db("Tournament", Tournament.active == True, session)
+
+def get_inactive_tournaments(session=None):
+  tournaments = get_condition_db("Tournament", Tournament.active == False, session)
+  tournaments.reverse()
+  return tournaments
 
 
 def get_match_from_vlr_code(vlr_code, session=None):

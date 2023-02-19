@@ -64,7 +64,7 @@ def get_mult_from_db(table_name, codes, session=None):
   if session is None:
     with Session.begin() as session:
       return get_mult_from_db(table_name, codes, session)
-  if table_name == "Color":
+  if table_name == "Color" or table_name == "Team" or table_name == "Tournament":
     return session.scalars(select(Color).where(Color.name.in_(codes))).all()
   else:
     obj = eval(table_name)
