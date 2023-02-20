@@ -32,6 +32,8 @@ class Tournament():
       self.color_name = None
       self.color_hex = get_random_hex_color()
     elif isinstance(color, str):
+      if self.color_hex == color:
+        return
       self.color = None
       self.color_name = None
       self.color_hex = color

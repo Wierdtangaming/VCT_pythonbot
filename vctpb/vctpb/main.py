@@ -1939,6 +1939,13 @@ teamsgc = SlashCommandGroup(
 )
 
 #team generate start
+@teamsgc.command(name = "generate", description = "Generate a team.")
+async def team_generate(ctx, link: Option(str, "Link of vlr tournament.")):
+  code = get_code(link)
+  if code is None:
+    await ctx.respond("Not a valid team link.", ephemeral = True)
+    return
+    
 #team generate end
 
 
