@@ -160,7 +160,6 @@ def save_savedata_from_github(content=None):
   with open("gitbackup.zip", "wb") as f:
     content._encoding.value = "base64"
     f.write(content.decoded_content)
-  
 
 
 def are_equivalent(filename1, filename2):
