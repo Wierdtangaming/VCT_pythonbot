@@ -7,6 +7,7 @@ from urllib.request import urlopen
 from PIL import Image
 from collections import Counter
 import requests
+import time
 
 from sqlaobjs import Session
 from convert import get_active_tournaments
@@ -108,15 +109,21 @@ def get_tournament_color_from_vlr_page(soup, tournament_name):
   color = get_most_common_color(img_link)
   return tuple_to_hex(color)
 
+def get_team_name_from_vlr(soup):
+  return soup.find("h1", class_="wf-title").get_text().strip()
+
+
 def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
   if team.vlr_code is None:
     if team_vlr_code is None:
       return
     team.vlr_code = team_vlr_code
-    if soup is None:
-      html = urlopen(get_team_link(team_vlr_code))
-      soup = BeautifulSoup(html, 'html.parser')
-    team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
+  if soup is None:
+    html = urlopen(get_team_link(team_vlr_code))
+    soup = BeautifulSoup(html, 'html.parser')
+  team.name = get_team_name_from_vlr(soup)
+  team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
+  
 
 def vlr_get_today_matches(tournament_code) -> list:
   tournament_link = get_tournament_link(tournament_code)
@@ -138,8 +145,6 @@ def vlr_get_today_matches(tournament_code) -> list:
     if date.__contains__("Today"):
       break;
     index += 1
-  
-  index = 2;
   
   # no games today
   if index == len(date_labels):
@@ -345,15 +350,16 @@ def generate_team(vlr_code, session=None):
     with Session.begin() as session:
       generate_team(vlr_code, session)
       
-  if get_team_from_vlr_code(vlr_code, session) is not None:
+  if (team := get_team_from_vlr_code(vlr_code, session)) is not None:
+    update_team_with_vlr_code(team, vlr_code, soup, session)
     return None
   
   team_link = get_team_link(vlr_code)
   print(f"generating team from link: {team_link}")
   html = urlopen(team_link)
   soup = BeautifulSoup(html, 'html.parser')
-  team_name = soup.find("h1", class_="wf-title").get_text().strip()
-  team_color = get_random_hex_color()
+  team_name = get_team_name_from_vlr(soup)
+  team_color = get_team_color_from_vlr_page(soup, team_name)
   team = Team(team_name, vlr_code, team_color)
   add_to_db(team, session)
   return team

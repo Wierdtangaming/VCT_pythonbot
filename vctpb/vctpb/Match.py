@@ -75,6 +75,8 @@ class Match():
     team1 = self.team1
     team2 = self.team2
     color = mix_colors([(team1.color_hex, 3), (team2.color_hex, 3), (self.tournament.color_hex, 1)])
+    if color == self.color_hex:
+      return
     self.color_hex = color
     
     for bet in self.bets:

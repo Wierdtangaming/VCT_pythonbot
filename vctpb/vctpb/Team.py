@@ -48,17 +48,16 @@ class Team():
       self.color = None
       self.color_name = None
       self.color_hex = get_random_hex_color()
-      return
-    
-    if isinstance(color, str):
+    elif isinstance(color, str):
+      if self.color_hex == color:
+        return
       self.color = None
       self.color_name = None
       self.color_hex = color
-      return
-    
-    self.color = color
-    self.color_name = color.name
-    self.color_hex = color.hex
+    else:
+      self.color = color
+      self.color_name = color.name
+      self.color_hex = color.hex
     
     if session is not None:
       for bet in self.bets:

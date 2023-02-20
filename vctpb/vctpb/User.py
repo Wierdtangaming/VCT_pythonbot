@@ -56,14 +56,15 @@ class User():
         
   def set_color(self, color, session=None):
     if isinstance(color, str):
+      if self.color_hex == color:
+        return
       self.color = None
       self.color_name = None
       self.color_hex = color
-      return
-    
-    self.color = color
-    self.color_name = color.name
-    self.color_hex = color.hex
+    else:
+      self.color = color
+      self.color_name = color.name
+      self.color_hex = color.hex
     
     if session is not None:
       for bet in self.bets:
