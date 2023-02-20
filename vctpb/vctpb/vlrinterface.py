@@ -58,23 +58,25 @@ def get_color_count(img):
 #clears colorless pixels
 def get_most_common_color(img_link):
   
-  threshold = 0.85
+  #percent of pixels that can be colorless for the image to be considered colorless
+  threshold = 0.95
   
   img = load_img(img_link)
   
   # Get a list of all the non-transparent pixel values in the image
-  pixels = [p[:3] for p in img.getdata() if p[3] != 0]
+  pixels = [p[:3] for p in img.getdata() if p[3] > 25]
       
   # Get the total number of pixels in the image
   total_pixels = len(pixels)
-
-  # Get the number of "colored" pixels (i.e. pixels where the RGB values are all not within 30 of each other)
+  
+  # Get the number of "colored" pixels (i.e. pixels where the RGB values are all not within 40 of each other)
   colored_pixels = [p for p in pixels if max(p) - min(p) > 30]
   colored_count = len(colored_pixels)
+  print(colored_count, total_pixels, colored_count / total_pixels, 1 - threshold)
 
   
   if colored_count / total_pixels > 1 - threshold:
-      pixels = colored_pixels
+    pixels = colored_pixels
 
   # Recount the frequency of each pixel value
   counts = Counter(pixels)
@@ -84,14 +86,25 @@ def get_most_common_color(img_link):
 
   return most_common
   
-def get_img_link(soup, team_name):
+def get_team_logo_img(soup, team_name):
   img = soup.find("img", alt=f"{team_name} team logo")
   if img is None:
     return None
   return "http:" + img.get("src")
 
-def get_color_from_vlr_page(soup, team_name):
-  img_link = get_img_link(soup, team_name)
+def get_team_color_from_vlr_page(soup, team_name):
+  img_link = get_team_logo_img(soup, team_name)
+  color = get_most_common_color(img_link)
+  return tuple_to_hex(color)
+
+def get_tournament_logo_img(soup, tournament_name):
+  img = soup.find("img",  alt=tournament_name)
+  if img is None:
+    return None
+  return "http:" + img.get("src")
+
+def get_tournament_color_from_vlr_page(soup, tournament_name):
+  img_link = get_tournament_logo_img(soup, tournament_name)
   color = get_most_common_color(img_link)
   return tuple_to_hex(color)
 
@@ -103,7 +116,7 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
     if soup is None:
       html = urlopen(get_team_link(team_vlr_code))
       soup = BeautifulSoup(html, 'html.parser')
-    team.set_color(get_color_from_vlr_page(soup, team.name), session)
+    team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
 
 def vlr_get_today_matches(tournament_code) -> list:
   tournament_link = get_tournament_link(tournament_code)
@@ -158,7 +171,7 @@ def get_or_create_team(team_name, team_vlr_code, session=None, soup=None):
     if soup is None:
       html = urlopen(get_team_link(team_vlr_code))
       soup = BeautifulSoup(html, 'html.parser')
-    color = get_color_from_vlr_page(soup, team_name)
+    color = get_team_color_from_vlr_page(soup, team_name)
   else:
     color = get_random_hex_color()
     
@@ -309,7 +322,7 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None)
   add_to_db(tournament, session)
   return tournament
   
-def generate_tournament(vlr_code, color, session=None):
+def generate_tournament(vlr_code, session=None):
   if session is None:
     with Session.begin() as session:
       generate_tournament(vlr_code, session)
@@ -322,7 +335,25 @@ def generate_tournament(vlr_code, color, session=None):
   html = urlopen(tournament_link)
   soup = BeautifulSoup(html, 'html.parser')
   tournament_name = soup.find("h1", class_="wf-title").get_text().strip()
-  tournament_color = color
+  tournament_color = get_tournament_color_from_vlr_page(soup, tournament_name)
   tournament = Tournament(tournament_name, vlr_code, tournament_color)
   add_to_db(tournament, session)
   return tournament
+
+def generate_team(vlr_code, session=None):
+  if session is None:
+    with Session.begin() as session:
+      generate_team(vlr_code, session)
+      
+  if get_team_from_vlr_code(vlr_code, session) is not None:
+    return None
+  
+  team_link = get_team_link(vlr_code)
+  print(f"generating team from link: {team_link}")
+  html = urlopen(team_link)
+  soup = BeautifulSoup(html, 'html.parser')
+  team_name = soup.find("h1", class_="wf-title").get_text().strip()
+  team_color = get_random_hex_color()
+  team = Team(team_name, vlr_code, team_color)
+  add_to_db(team, session)
+  return team

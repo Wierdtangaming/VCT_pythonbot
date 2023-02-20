@@ -1803,21 +1803,14 @@ tournamentsgc = SlashCommandGroup(
 
 #tournament start start
 @tournamentsgc.command(name = "start", description = "Startes a tournament. Pick one color to fill")
-async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament."),
-                           xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
-                           color_name:Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
-                           hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
+async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")):
   code = get_code(vlr_link)
   if code is None:
     await ctx.respond("Invalid VLR link.", ephemeral = True)
     return
   
   with Session.begin() as session:
-    color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
-    if color is None:
-      return
-    
-    if (tournament := generate_tournament(code, color, session)) is None:
+    if (tournament := generate_tournament(code, session)) is None:
       await ctx.respond(f'Tournament already exists.', ephemeral = True)
       return
     
