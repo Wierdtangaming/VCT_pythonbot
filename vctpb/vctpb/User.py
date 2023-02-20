@@ -771,7 +771,6 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
     plt.savefig(buf, format='png')
     buf.seek(0)
     im = Image.open(buf)
-    byte = im.tell()
     
     end = time()
     print(fmiddle - start, smiddle - fmiddle, end - smiddle, end - start)
