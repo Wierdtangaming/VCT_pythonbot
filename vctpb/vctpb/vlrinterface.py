@@ -96,6 +96,7 @@ def get_team_logo_img(soup, team_name):
 def get_team_color_from_vlr_page(soup, team_name):
   img_link = get_team_logo_img(soup, team_name)
   color = get_most_common_color(img_link)
+  print(f"{team_name}'s new color: {color}")
   return tuple_to_hex(color)
 
 def get_tournament_logo_img(soup, tournament_name):
