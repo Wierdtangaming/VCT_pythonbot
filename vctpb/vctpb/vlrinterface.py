@@ -124,7 +124,9 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
   if soup is None:
     html = urlopen(get_team_link(team_vlr_code))
     soup = BeautifulSoup(html, 'html.parser')
-    team.name = get_team_name_from_vlr(soup)
+    name = get_team_name_from_vlr(soup)
+    if name is not None:
+      team.name = name
   team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
