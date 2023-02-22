@@ -110,7 +110,10 @@ def get_tournament_color_from_vlr_page(soup, tournament_name):
   return tuple_to_hex(color)
 
 def get_team_name_from_vlr(soup):
-  return soup.find("h1", class_="wf-title").get_text().strip()
+  team_name = soup.find("h1", class_="wf-title")
+  if team_name is None:
+    return None
+  return team_name.get_text().strip()
 
 
 def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
@@ -121,7 +124,9 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
   if soup is None:
     html = urlopen(get_team_link(team_vlr_code))
     soup = BeautifulSoup(html, 'html.parser')
-  team.name = get_team_name_from_vlr(soup)
+    name = get_team_name_from_vlr(soup)
+    if name is not None:
+      team.name = name
   team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
@@ -158,14 +163,14 @@ def vlr_get_today_matches(tournament_code) -> list:
       match_codes.append((int)(match_code.split("/")[1]))
   return match_codes
 
-def get_or_create_team(team_name, team_vlr_code, session=None, soup=None):
+def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None):
   if session is None:
     with Session.begin() as session:
-      get_or_create_team(team_name, team_vlr_code, soup, session)
+      get_or_create_team(team_name, team_vlr_code, team_soup, session)
       
   team = get_from_db("Team", team_name, session)
   if team is not None:
-    update_team_with_vlr_code(team, team_vlr_code, soup, session)
+    update_team_with_vlr_code(team, team_vlr_code, team_soup, session)
     return team
   
   if team_vlr_code is not None:
@@ -173,10 +178,10 @@ def get_or_create_team(team_name, team_vlr_code, session=None, soup=None):
     if team is not None:
       team.name = team_name
       return team
-    if soup is None:
+    if team_soup is None:
       html = urlopen(get_team_link(team_vlr_code))
-      soup = BeautifulSoup(html, 'html.parser')
-    color = get_team_color_from_vlr_page(soup, team_name)
+      team_soup = BeautifulSoup(html, 'html.parser')
+    color = get_team_color_from_vlr_page(team_soup, team_name)
   else:
     color = get_random_hex_color()
     
@@ -239,8 +244,8 @@ def get_teams_from_match_page(soup, session):
   if t1_vlr_code is None or t1_name is None:
     return None, None
   
-  team1 = get_or_create_team(t1_name, t1_vlr_code, session, soup)
-  team2 = get_or_create_team(t2_name, t2_vlr_code, session, soup)
+  team1 = get_or_create_team(t1_name, t1_vlr_code, session, None)
+  team2 = get_or_create_team(t2_name, t2_vlr_code, session, None)
   return team1, team2
   
 def vlr_create_match(match_code, tournament, session=None):
