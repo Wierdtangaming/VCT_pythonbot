@@ -486,10 +486,8 @@ class BetCreateModal(Modal):
           errortext += error[1]
         await interaction.response.send_message(errortext, ephemeral = True)
         return
-
-      color = code[:6]
       
-      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), color, match.code, user.code, get_date(), self.hidden)
+      bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), match.code, user.code, get_date(), self.hidden)
       add_to_db(bet, session)
       
       session.flush([bet])
