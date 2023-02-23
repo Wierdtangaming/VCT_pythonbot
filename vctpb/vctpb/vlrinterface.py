@@ -107,28 +107,34 @@ def get_tournament_logo_img(soup, tournament_name):
 
 def get_tournament_color_from_vlr_page(soup, tournament_name):
   img_link = get_tournament_logo_img(soup, tournament_name)
+  print(f"{tournament_name}'s color: {color}")
   color = get_most_common_color(img_link)
   return tuple_to_hex(color)
 
-def get_team_name_from_vlr(soup):
+def get_team_name_from_team_vlr(soup):
   team_name = soup.find("h1", class_="wf-title")
   if team_name is None:
     return None
   return team_name.get_text().strip()
 
 
-def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None):
+def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, force_color_update = False):
+  updated_vlr_code = False
   if team.vlr_code is None:
     if team_vlr_code is None:
       return
+    updated_vlr_code = True
     team.vlr_code = team_vlr_code
+    #can move code here to the end of the function to always recolor
+  
   if soup is None:
     html = urlopen(get_team_link(team_vlr_code))
     soup = BeautifulSoup(html, 'html.parser')
-    name = get_team_name_from_vlr(soup)
+    name = get_team_name_from_team_vlr(soup)
     if name is not None:
-      team.name = name
-  team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
+      team.set_name(name, session)
+  if updated_vlr_code or force_color_update:
+    team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
 def vlr_get_today_matches(tournament_code) -> list:
@@ -177,7 +183,7 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None):
   if team_vlr_code is not None:
     team = get_team_from_vlr_code(team_vlr_code, session)
     if team is not None:
-      team.name = team_name
+      team.set_name(team_name, session)
       return team
     if team_soup is None:
       html = urlopen(get_team_link(team_vlr_code))
@@ -335,37 +341,59 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None)
   
 def generate_tournament(vlr_code, session=None):
   if session is None:
+    # if the session is not provided, create a session with a context manager
     with Session.begin() as session:
       generate_tournament(vlr_code, session)
       
+  # check if the tournament already exists
   if get_tournament_from_vlr_code(vlr_code, session) is not None:
     return None
   
+  # get the tournament page from the vlr code
   tournament_link = get_tournament_link(vlr_code)
   print(f"generating tournament from link: {tournament_link}")
   html = urlopen(tournament_link)
   soup = BeautifulSoup(html, 'html.parser')
+  
+  # get the tournament name and color from the page
   tournament_name = soup.find("h1", class_="wf-title").get_text().strip()
   tournament_color = get_tournament_color_from_vlr_page(soup, tournament_name)
+  
+  # create the tournament object
   tournament = Tournament(tournament_name, vlr_code, tournament_color)
+  
+  # add the tournament to the database
   add_to_db(tournament, session)
   return tournament
 
 def generate_team(vlr_code, session=None):
+  # if no session is passed in, create one and pass it to itself
   if session is None:
     with Session.begin() as session:
       generate_team(vlr_code, session)
       
+  # if team already exists, return it
   if (team := get_team_from_vlr_code(vlr_code, session)) is not None:
-    update_team_with_vlr_code(team, vlr_code, soup, session)
-    return None
+    update_team_with_vlr_code(team, vlr_code, None, session, True)
+    return team
   
+  # get team link from vlr code
   team_link = get_team_link(vlr_code)
   print(f"generating team from link: {team_link}")
+  # open team link
   html = urlopen(team_link)
-  soup = BeautifulSoup(html, 'html.parser')
-  team_name = get_team_name_from_vlr(soup)
-  team_color = get_team_color_from_vlr_page(soup, team_name)
+  # parse html
+  team_soup = BeautifulSoup(html, 'html.parser')
+  # get team name from team link
+  team_name = get_team_name_from_team_vlr(team_soup)
+  
+  # if team already exists, return it
+  if (team := get_from_db("Team", team_name, session)) is not None:
+    update_team_with_vlr_code(team, vlr_code, team_soup, session, True)
+    return team
+  
+  # if team does not exist, create it
+  team_color = get_team_color_from_vlr_page(team_soup, team_name)
   team = Team(team_name, vlr_code, team_color)
   add_to_db(team, session)
   return team

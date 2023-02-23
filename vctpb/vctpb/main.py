@@ -37,7 +37,7 @@ import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
 
-from vlrinterface import generate_matches, get_code, generate_tournament, get_or_create_team, get_or_create_tournament
+from vlrinterface import generate_matches, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
 
 from sqlaobjs import Session
 from utils import *
@@ -1937,14 +1937,43 @@ teamsgc = SlashCommandGroup(
 )
 
 #team generate start
-@teamsgc.command(name = "generate", description = "Generate a team.")
+@teamsgc.command(name = "generate", description = "Generate a team or updates a prexisting team.")
 async def team_generate(ctx, link: Option(str, "Link of vlr tournament.")):
   code = get_code(link)
   if code is None:
     await ctx.respond("Not a valid team link.", ephemeral = True)
     return
-    
+  with Session.begin() as session:
+    team = generate_team(code, session)
+    embedd = create_team_embedded(f"Generated Tournament: {team.name}", team)
+    await ctx.respond(embed=embedd)
 #team generate end
+
+#team update start
+@teamsgc.command(name = "update", description = "Updates a team's name and vlr code.")
+async def team_generate(ctx, team: Option(str, "Name of team.", autocomplete=team_autocomplete),):
+  with Session.begin() as session:
+    if (team := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), team, "Team", session)) is None: return
+    team = generate_team(team.vlr_code, session)
+    embedd = create_team_embedded(f"Generated Tournament: {team.name}", team)
+    await ctx.respond(embed=embedd)
+#team generate end
+
+#team merge start
+@teamsgc.command(name = "merge", description = "Merge two teams.")
+async def team_merge(ctx, original: Option(str, "Team to keep.", autocomplete=team_autocomplete),
+                     old: Option(str, "Team to merge into other team.", autocomplete=team_autocomplete)):
+  with Session.begin() as session:
+    if (t1 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), original, "Team", session)) is None: return
+    if (t2 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), old, "Team", session)) is None: return
+    if t1 == t2:
+      await ctx.respond("Teams are the same.", ephemeral = True)
+      return
+    t1.merge(t2, session)
+    embedd = create_team_embedded(f"Merged Team {t2.name} into: {t1.name}", t1)
+    await ctx.respond(embed=embedd)
+#team merge end
+
 
 
 bot.add_application_command(teamsgc)

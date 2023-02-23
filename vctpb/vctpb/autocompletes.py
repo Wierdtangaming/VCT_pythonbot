@@ -226,6 +226,11 @@ async def tournament_inactive_autocomplete(ctx: discord.AutocompleteContext):
   with Session.begin() as session:
     return filter_names(ctx.value.lower(), get_inactive_tournaments(session), session)
   #tournament inactive autocomplete end
+  
+#team autocomplete start
+async def team_autocomplete(ctx: discord.AutocompleteContext):
+  with Session.begin() as session:
+    return filter_names(ctx.value.lower(), get_all_db("Team", session), session)
 
 #season autocomplete start
 async def seasons_autocomplete(ctx: discord.AutocompleteContext):
