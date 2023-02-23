@@ -34,7 +34,7 @@ class Bet():
   hidden = Column(BOOLEAN, nullable=False)
   
   
-  def __init__(self, code, t1, t2, tournament_name, amount_bet, team_num, color, match_id, user_id, date_created, hidden):
+  def __init__(self, code, t1, t2, tournament_name, amount_bet, team_num, match_id, user_id, date_created, hidden):
     
     self.code = code
     
@@ -47,7 +47,7 @@ class Bet():
     self.amount_bet = amount_bet
     self.team_num = team_num
     
-    self.color_hex = color
+    self.set_color()
     
     self.match_id = match_id
     self.user_id = user_id
@@ -58,7 +58,7 @@ class Bet():
     
     self.hidden = hidden
 
-  def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, color_hex, match_id, user_id, date_created, message_ids):
+  def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, match_id, user_id, date_created, message_ids):
     self.code = code
     self.t1 = t1
     self.t2 = t2
@@ -66,7 +66,7 @@ class Bet():
     self.winner = winner
     self.amount_bet = amount_bet
     self.team_num = team_num
-    self.color_hex = color_hex
+    self.set_color()
     self.match_id = match_id
     self.user_id = user_id
     self.date_created = date_created
