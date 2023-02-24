@@ -205,6 +205,7 @@ async def on_ready():
   
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
+  auto_generate_matches.start()
 
 
 @tasks.loop(hours=1)
@@ -212,6 +213,10 @@ async def auto_backup_timer():
   backup_full()
 
 
+@tasks.loop(minutes=30)
+async def auto_generate_matches():
+  print("-----------Generating Matches-----------")
+  await generate_matches(bot, reply_if_none=False)
   
 
 #choices start
@@ -1164,7 +1169,7 @@ async def log(ctx, amount: Option(int, "How many balance changes you want to see
 
 
 #loan start
-loan = SlashCommandGroup(
+loanscg = SlashCommandGroup(
   name = "loan", 
   description = "Create and pay off loans.",
   guild_ids = gid,
@@ -1172,7 +1177,7 @@ loan = SlashCommandGroup(
 
 
 #loan create start
-@loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
+@loanscg.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
@@ -1187,7 +1192,7 @@ async def loan_create(ctx):
 
   
 #loan count start
-@loan.command(name = "count", description = "See how many loans you have active.")
+@loanscg.command(name = "count", description = "See how many loans you have active.")
 async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
   if (user := await get_user_from_ctx(ctx, user)) is None: return
   await ctx.respond(f"{user.username} currently has {len(user.get_open_loans())} active loans")
@@ -1195,7 +1200,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 
   
 #loan pay start
-@loan.command(name = "pay", description = "See how many loans you have active.")
+@loanscg.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
@@ -1214,8 +1219,31 @@ async def loan_pay(ctx):
     await ctx.respond(f"You have paid off a loan")
 #loan pay end
 
-bot.add_application_command(loan)
+bot.add_application_command(loanscg)
 #loan end
+
+#generate start
+generatescg = SlashCommandGroup(
+  name = "generate", 
+  description = "Generate things.",
+  guild_ids = gid,
+)
+
+#match generate start
+@generatescg.command(name = "matches", description = "Generates matches for the current tournament.")
+async def match_generate(ctx):
+  with Session.begin() as session:
+    if (len(get_active_tournaments(session)) == 0):
+      await ctx.respond("There is no current tournament.", ephemeral = True)
+      return
+    
+    await ctx.respond("Matches are being generated.", ephemeral = True)
+    
+    await generate_matches(bot, session)
+#match generate end
+
+bot.add_application_command(generatescg)
+#generate end
 
 
 #match start
@@ -1842,7 +1870,6 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
           match.message_ids.append((msg.id, msg.channel.id))
 #tournament matches end
 
-
 #tournament recolor start
 @tournamentsgc.command(name = "recolor", description = "Changes the color of a tournament.")
 async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete),
@@ -1857,7 +1884,7 @@ async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autoc
     
     tournament.set_color(color, session)
     await ctx.respond(f'Tournament "{tournament.name}" color changed.')
-    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
+    embedd = create_tournament_embedded(f"Recolor Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament recolor end
 
@@ -1992,6 +2019,31 @@ async def team_merge(ctx, new: Option(str, "Team to keep.", autocomplete=team_au
     if (t2 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), old, "Team", session)) is None: return
     session.delete(t2)
 #team merge end
+
+#team recolor start
+@teamsgc.command(name = "recolor", description = "Changes the color of a team.")
+async def team_recolor(ctx, name: Option(str, "Name of team.", autocomplete=team_autocomplete),
+                           xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
+                           color_name: Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
+                           hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
+  with Session.begin() as session:
+    if (team := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), name, "Team", session)) is None: return
+    
+    if xkcd_color_name == None and color_name == None and hex == None:
+      team = generate_team(team.vlr_code, session)
+      embedd = create_team_embedded(f"Updated Team: {team.name}", team)
+      await ctx.respond(embed=embedd)
+      return
+    
+    color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
+    if color is None:
+      return
+    
+    team.set_color(color, session)
+    await ctx.respond(f'Team "{team.name}" color changed.')
+    embedd = create_team_embedded(f"Recolored Team: {team.name}", team)
+    await ctx.respond(embed=embedd)
+#team recolor end
 
 
 
