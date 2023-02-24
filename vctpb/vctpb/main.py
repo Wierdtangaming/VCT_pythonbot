@@ -1954,10 +1954,25 @@ async def team_generate(ctx, link: Option(str, "Link of vlr tournament.")):
 async def team_generate(ctx, team: Option(str, "Name of team.", autocomplete=team_autocomplete),):
   with Session.begin() as session:
     if (team := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), team, "Team", session)) is None: return
+    if team.vlr_code is None:
+      await ctx.respond("Team has no vlr code.", ephemeral = True)
+      return
     team = generate_team(team.vlr_code, session)
-    embedd = create_team_embedded(f"Generated Tournament: {team.name}", team)
+    embedd = create_team_embedded(f"Updated Team: {team.name}", team)
     await ctx.respond(embed=embedd)
-#team generate end
+#team update end
+
+#team update_all start
+@teamsgc.command(name = "update_all", description = "Updates all team colors and names. WILL TAKE A WHILE.")
+async def team_generate(ctx):
+  await ctx.respond("Updateing all team colors.")
+  with Session.begin() as session:
+    for team in get_all_db("Team", session):
+      if team.vlr_code is None: continue
+      team = generate_team(team.vlr_code, session)
+      embedd = create_team_embedded("Updated Team:", team)
+      await ctx.channel.send(embed=embedd)
+#team update_all end
 
 #team merge start
 @teamsgc.command(name = "merge", description = "Merge two teams.")
