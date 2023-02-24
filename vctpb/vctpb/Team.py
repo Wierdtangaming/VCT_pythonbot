@@ -78,21 +78,18 @@ class Team():
   
   def merge(self, other, session):
     # overrides color of other to update the best and matches it is in
-    print("\n\n\n>>>>>>>>>>>>>>>>>>>>>>>>>\n\n\n")
+    print(f"merging {other.name} into {self.name}")
     if self.color is None:
       other.set_color(self.color_hex, session)
     else:
       other.set_color(self.color, session)
-      print(self.name)
-    print("\n\n\n---------------------------\n\n\n")
+      
     for bet in other.bets_as_t1:
       bet.t1 = self.name
     for bet in other.bets_as_t2:
       bet.t2 = self.name
-    print("\n\n\n++++++++++++++++++++++++++\n\n\n")
     for match in other.matches_as_t1:
       match.t1 = self.name
     for match in other.matches_as_t2:
       match.t2 = self.name
-    print("\n\n\n==========================\n\n\n")
-    session.delete(other)
+    #session.delete(other)

@@ -1961,10 +1961,10 @@ async def team_generate(ctx, team: Option(str, "Name of team.", autocomplete=tea
 
 #team merge start
 @teamsgc.command(name = "merge", description = "Merge two teams.")
-async def team_merge(ctx, original: Option(str, "Team to keep.", autocomplete=team_autocomplete),
+async def team_merge(ctx, new: Option(str, "Team to keep.", autocomplete=team_autocomplete),
                      old: Option(str, "Team to merge into other team.", autocomplete=team_autocomplete)):
   with Session.begin() as session:
-    if (t1 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), original, "Team", session)) is None: return
+    if (t1 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), new, "Team", session)) is None: return
     if (t2 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), old, "Team", session)) is None: return
     if t1 == t2:
       await ctx.respond("Teams are the same.", ephemeral = True)
@@ -1972,6 +1972,10 @@ async def team_merge(ctx, original: Option(str, "Team to keep.", autocomplete=te
     t1.merge(t2, session)
     embedd = create_team_embedded(f"Merged Team {t2.name} into: {t1.name}", t1)
     await ctx.respond(embed=embedd)
+    
+  with Session.begin() as session:
+    if (t2 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), old, "Team", session)) is None: return
+    session.delete(t2)
 #team merge end
 
 
