@@ -38,6 +38,8 @@ def t_list_ambig_to_name_objs(ambig, session=None, user=None, naming_type=1):
     return matches_to_name_objs(ambig, naming_type)
   elif isinstance(ambig[0], Tournament):
     return tournaments_to_name_objs(ambig)
+  elif isinstance(ambig[0], Team):
+    return team_to_name_objs(ambig)
   elif isinstance(ambig[0], tuple):
     return ambig
 
@@ -53,6 +55,8 @@ def names_ambig_to_names(ambig, session=None, user=None, naming_type=1):
     return matches_to_names(ambig, naming_type)
   elif isinstance(ambig[0], Tournament):
     return tournaments_to_names(ambig)
+  elif isinstance(ambig[0], Team):
+    return teams_to_names(ambig)
   elif isinstance(ambig[0], tuple):
     return [a[0] for a in ambig]
 
@@ -151,7 +155,6 @@ def filter_names(value, ambig, session=None, user=None, naming_type=1):
     #get all names from objs (ambig)
     names = names_ambig_to_names(ambig, session, user, naming_type)
     
-  
   value = value.lower()
   value.replace(",", "")
   value_keywords = value.split(" ")
@@ -294,6 +297,9 @@ def matches_to_name_objs(matches, naming_type=1):
 def tournaments_to_name_objs(tournaments):
   return [(shorten_tournament_name(tournament), tournament) for tournament in tournaments]
 
+def team_to_name_objs(teams):
+  return [(team.name, team) for team in teams]
+
 def bets_to_names(bets, session=None, user=None):
   if session is None:
     with Session.begin() as session:
@@ -305,6 +311,9 @@ def matches_to_names(matches, naming_type):
 
 def tournaments_to_names(tournaments):
   return [no[0] for no in tournaments_to_name_objs(tournaments)]
+
+def teams_to_names(teams):
+  return [no[0] for no in team_to_name_objs(teams)]
 
 def get_current_bets(session=None):
   return get_condition_db("Bet", Bet.winner == 0, session)

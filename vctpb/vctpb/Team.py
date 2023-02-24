@@ -43,7 +43,7 @@ class Team():
   def __repr__(self):
     return f"<Team {self.name}, code: {self.vlr_code}>"
         
-  def set_color(self, color, session=None):
+  def set_color(self, color, session = None):
     if color is None:
       self.color = None
       self.color_name = None
@@ -64,3 +64,32 @@ class Team():
         bet.set_color(session)
       for match in self.matches:
         match.set_color(session)
+        
+  def set_name(self, name, session):
+    for bet in self.bets_as_t1:
+      bet.t1 = self.name
+    for bet in self.bets_as_t2:
+      bet.t2 = self.name
+    for match in self.matches_as_t1:
+      match.t1 = self.name
+    for match in self.matches_as_t2:
+      match.t2 = self.name
+    self.name = name
+  
+  def merge(self, other, session):
+    # overrides color of other to update the best and matches it is in
+    print(f"merging {other.name} into {self.name}")
+    if self.color is None:
+      other.set_color(self.color_hex, session)
+    else:
+      other.set_color(self.color, session)
+      
+    for bet in other.bets_as_t1:
+      bet.t1 = self.name
+    for bet in other.bets_as_t2:
+      bet.t2 = self.name
+    for match in other.matches_as_t1:
+      match.t1 = self.name
+    for match in other.matches_as_t2:
+      match.t2 = self.name
+    #session.delete(other)
