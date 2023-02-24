@@ -47,8 +47,6 @@ class Bet():
     self.amount_bet = amount_bet
     self.team_num = team_num
     
-    self.set_color()
-    
     self.match_id = match_id
     self.user_id = user_id
     self.date_created = date_created
@@ -57,6 +55,7 @@ class Bet():
     self.message_ids = []
     
     self.hidden = hidden
+    self.set_color(from_init=True)
 
   def full__init__(self, code, t1, t2, tournament_name, winner, amount_bet, team_num, match_id, user_id, date_created, message_ids):
     self.code = code
@@ -66,22 +65,36 @@ class Bet():
     self.winner = winner
     self.amount_bet = amount_bet
     self.team_num = team_num
-    self.set_color()
     self.match_id = match_id
     self.user_id = user_id
     self.date_created = date_created
     self.message_ids = message_ids
+    self.set_color(from_init=True)
   
   
   def __repr__(self):
     return f"<Bet {self.code}>"
 
-  def set_color(self, session=None):
+  def set_color(self, session=None, from_init=False):
     if session is None:
       with Session.begin() as session:
-        return self.set_color(session)
-    team_hex = self.team1.color_hex if self.team_num == 1 else self.team2.color_hex
-    hex = mix_colors([(team_hex, 3), (self.user.color_hex, 3), (self.match.color_hex, 1)])
+        return self.set_color(session, from_init)
+    
+    from dbinterface import get_from_db  
+    
+    if from_init:
+      team1 = get_from_db("Team", self.t1, session)
+      team2 = get_from_db("Team", self.t2, session)
+      user = get_from_db("User", self.user_id, session)
+      match = get_from_db("Match", self.match_id, session)
+    else:
+      team1 = self.team1
+      team2 = self.team2
+      user = self.user
+      match = self.match
+      
+    team_hex = team1.color_hex if self.team_num == 1 else team2.color_hex
+    hex = mix_colors([(team_hex, 3), (user.color_hex, 3), (match.color_hex, 1)])
     self.color_hex = hex
   
   
