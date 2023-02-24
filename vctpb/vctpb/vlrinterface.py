@@ -155,22 +155,22 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   if len(day_matches_cards) == 0:
     return []
   
+  indexes = []
   index = 0
   for date_label in date_labels:
     date = date_label.get_text().lower()
     if date.__contains__("today") or date.__contains__("yesterday"):
-      break;
+      indexes += index
     index += 1
   print(index)
   
   # no games today
-  if index == len(date_labels):
+  if len(indexes == 0):
     return []
-    
   
-  match_cards = day_matches_cards[index].find_all("a", class_="wf-module-item")
-  if index > 0:
-    match_cards += day_matches_cards[index - 1].find_all("a", class_="wf-module-item")
+  match_cards = []
+  for index in indexes:
+    match_cards += day_matches_cards[index].find_all("a", class_="wf-module-item")
   match_codes = []
   for match_card in match_cards:
     match_link = match_card.get("href")
@@ -180,6 +180,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
       if match is not None:
         status = match_card.find("div", class_="ml-status")
         status = status.get_text().strip().lower()
+        print(f"{match.code} status: {status}")
         if status == "live":
           if match.date_closed is None:
             print("closing live match")
@@ -193,7 +194,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
             if len(teams_cards) != 2:
               print("can't find teams")
               continue
-            print("setting winner for match to")
+            print(f"setting winner for match {match.code} to")
             
             winner = 0
             if teams_cards[0].get("class").__contains__("mod-winner"):
