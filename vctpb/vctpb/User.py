@@ -882,3 +882,15 @@ def get_first_place(users):
   if tied > 1:
     return None
   return first_place
+
+def add_balance_user(user_ambig, change, description, date, session=None):
+  from convert import ambig_to_obj
+  if session is None:
+    with Session.begin() as session:
+      return add_balance_user(user_ambig, change, description, date, session=session)
+      
+  user = ambig_to_obj(user_ambig, "User")
+  if user is None:
+    return None
+  user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
+  return user

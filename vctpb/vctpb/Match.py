@@ -5,7 +5,7 @@ from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
-from utils import mix_colors
+from utils import mix_colors, get_date, get_random_hex_color
 
 @mapper_registry.mapped
 class Match():
@@ -101,7 +101,104 @@ class Match():
   def basic_to_string(self):
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
+  async def close(self, bot, ctx=None, session=None):
+    from objembed import create_bet_list_embedded, create_match_embedded
+    from convert import edit_all_messages
+    self.date_closed = get_date()
+    for bet in self.bets:
+      if bet.hidden == True:
+        bet.hidden = False
+    embedd = create_match_embedded(self, "Placeholder", session)
+    if ctx is not None:
+      await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
+    await edit_all_messages(bot, self.message_ids, embedd)
   
+  
+  async def set_winner(self, team_num, bot, ctx=None, session=None):
+    if session is None:
+      with Session.begin() as session:
+        return await self.set_winner(team_num, bot, ctx, session)
+    from objembed import create_match_embedded, create_bet_embedded, create_payout_list_embedded
+    from dbinterface import get_all_db, get_channel_from_db
+    from User import add_balance_user, get_first_place
+    from convert import edit_all_messages
+    
+    time = get_date()
+    
+    self.date_winner = time
+    if self.date_closed is None:
+      self.date_closed = time
+      
+    if (team_num == 1) or (team_num == "1") or (team_num == self.t1):
+      team_num = 1
+    elif (team_num == 2) or (team_num == "2") or (team_num == self.t2):
+      team_num = 2
+    else:
+      if ctx is not None:
+        await ctx.respond(f"Invalid team name of {team_num} please enter {self.t1} or {self.t2}.", ephemeral = True)
+      print(f"Invalid team name of {team_num} please enter {self.t1} or {self.t2}.")
+      return
+    
+    if int(self.winner) != 0:
+      if ctx is not None:
+        await ctx.respond(f"Winner has already been set to {self.winner_name()}", ephemeral = True)
+      print(f"Winner has already been set to {self.winner_name()}")
+      return
+    
+    self.winner = team_num
+    m_embedd = create_match_embedded(self, "Placeholder", session)
+    
+    odds = 0.0
+    #change when autocomplete
+    if team_num == 1:
+      odds = self.t1o
+      winner_msg = f"Winner has been set to {self.t1}."
+    else:
+      odds = self.t2o
+      winner_msg = f"Winner has been set to {self.t2}."
+
+    users = get_all_db("User", session)
+    leader = get_first_place(users)
+    msg_ids = []
+    bet_user_payouts = []
+    date = get_date()
+    new_users = []
+    for bet in self.bets:
+      bet.winner = int(self.winner)
+      bet.hidden = False
+      payout = -bet.amount_bet
+      if bet.team_num == team_num:
+        payout += bet.amount_bet * odds
+      user = bet.user
+      new_users.append(user)
+      add_balance_user(user, payout, "id_" + str(bet.code), date, session)
+      while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
+        user.pay_loan(date)
+      embedd = create_bet_embedded(bet, "Placeholder", session)
+      msg_ids.append((bet, embedd))
+      bet_user_payouts.append((bet, user, payout))
+
+    new_leader = get_first_place(users)
+
+    embedd = create_payout_list_embedded(f"Payouts of {self.t1} vs {self.t2}:", self, bet_user_payouts)
+    channel = await bot.fetch_channel(get_channel_from_db("match", session))
+    
+    if channel is not None:
+      await channel.send(content=winner_msg, embed=embedd)
+    if new_leader != leader:
+      if channel is not None:
+        if new_leader == None:
+          await channel.send(f"leader is now tied.")
+        else:
+          await channel.send(f"{new_leader.username} is now the leader.")
+        
+      if leader != None:
+        print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
+        if leader.has_leader_profile():
+          print("start")
+          leader.set_color(get_random_hex_color(), session)
+    await edit_all_messages(bot, self.message_ids, m_embedd)
+    [await edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
   
 def is_valid_match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, winner, color, creator_id, date_created, date_winner, date_closed, bet_ids, message_ids):
   errors = [False for _ in range(17)]

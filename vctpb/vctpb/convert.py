@@ -373,3 +373,20 @@ def get_tournament_from_vlr_code(vlr_code, session=None):
   if len(tournament) != 1:
     return None
   return tournament[0]
+
+async def edit_all_messages(bot, ids, embedd, new_title=None):
+  ids.reverse()
+  for id in ids:
+    try:
+      channel = await bot.fetch_channel(id[1])
+      msg = await channel.fetch_message(id[0])
+      title = msg.embeds[0].title.split(":")[0]
+      if new_title is not None:
+        if (":" not in title) or (":" not in new_title):
+          title = new_title
+        else:
+          title = title.split(":")[0] + ":" + ":".join(new_title.split(":")[1:])
+      embedd.title = title
+      await msg.edit(embed=embedd)
+    except Exception:
+      print(id, "no msg found")

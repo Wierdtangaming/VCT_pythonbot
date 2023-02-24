@@ -20,7 +20,7 @@ import random
 import jsonpickle
 from Match import Match
 from Bet import Bet
-from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place
+from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place, add_balance_user
 from Team import Team
 from Tournament import Tournament
 from dbinterface import *
@@ -134,42 +134,12 @@ def print_all_balances(user_ambig, session=None):
   [print(bal[0], bal[1]) for bal in user.balances]
 
 
-async def edit_all_messages(ids, embedd, new_title=None):
-  ids.reverse()
-  for id in ids:
-    try:
-      channel = await bot.fetch_channel(id[1])
-      msg = await channel.fetch_message(id[0])
-      title = msg.embeds[0].title.split(":")[0]
-      if new_title is not None:
-        if (":" not in title) or (":" not in new_title):
-          title = new_title
-        else:
-          title = title.split(":")[0] + ":" + ":".join(new_title.split(":")[1:])
-      embedd.title = title
-      await msg.edit(embed=embedd)
-    except Exception:
-      print(id, "no msg found")
-
-
 def create_user(user_id, username, session=None):
   random.seed()
   color = secrets.token_hex(3)
   user = User(user_id, username, color, get_date())
   print(jsonpickle.encode(user), session)
   add_to_db("User", user)
-  return user
-
-
-def add_balance_user(user_ambig, change, description, date, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return add_balance_user(user_ambig, change, description, date, session=session)
-      
-  user = ambig_to_obj(user_ambig, "User")
-  if user is None:
-    return None
-  user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
   return user
 
 
@@ -205,7 +175,7 @@ async def on_ready():
   
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
-  auto_generate_matches.start()
+  auto_generate_matches_timer.start()
 
 
 @tasks.loop(hours=1)
@@ -213,10 +183,11 @@ async def auto_backup_timer():
   backup_full()
 
 
-@tasks.loop(minutes=30)
-async def auto_generate_matches():
+@tasks.loop(minutes=5)
+async def auto_generate_matches_timer():
   print("-----------Generating Matches-----------")
-  await generate_matches(bot, reply_if_none=False)
+  with Session.begin() as session:
+    await generate_matches(bot, session, reply_if_none=False)
   
 
 #choices start
@@ -258,6 +229,13 @@ async def assign_bets(ctx):
   set_channel_in_db("bet", ctx.channel.id)
   await ctx.respond(f"<#{ctx.channel.id}> is now the bet list channel.")
 #assign bets end
+
+#assign results start
+@assign.command(name = "results", description = "Where the end results show up.")
+async def assign_results(ctx):
+  set_channel_in_db("result", ctx.channel.id)
+  await ctx.respond(f"<#{ctx.channel.id}> is now the result list channel.")
+#assign results end
 
 bot.add_application_command(assign)
 #assign end
@@ -621,7 +599,7 @@ class BetEditModal(Modal):
       msg = await inter.original_message()
       
       bet.message_ids.append((msg.id, msg.channel.id))
-    await edit_all_messages(bet.message_ids, embedd, title)
+    await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet edit modal end
 
   
@@ -757,7 +735,7 @@ async def bet_hide(ctx, bet: Option(str, "Bet you want to hide.", autocomplete=u
     inter = await ctx.respond(embed=embedd)
     msg = await inter.original_message()
     bet.message_ids.append((msg.id, msg.channel.id))
-  await edit_all_messages(bet.message_ids, embedd, title)
+  await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet hide end
 
 
@@ -788,7 +766,7 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
     inter = await ctx.respond(embed=embedd)
     msg = await inter.original_message()
     bet.message_ids.append((msg.id, msg.channel.id))
-  await edit_all_messages(bet.message_ids, embedd, title)
+  await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet show end
 
 
@@ -1448,7 +1426,7 @@ class MatchEditModal(Modal):
       
       inter = await interaction.response.send_message(embed=embedd)
       msg = await inter.original_message()
-      await edit_all_messages(match.message_ids, embedd, title)
+      await edit_all_messages(bot, match.message_ids, embedd, title)
       match.message_ids.append((msg.id, msg.channel.id))
 #match edit modal end
 
@@ -1523,7 +1501,7 @@ async def match_open(ctx, match: Option(str, "Match you want to open.", autocomp
     match.date_closed = None
     await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
     embedd = create_match_embedded(match, "Placeholder", session)
-  await edit_all_messages(match.message_ids, embedd)
+  await edit_all_messages(bot, match.message_ids, embedd)
 #match open end
 
 
@@ -1535,13 +1513,7 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
     if match.date_closed != None:
       await ctx.respond(f"Match {match.t1} vs {match.t2} is already closed.", ephemeral=True)
       return
-    match.date_closed = get_date()
-    for bet in match.bets:
-      if bet.hidden == True:
-        bet.hidden = False
-    embedd = create_match_embedded(match, "Placeholder", session)
-    await ctx.respond(content=f"{match.t1} vs {match.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {match.t1} vs {match.t2}:", match.bets, True, session)])
-  await edit_all_messages(match.message_ids, embedd)
+    await match.close(bot, ctx, session)
 #match close end
 
 #match create start
@@ -1640,80 +1612,8 @@ async def match_winner(ctx, match: Option(str, "Match you want to set winner of.
     match = nmatch
     
     team.strip()
-    if (team == "1") or (team == match.t1):
-      team = 1
-    elif (team == "2") or (team == match.t2):
-      team = 2
-    else:
-      await ctx.respond(f"Invalid team name of {team} please enter {match.t1} or {match.t2}.", ephemeral = True)
-      return
     
-    if int(match.winner) != 0:
-      await ctx.respond(f"Winner has already been set to {match.winner_name()}", ephemeral = True)
-      return
-
-    match.winner = team
-    time = get_date()
-    
-    match.date_winner = time
-    if match.date_closed is None:
-      match.date_closed = time
-      
-    m_embedd = create_match_embedded(match, "Placeholder", session)
-    
-    odds = 0.0
-    #change when autocomplete
-    if team == 1:
-      odds = match.t1o
-      winner_msg = f"Winner has been set to {match.t1}."
-    else:
-      odds = match.t2o
-      winner_msg = f"Winner has been set to {match.t2}."
-
-    users = get_all_db("User", session)
-    leader = get_first_place(users)
-    msg_ids = []
-    bet_user_payouts = []
-    date = get_date()
-    new_users = []
-    for bet in match.bets:
-      bet.winner = int(match.winner)
-      bet.hidden = False
-      payout = -bet.amount_bet
-      if bet.team_num == team:
-        payout += bet.amount_bet * odds
-      user = bet.user
-      new_users.append(user)
-      add_balance_user(user, payout, "id_" + str(bet.code), date, session)
-      while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
-        user.pay_loan(date)
-      embedd = create_bet_embedded(bet, "Placeholder", session)
-      msg_ids.append((bet, embedd))
-      bet_user_payouts.append((bet, user, payout))
-
-    new_leader = get_first_place(users)
-
-    embedd = create_payout_list_embedded(f"Payouts of {match.t1} vs {match.t2}:", match, bet_user_payouts)
-    await ctx.respond(content=winner_msg, embed=embedd)
-    if new_leader != leader:
-      if new_leader == None:
-        await ctx.interaction.followup.send(f"leader is now tied.")
-      else:
-        await ctx.interaction.followup.send(f"{new_leader.username} is now the leader.")
-        
-      if leader != None:
-        print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
-        if leader.has_leader_profile():
-          print("start")
-          leader.set_color(str(secrets.token_hex(3)), session)
-          print("2")
-          member = await get_member_from_id(ctx.interaction.guild, leader.code)
-          print("winner_member", member, type(member))
-          await edit_role(member, user.username, user.color_hex)
-          print("3")
-
-  await edit_all_messages(match.message_ids, m_embedd)
-  [await edit_all_messages(tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
+    await match.set_winner(team, bot, ctx, session)
 #match winner end
 
 
@@ -1795,8 +1695,8 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       embedd = create_user_embedded(user, session)
       await ctx.respond(embed=embedd)
 
-    await edit_all_messages(match.message_ids, m_embedd)
-    [await edit_all_messages(tup[0], tup[1]) for tup in msg_ids]
+    await edit_all_messages(bot, match.message_ids, m_embedd)
+    [await edit_all_messages(bot, tup[0], tup[1]) for tup in msg_ids]
 #match reset end
   
   
@@ -2045,6 +1945,14 @@ async def team_recolor(ctx, name: Option(str, "Name of team.", autocomplete=team
     await ctx.respond(embed=embedd)
 #team recolor end
 
+#team find start
+@teamsgc.command(name = "find", description = "Find a team.")
+async def team_find(ctx, name: Option(str, "Name of team.", autocomplete=team_autocomplete)):
+  with Session.begin() as session:
+    if (team := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), name, "Team", session)) is None: return
+    embedd = create_team_embedded(f"Team: {team.name}", team)
+    await ctx.respond(embed=embedd)
+#team find end
 
 
 bot.add_application_command(teamsgc)
@@ -2112,7 +2020,7 @@ async def update_bets(ctx):
 #debug command
 @bot.slash_command(name = "check_balance_order", description = "Do not user command if not Pig, Debugs some stuff.")
 async def check_balance_order(ctx):
-  #check if the order of user balance and the order of timer in balances[2] are the same
+  #check if the order of user balance and the order of time in balances[2] are the same
   users = get_all_db("User")
   for user in users:
     sorted = user.balances.copy()

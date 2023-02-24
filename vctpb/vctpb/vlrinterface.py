@@ -33,7 +33,7 @@ def get_code(link):
       return code
 
 def get_tournament_link(code):
-  link = "https://www.vlr.gg/event/matches/" + str(code) + "/?group=upcoming&series_id=all"
+  link = "https://www.vlr.gg/event/matches/" + str(code) + "/?group=all&series_id=all"
   return link
 
 def get_match_link(code):
@@ -137,7 +137,11 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
     team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
-def vlr_get_today_matches(tournament_code) -> list:
+async def vlr_get_today_matches(bot, tournament_code, session) -> list:
+  if session is None:
+    with Session.begin() as session:
+      return await vlr_get_today_matches(bot, tournament_code, session)
+    
   tournament_link = get_tournament_link(tournament_code)
   html = urlopen(tournament_link)
   soup = BeautifulSoup(html, 'html.parser')
@@ -153,27 +157,52 @@ def vlr_get_today_matches(tournament_code) -> list:
   
   index = 0
   for date_label in date_labels:
-    date = date_label.get_text()
-    if date.__contains__("Today"):
+    date = date_label.get_text().lower()
+    if date.__contains__("today") or date.__contains__("yesterday"):
       break;
     index += 1
+  print(index)
   
   # no games today
   if index == len(date_labels):
     return []
+    
   
   match_cards = day_matches_cards[index].find_all("a", class_="wf-module-item")
+  if index > 0:
+    match_cards += day_matches_cards[index - 1].find_all("a", class_="wf-module-item")
   match_codes = []
   for match_card in match_cards:
-    status = match_card.find("div", class_="ml-status")
-    if status is not None:
-      if status.get_text().strip() == "LIVE":
-        continue
-    else:
-      print("+++++++++++++++status not found++++++++++++++++")
-    match_code = match_card.get("href")
-    if match_code is not None:
-      match_codes.append((int)(match_code.split("/")[1]))
+    match_link = match_card.get("href")
+    if match_link is not None:
+      match_code = get_code(match_link)
+      match = get_match_from_vlr_code(match_code, session=session)
+      if match is not None:
+        status = match_card.find("div", class_="ml-status")
+        status = status.get_text().strip().lower()
+        if status == "live":
+          if match.date_closed is None:
+            print("closing live match")
+            await match.close(bot, session=session)
+          continue
+        elif status == "completed":
+          # get match-item-vs div in match_card
+          # if first div has class "match-item-vs-team mod-winner" set winner to team 1
+          if match.winner == 0:
+            teams_cards = match_card.find_all("div", class_="match-item-vs-team")
+            if len(teams_cards) != 2:
+              print("can't find teams")
+              continue
+            print("setting winner for match to")
+            
+            winner = 0
+            if teams_cards[0].get("class").__contains__("mod-winner"):
+              winner = 1
+            else:
+              winner = 2
+            await match.set_winner(winner, bot, session=session)
+          continue
+      match_codes.append(match_code)
   return match_codes
 
 def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None):
@@ -261,13 +290,17 @@ def get_teams_from_match_page(soup, session):
   team2 = get_or_create_team(t2_name, t2_vlr_code, session, None)
   return team1, team2
   
-def vlr_create_match(match_code, tournament, session=None):
+async def vlr_create_match(match_code, tournament, bot, session=None):
   if session is None:
     with Session.begin() as session:
-      vlr_create_match(match_code, tournament, session)
-      
+      return await vlr_create_match(match_code, tournament, bot, session)
+  
   if (match := get_match_from_vlr_code(match_code, session)) is not None:
     if match.has_bets or match.date_closed is not None:
+      if match.date_closed is not None:
+        print(f"match {match_code} already closed")
+      else:
+        print(f"match {match_code} already has bets")
       return None
     
   match_link = get_match_link(match_code)
@@ -280,11 +313,16 @@ def vlr_create_match(match_code, tournament, session=None):
   t1o, t2o = balance_odds(t1oo, t2oo)
   
   if match is not None:
+    from convert import edit_all_messages
+    from objembed import create_match_embedded
+    print("updating odds")
     match.t1oo = t1oo
     match.t2oo = t2oo
     
     match.t1o = t1o
     match.t2o = t2o
+    embedd = create_match_embedded(match, "Placeholder", session)
+    await edit_all_messages(bot, match.message_ids, embedd)
     return None
   
   team1, team2 = get_teams_from_match_page(soup, session)
@@ -314,17 +352,17 @@ async def generate_matches(bot, session=None, reply_if_none=True):
   match_channel = await bot.fetch_channel(get_channel_from_db("match", session))
   
   for tournament in tournaments:
-    match_codes = vlr_get_today_matches(tournament.vlr_code)
+    match_codes = await vlr_get_today_matches(bot, tournament.vlr_code, session)
     print(f"generating matches with codes: {match_codes}")
     for match_code in match_codes:
-      match = vlr_create_match(match_code, tournament, session)
+      match = await vlr_create_match(match_code, tournament, bot, session)
       if match is None:
         continue
       add_to_db(match, session)
       
-      embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
       
       if match_channel is not None:
+        embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
         msg = await match_channel.send(embed=embedd)
         match.message_ids.append((msg.id, msg.channel.id))
       matches.append(match)
