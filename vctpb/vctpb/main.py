@@ -1842,7 +1842,6 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
           match.message_ids.append((msg.id, msg.channel.id))
 #tournament matches end
 
-
 #tournament recolor start
 @tournamentsgc.command(name = "recolor", description = "Changes the color of a tournament.")
 async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete),
@@ -1857,7 +1856,7 @@ async def tournament_recolor(ctx, name: Option(str, "Name of tournament.", autoc
     
     tournament.set_color(color, session)
     await ctx.respond(f'Tournament "{tournament.name}" color changed.')
-    embedd = create_tournament_embedded(f"Updated Tournament: {tournament.name}", tournament)
+    embedd = create_tournament_embedded(f"Recolor Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament recolor end
 
@@ -1992,6 +1991,31 @@ async def team_merge(ctx, new: Option(str, "Team to keep.", autocomplete=team_au
     if (t2 := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), old, "Team", session)) is None: return
     session.delete(t2)
 #team merge end
+
+#team recolor start
+@teamsgc.command(name = "recolor", description = "Changes the color of a team.")
+async def team_recolor(ctx, name: Option(str, "Name of team.", autocomplete=team_autocomplete),
+                           xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
+                           color_name: Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
+                           hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
+  with Session.begin() as session:
+    if (team := await obj_from_autocomplete_tuple(ctx, get_all_db("Team", session), name, "Team", session)) is None: return
+    
+    if xkcd_color_name == None and color_name == None and hex == None:
+      team = generate_team(team.vlr_code, session)
+      embedd = create_team_embedded(f"Updated Team: {team.name}", team)
+      await ctx.respond(embed=embedd)
+      return
+    
+    color = await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)
+    if color is None:
+      return
+    
+    team.set_color(color, session)
+    await ctx.respond(f'Team "{team.name}" color changed.')
+    embedd = create_team_embedded(f"Recolored Team: {team.name}", team)
+    await ctx.respond(embed=embedd)
+#team recolor end
 
 
 
