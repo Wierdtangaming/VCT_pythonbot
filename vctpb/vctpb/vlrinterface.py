@@ -160,12 +160,12 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   for date_label in date_labels:
     date = date_label.get_text().lower()
     if date.__contains__("today") or date.__contains__("yesterday"):
-      indexes += index
+      indexes += [index]
     index += 1
-  print(index)
+  print(indexes)
   
   # no games today
-  if len(indexes == 0):
+  if len(indexes) == 0:
     return []
   
   match_cards = []
