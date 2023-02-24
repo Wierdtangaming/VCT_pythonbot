@@ -107,8 +107,8 @@ def get_tournament_logo_img(soup, tournament_name):
 
 def get_tournament_color_from_vlr_page(soup, tournament_name):
   img_link = get_tournament_logo_img(soup, tournament_name)
-  print(f"{tournament_name}'s color: {color}")
   color = get_most_common_color(img_link)
+  print(f"{tournament_name}'s color: {color}")
   return tuple_to_hex(color)
 
 def get_team_name_from_team_vlr(soup):
@@ -151,7 +151,7 @@ def vlr_get_today_matches(tournament_code) -> list:
   if len(day_matches_cards) == 0:
     return []
   
-  index = 0;
+  index = 0
   for date_label in date_labels:
     date = date_label.get_text()
     if date.__contains__("Today"):
@@ -165,6 +165,12 @@ def vlr_get_today_matches(tournament_code) -> list:
   match_cards = day_matches_cards[index].find_all("a", class_="wf-module-item")
   match_codes = []
   for match_card in match_cards:
+    status = match_card.find("div", class_="ml-status")
+    if status is not None:
+      if status.get_text().strip() == "LIVE":
+        continue
+    else:
+      print("+++++++++++++++status not found++++++++++++++++")
     match_code = match_card.get("href")
     if match_code is not None:
       match_codes.append((int)(match_code.split("/")[1]))
@@ -259,11 +265,11 @@ def vlr_create_match(match_code, tournament, session=None):
   if session is None:
     with Session.begin() as session:
       vlr_create_match(match_code, tournament, session)
-  
-  if get_match_from_vlr_code(match_code, session) is not None:
-    print("match already exists")
-    return None
       
+  if (match := get_match_from_vlr_code(match_code, session)) is not None:
+    if match.has_bets or match.date_closed is not None:
+      return None
+    
   match_link = get_match_link(match_code)
   html = urlopen(match_link)
   soup = BeautifulSoup(html, 'html.parser')
@@ -272,6 +278,14 @@ def vlr_create_match(match_code, tournament, session=None):
   if t1oo is None:
     return None
   t1o, t2o = balance_odds(t1oo, t2oo)
+  
+  if match is not None:
+    match.t1oo = t1oo
+    match.t2oo = t2oo
+    
+    match.t1o = t1o
+    match.t2o = t2o
+    return None
   
   team1, team2 = get_teams_from_match_page(soup, session)
   if team1 is None:
@@ -288,10 +302,10 @@ def vlr_create_match(match_code, tournament, session=None):
   return Match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament.name, odds_source, color_hex, None, date_created, match_code)
 
 
-async def generate_matches(bot, session=None):
+async def generate_matches(bot, session=None, reply_if_none=True):
   if session is None:
     with Session.begin() as session:
-      generate_matches(bot, session)
+      return await generate_matches(bot, session, reply_if_none)
   
   tournaments = get_active_tournaments(session)
   
@@ -316,8 +330,9 @@ async def generate_matches(bot, session=None):
       matches.append(match)
   
   if match_channel is not None:
-    if len(matches) != 1:
+    if len(matches) != 1 and (reply_if_none or len(matches) != 0):
       await channel_send_match_list_embedded(match_channel, "Generated Matches:", matches, session)
+
 
 def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None):
   if session is None:

@@ -205,6 +205,7 @@ async def on_ready():
   
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
+  auto_generate_matches.start()
 
 
 @tasks.loop(hours=1)
@@ -212,6 +213,10 @@ async def auto_backup_timer():
   backup_full()
 
 
+@tasks.loop(minutes=30)
+async def auto_generate_matches():
+  print("-----------Generating Matches-----------")
+  await generate_matches(bot, reply_if_none=False)
   
 
 #choices start
@@ -1164,7 +1169,7 @@ async def log(ctx, amount: Option(int, "How many balance changes you want to see
 
 
 #loan start
-loan = SlashCommandGroup(
+loanscg = SlashCommandGroup(
   name = "loan", 
   description = "Create and pay off loans.",
   guild_ids = gid,
@@ -1172,7 +1177,7 @@ loan = SlashCommandGroup(
 
 
 #loan create start
-@loan.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
+@loanscg.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
@@ -1187,7 +1192,7 @@ async def loan_create(ctx):
 
   
 #loan count start
-@loan.command(name = "count", description = "See how many loans you have active.")
+@loanscg.command(name = "count", description = "See how many loans you have active.")
 async def loan_count(ctx, user: Option(discord.Member, "User you want to get loan count of.", default = None, required = False)):
   if (user := await get_user_from_ctx(ctx, user)) is None: return
   await ctx.respond(f"{user.username} currently has {len(user.get_open_loans())} active loans")
@@ -1195,7 +1200,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 
   
 #loan pay start
-@loan.command(name = "pay", description = "See how many loans you have active.")
+@loanscg.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
@@ -1214,8 +1219,31 @@ async def loan_pay(ctx):
     await ctx.respond(f"You have paid off a loan")
 #loan pay end
 
-bot.add_application_command(loan)
+bot.add_application_command(loanscg)
 #loan end
+
+#generate start
+generatescg = SlashCommandGroup(
+  name = "generate", 
+  description = "Generate things.",
+  guild_ids = gid,
+)
+
+#match generate start
+@generatescg.command(name = "matches", description = "Generates matches for the current tournament.")
+async def match_generate(ctx):
+  with Session.begin() as session:
+    if (len(get_active_tournaments(session)) == 0):
+      await ctx.respond("There is no current tournament.", ephemeral = True)
+      return
+    
+    await ctx.respond("Matches are being generated.", ephemeral = True)
+    
+    await generate_matches(bot, session)
+#match generate end
+
+bot.add_application_command(generatescg)
+#generate end
 
 
 #match start
