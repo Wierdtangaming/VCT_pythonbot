@@ -107,7 +107,13 @@ def get_tournament_logo_img(soup, tournament_name):
     return None
   return "http:" + img.get("src")
 
-def get_tournament_color_from_vlr_page(soup, tournament_name):
+def get_tournament_color_from_vlr_page(soup, tournament_name, tournament_code = None):
+  if soup is None and tournament_code is None:
+    return get_random_hex_color()
+  
+  if soup is None:
+    soup = BeautifulSoup(urlopen(get_tournament_link(tournament_code)), 'html.parser')
+    
   img_link = get_tournament_logo_img(soup, tournament_name)
   color = get_most_common_color(img_link)
   print(f"{tournament_name}'s color: {color}")
@@ -143,6 +149,8 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
   
 
 async def vlr_get_today_matches(bot, tournament_code, session) -> list:
+  if tournament_code is None:
+    return []
   if session is None:
     with Session.begin() as session:
       return await vlr_get_today_matches(bot, tournament_code, session)
@@ -228,7 +236,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
       match_codes.append(match_code)
   return match_codes
 
-def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None):
+def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, match_soup=None):
   if session is None:
     with Session.begin() as session:
       get_or_create_team(team_name, team_vlr_code, team_soup, session)
@@ -243,9 +251,13 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None):
     if team is not None:
       team.set_name(team_name, session)
       return team
+    
     if team_soup is None:
-      html = urlopen(get_team_link(team_vlr_code))
-      team_soup = BeautifulSoup(html, 'html.parser')
+      if match_soup is None:
+        html = urlopen(get_team_link(team_vlr_code))
+        team_soup = BeautifulSoup(html, 'html.parser')
+      else:
+        team_soup = match_soup
     color = get_team_color_from_vlr_page(team_soup, team_name)
   else:
     color = get_random_hex_color()
@@ -309,20 +321,21 @@ def get_teams_from_match_page(soup, session):
   if t1_vlr_code is None or t1_name is None:
     return None, None
   
-  team1 = get_or_create_team(t1_name, t1_vlr_code, session, None)
-  team2 = get_or_create_team(t2_name, t2_vlr_code, session, None)
+  team1 = get_or_create_team(t1_name, t1_vlr_code, session, None, match_soup=soup)
+  team2 = get_or_create_team(t2_name, t2_vlr_code, session, None, match_soup=soup)
   return team1, team2
 
-def get_tournament_name_from_match_page(soup):
+def get_tournament_name_and_code_from_match_page(soup):
   match_header = soup.find("a", class_="match-header-event")
   if match_header is None:
     print(f"match header not found")
-    return None
+    return None, None
+  code = get_code(match_header.get("href"))
   tournament_div = match_header.find("div", attrs={'style': 'font-weight: 700;'})
   if tournament_div is None:
     print(f"tournament not found")
-    return None
-  return tournament_div.get_text().strip()
+    return None, None
+  return tournament_div.get_text().strip(), code
   
   
 async def vlr_create_match(match_code, tournament, bot, session=None):
@@ -407,7 +420,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       await channel_send_match_list_embedded(match_channel, "Generated Matches:", matches, session)
 
 
-def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None):
+def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None, activate_on_create=True):
   if session is None:
     with Session.begin() as session:
       get_or_create_tournament(tournament_name, tournament_vlr_code, session)
@@ -423,7 +436,14 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None)
     tournament = get_tournament_from_vlr_code(tournament_vlr_code, session)
     if tournament is not None:
       return tournament
-  tournament = Tournament(tournament_name, tournament_vlr_code, get_random_hex_color())
+    
+  color = get_tournament_color_from_vlr_page(None, tournament_name, tournament_vlr_code)
+    
+  tournament = Tournament(tournament_name, tournament_vlr_code, color)
+  if activate_on_create:
+    tournament.active = True
+  else:
+    tournament.active = False
   add_to_db(tournament, session)
   return tournament
   
