@@ -58,6 +58,8 @@ def hex_to_tuple(hex):
   return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
 
 def tuple_to_hex(tup):
+  if tup is None:
+    return get_random_hex_color()
   if len(tup) != 3:
     return None
     

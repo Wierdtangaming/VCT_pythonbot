@@ -5,6 +5,9 @@
 # test prefix unique with 1 long in test code
 
 from io import BytesIO
+from urllib.request import urlopen
+
+from bs4 import BeautifulSoup
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -36,8 +39,9 @@ import secrets
 import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
+from vlrinterface import get_odds_from_match_page, get_team_names_from_match_page, get_tournament_name_from_match_page, get_match_link, get_teams_from_match_page
 
-from vlrinterface import generate_matches, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
+from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
 
 from sqlaobjs import Session
 from utils import *
@@ -175,7 +179,7 @@ async def on_ready():
   
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
-  auto_generate_matches_timer.start()
+  auto_generate_matches_from_vlr_timer.start()
 
 
 @tasks.loop(hours=1)
@@ -184,10 +188,10 @@ async def auto_backup_timer():
 
 
 @tasks.loop(minutes=5)
-async def auto_generate_matches_timer():
+async def auto_generate_matches_from_vlr_timer():
   print("-----------Generating Matches-----------")
   with Session.begin() as session:
-    await generate_matches(bot, session, reply_if_none=False)
+    await generate_matches_from_vlr(bot, session, reply_if_none=False)
   
 
 #choices start
@@ -1207,9 +1211,9 @@ generatescg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#match generate start
-@generatescg.command(name = "matches", description = "Generates matches for the current tournament.")
-async def match_generate(ctx):
+#generate matches start
+@generatescg.command(name = "matches", description = "Generates matches for the current tournaments.")
+async def generate_matches(ctx):
   with Session.begin() as session:
     if (len(get_active_tournaments(session)) == 0):
       await ctx.respond("There is no current tournament.", ephemeral = True)
@@ -1217,12 +1221,11 @@ async def match_generate(ctx):
     
     await ctx.respond("Matches are being generated.", ephemeral = True)
     
-    await generate_matches(bot, session)
-#match generate end
+    await generate_matches_from_vlr(bot, session)
+#generate matches end
 
 bot.add_application_command(generatescg)
 #generate end
-
 
 #match start
 matchscg = SlashCommandGroup(
@@ -1231,34 +1234,34 @@ matchscg = SlashCommandGroup(
   guild_ids = gid,
 )
 
-#match generate start
-@matchscg.command(name = "generate", description = "Generates matches for the current tournament.")
-async def match_generate(ctx):
-  with Session.begin() as session:
-    if (len(get_active_tournaments(session)) == 0):
-      await ctx.respond("There is no current tournament.", ephemeral = True)
-      return
-    
-    await ctx.respond("Matches are being generated.", ephemeral = True)
-    
-    await generate_matches(bot, session)
-#match generate end
-
 #match create modal start
 class MatchCreateModal(Modal):
-  
-  def __init__(self, session, balance_odds=1, *args, **kwargs) -> None:
+  def __init__(self, session, balance_odds=1, team1=None, team2=None, t1oo=None, t2oo=None, odds_source=None, tournament=None, vlr_code=None, *args, **kwargs) -> None:
     
     super().__init__(*args, **kwargs)
     self.balance_odds = balance_odds
-    leaderboard, odds_source = get_last_tournament_and_odds(session)
-    self.add_item(InputText(label="Enter team one name.", placeholder='Get from VLR', min_length=1, max_length=100))
-    self.add_item(InputText(label="Enter team two name.", placeholder='Get from VLR', min_length=1, max_length=100))
     
-    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
-    self.add_item(InputText(label="Enter tournament name.", value=leaderboard, min_length=1, max_length=300))
     
-    self.add_item(InputText(label="Enter odds source.", value=odds_source, min_length=1, max_length=100))
+    t1, t2 = None, None
+    if team1 is not None:
+      t1, t2 = team1.name, team2.name
+      self.team1_name = team1.name
+      self.team2_name = team2.name
+      self.team1_vlr_code = team1.vlr_code
+      self.team2_vlr_code = team2.vlr_code
+      
+    self.add_item(InputText(label="Enter team one name.", value=t1, placeholder='Get from VLR', min_length=1, max_length=50))
+    self.add_item(InputText(label="Enter team two name.", value=t2, placeholder='Get from VLR', min_length=1, max_length=50))
+    value = None
+    
+    if (t1oo is not None) and (t2oo is not None):
+      value = f"{t1oo} / {t2oo}"
+    self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=value, placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
+    
+    self.add_item(InputText(label="Enter tournament name.", value=tournament, min_length=1, max_length=100))
+    
+    self.add_item(InputText(label="Enter odds source.", value=odds_source, min_length=1, max_length=50))
+    self.vlr_code = vlr_code
 
   
   async def callback(self, interaction: discord.Interaction):
@@ -1266,8 +1269,17 @@ class MatchCreateModal(Modal):
       team_one = self.children[0].value.strip()
       team_two = self.children[1].value.strip()
       
-      team1 = get_or_create_team(team_one, None, session)
-      team2 = get_or_create_team(team_two, None, session)
+      t1_code, t2_code = None, None
+      if self.team1_name == team_one:
+        t1_code = self.team1_vlr_code;
+      if self.team2_name == team_two:
+        t2_code = self.team2_vlr_code;
+        
+      if (t1_code is None) or (t2_code is None):
+        self.vlr_code = None
+        
+      team1 = get_or_create_team(team_one, t1_code, session)
+      team2 = get_or_create_team(team_two, t2_code, session)
       
       odds_combined = self.children[2].value.strip()
       tournament_name = self.children[3].value.strip()
@@ -1307,7 +1319,7 @@ class MatchCreateModal(Modal):
       code = get_unique_code("Match", session)
     
       color = mix_colors([(team1.color_hex, 3), (team2.color_hex, 3), (tournament.color_hex, 1)])
-      match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date())
+      match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date(), self.vlr_code)
       
       
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
@@ -1506,6 +1518,7 @@ async def match_open(ctx, match: Option(str, "Match you want to open.", autocomp
 
 
 #match close start
+#balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)
 @matchscg.command(name = "close", description = "Close a match.")
 async def match_close(ctx, match: Option(str, "Match you want to close.", autocomplete=match_open_list_autocomplete)):
   with Session.begin() as session:
@@ -1518,12 +1531,41 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
 
 #match create start
 @matchscg.command(name = "create", description = "Create a match.")
-async def match_create(ctx, balance_odds: Option(int, "Balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
+async def match_create(ctx):
   with Session.begin() as session:
-    match_modal = MatchCreateModal(session, balance_odds=balance_odds, title="Create Match")
+    match_modal = MatchCreateModal(session, title="Create Match")
     await ctx.interaction.response.send_modal(match_modal)
 #match create end
 
+#match generate start
+@matchscg.command(name = "generate", description = "Generate a match.")
+async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
+  code = get_code(vlr_link)
+  print(code)
+  with Session.begin() as session:
+    
+    if (match := get_match_from_vlr_code(code, session)) is not None:
+      await ctx.respond(f"Match {match.t1} vs {match.t2} already exists.", ephemeral=True)
+      return
+    
+    match_link = get_match_link(code)
+    print(match_link)
+    html = urlopen(match_link)
+    soup = BeautifulSoup(html, 'html.parser')
+    
+    t1oo, t2oo = get_odds_from_match_page(soup)
+    
+    team1, team2 = get_teams_from_match_page(soup, session)
+    
+    tournament_name = get_tournament_name_from_match_page(soup)
+    
+    odds_source = None
+    if t1oo is not None:
+      odds_source = "VLR.gg"
+    
+    match_modal = MatchCreateModal(session, vlr_code=code, t1oo=t1oo, t2oo=t2oo, team1=team1, team2=team2, tournament=tournament_name, odds_source=odds_source, title="Generate Match")
+    await ctx.interaction.response.send_modal(match_modal)
+#match generate end
 
 #match delete start
 @matchscg.command(name = "delete", description = "Delete a match. Can only be done if betting is open.")
@@ -1865,8 +1907,8 @@ teamsgc = SlashCommandGroup(
 
 #team generate start
 @teamsgc.command(name = "generate", description = "Generate a team or updates a prexisting team.")
-async def team_generate(ctx, link: Option(str, "Link of vlr tournament.")):
-  code = get_code(link)
+async def team_generate(ctx, vlr_link: Option(str, "Link of vlr tournament.")):
+  code = get_code(vlr_link)
   if code is None:
     await ctx.respond("Not a valid team link.", ephemeral = True)
     return
