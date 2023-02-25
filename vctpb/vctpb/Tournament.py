@@ -21,7 +21,7 @@ class Tournament():
     self.name = name
     self.vlr_code = vlr_code
     self.set_color(color)
-    self.active = True
+    self.active = vlr_code is not None
     
   def __repr__(self):
     return f"<Tournament {self.name}>"
