@@ -313,16 +313,17 @@ def get_teams_from_match_page(soup, session):
   team2 = get_or_create_team(t2_name, t2_vlr_code, session, None)
   return team1, team2
 
-def get_tournament_name_from_match_page(soup):
+def get_tournament_name_and_code_from_match_page(soup):
   match_header = soup.find("a", class_="match-header-event")
   if match_header is None:
     print(f"match header not found")
-    return None
+    return None, None
+  code = get_code(match_header.get("href"))
   tournament_div = match_header.find("div", attrs={'style': 'font-weight: 700;'})
   if tournament_div is None:
     print(f"tournament not found")
-    return None
-  return tournament_div.get_text().strip()
+    return None, None
+  return tournament_div.get_text().strip(), code
   
   
 async def vlr_create_match(match_code, tournament, bot, session=None):
@@ -407,7 +408,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       await channel_send_match_list_embedded(match_channel, "Generated Matches:", matches, session)
 
 
-def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None):
+def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None, activate_on_create=True):
   if session is None:
     with Session.begin() as session:
       get_or_create_tournament(tournament_name, tournament_vlr_code, session)
@@ -424,6 +425,10 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None)
     if tournament is not None:
       return tournament
   tournament = Tournament(tournament_name, tournament_vlr_code, get_random_hex_color())
+  if activate_on_create:
+    tournament.active = True
+  else:
+    tournament.active = False
   add_to_db(tournament, session)
   return tournament
   

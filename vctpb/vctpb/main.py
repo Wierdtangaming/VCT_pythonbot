@@ -39,7 +39,7 @@ import secrets
 import atexit
 from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
-from vlrinterface import get_odds_from_match_page, get_team_names_from_match_page, get_tournament_name_from_match_page, get_match_link, get_teams_from_match_page
+from vlrinterface import get_odds_from_match_page, get_team_names_from_match_page, get_tournament_name_and_code_from_match_page, get_match_link, get_teams_from_match_page
 
 from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
 
@@ -1236,11 +1236,10 @@ matchscg = SlashCommandGroup(
 
 #match create modal start
 class MatchCreateModal(Modal):
-  def __init__(self, session, balance_odds=1, team1=None, team2=None, t1oo=None, t2oo=None, odds_source=None, tournament=None, vlr_code=None, *args, **kwargs) -> None:
+  def __init__(self, session, balance_odds=1, team1=None, team2=None, t1oo=None, t2oo=None, odds_source=None, tournament_name=None, tournament_code=None, vlr_code=None, *args, **kwargs) -> None:
     
     super().__init__(*args, **kwargs)
     self.balance_odds = balance_odds
-    
     
     t1, t2 = None, None
     if team1 is not None:
@@ -1258,7 +1257,9 @@ class MatchCreateModal(Modal):
       value = f"{t1oo} / {t2oo}"
     self.add_item(InputText(label="Enter odds. Team 1 odds/Team 2 odds.", value=value, placeholder='eg: "2.34/1.75" or "1.43 3.34".', min_length=1, max_length=12))
     
-    self.add_item(InputText(label="Enter tournament name.", value=tournament, min_length=1, max_length=100))
+    self.tournament_name = tournament_name
+    self.tournament_code = tournament_code
+    self.add_item(InputText(label="Enter tournament name.", value=tournament_name, min_length=1, max_length=100))
     
     self.add_item(InputText(label="Enter odds source.", value=odds_source, min_length=1, max_length=50))
     self.vlr_code = vlr_code
@@ -1283,7 +1284,10 @@ class MatchCreateModal(Modal):
       
       odds_combined = self.children[2].value.strip()
       tournament_name = self.children[3].value.strip()
-      tournament = get_or_create_tournament(tournament_name, None, session)
+      tournament_code = None
+      if self.tournament_name == tournament_name:
+        tournament_code = self.tournament_code
+      tournament = get_or_create_tournament(tournament_name, tournament_code, session, activate_on_create=False)
       betting_site = self.children[4].value.strip()
       
       
@@ -1557,13 +1561,13 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
     
     team1, team2 = get_teams_from_match_page(soup, session)
     
-    tournament_name = get_tournament_name_from_match_page(soup)
+    tournament_name, tournament_code = get_tournament_name_and_code_from_match_page(soup)
     
     odds_source = None
     if t1oo is not None:
       odds_source = "VLR.gg"
     
-    match_modal = MatchCreateModal(session, vlr_code=code, t1oo=t1oo, t2oo=t2oo, team1=team1, team2=team2, tournament=tournament_name, odds_source=odds_source, title="Generate Match")
+    match_modal = MatchCreateModal(session, vlr_code=code, t1oo=t1oo, t2oo=t2oo, team1=team1, team2=team2, tournament_name=tournament_name, tournament_code=tournament_code, odds_source=odds_source, title="Generate Match")
     await ctx.interaction.response.send_modal(match_modal)
 #match generate end
 
