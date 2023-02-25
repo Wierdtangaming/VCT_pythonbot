@@ -58,6 +58,8 @@ def get_color_count(img):
 #finds the most common pixel in the image image is a link to the image
 #clears colorless pixels
 def get_most_common_color(img_link):
+  if img_link is None:
+    return None
   
   #percent of pixels that can be colorless for the image to be considered colorless
   threshold = 0.95
@@ -126,15 +128,18 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
     updated_vlr_code = True
     team.vlr_code = team_vlr_code
     #can move code here to the end of the function to always recolor
-  
-  if soup is None:
-    html = urlopen(get_team_link(team_vlr_code))
-    soup = BeautifulSoup(html, 'html.parser')
-    name = get_team_name_from_team_vlr(soup)
-    if name is not None:
-      team.set_name(name, session)
-  if updated_vlr_code or force_color_update:
-    team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
+  else:
+    team_vlr_code = team.vlr_code
+    
+  if team_vlr_code is not None:
+    if soup is None:
+      html = urlopen(get_team_link(team_vlr_code))
+      soup = BeautifulSoup(html, 'html.parser')
+      name = get_team_name_from_team_vlr(soup)
+      if name is not None:
+        team.set_name(name, session)
+    if updated_vlr_code or force_color_update:
+      team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
 async def vlr_get_today_matches(bot, tournament_code, session) -> list:
@@ -146,7 +151,8 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   html = urlopen(tournament_link)
   soup = BeautifulSoup(html, 'html.parser')
   
-  date_labels = soup.find_all("div", class_="wf-label mod-large")
+  col = soup.find("div", class_="col mod-1")
+  date_labels = col.find_all("div", class_="wf-label mod-large")
   
   # top is not a matches card
   day_matches_cards = soup.find_all("div", class_="wf-card")
@@ -168,40 +174,56 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   if len(indexes) == 0:
     return []
   
+  # get all match cards from the day
   match_cards = []
   for index in indexes:
     match_cards += day_matches_cards[index].find_all("a", class_="wf-module-item")
   match_codes = []
   for match_card in match_cards:
+    # get match link from card
     match_link = match_card.get("href")
     if match_link is not None:
+      # get match code from link
       match_code = get_code(match_link)
+      # get match from db
       match = get_match_from_vlr_code(match_code, session=session)
+      
+      # get match status from card
+      status = match_card.find("div", class_="ml-status")
+      status = status.get_text().strip().lower()
+      print(f"{match_code} status: {status}")
+      
+      # check if match is live
       if match is not None:
-        status = match_card.find("div", class_="ml-status")
-        status = status.get_text().strip().lower()
-        print(f"{match.code} status: {status}")
         if status == "live":
+          # check if match is already closed
           if match.date_closed is None:
+            # close match
             print("closing live match")
             await match.close(bot, session=session)
           continue
         elif status == "completed":
-          # get match-item-vs div in match_card
-          # if first div has class "match-item-vs-team mod-winner" set winner to team 1
+          # check if match has a winner
           if match.winner == 0:
+            # get teams cards
             teams_cards = match_card.find_all("div", class_="match-item-vs-team")
             if len(teams_cards) != 2:
               print("can't find teams")
               continue
-            print(f"setting winner for match {match.code} to")
+            print(f"setting winner for match {match_code} to")
             
+            # check which team has the "mod-winner" class and set winner
             winner = 0
             if teams_cards[0].get("class").__contains__("mod-winner"):
               winner = 1
             else:
               winner = 2
             await match.set_winner(winner, bot, session=session)
+          continue
+      else:
+        if status == "upcoming":
+          print(f"{match_code} being created")
+        else:
           continue
       match_codes.append(match_code)
   return match_codes
@@ -290,6 +312,18 @@ def get_teams_from_match_page(soup, session):
   team1 = get_or_create_team(t1_name, t1_vlr_code, session, None)
   team2 = get_or_create_team(t2_name, t2_vlr_code, session, None)
   return team1, team2
+
+def get_tournament_name_from_match_page(soup):
+  match_header = soup.find("a", class_="match-header-event")
+  if match_header is None:
+    print(f"match header not found")
+    return None
+  tournament_div = match_header.find("div", attrs={'style': 'font-weight: 700;'})
+  if tournament_div is None:
+    print(f"tournament not found")
+    return None
+  return tournament_div.get_text().strip()
+  
   
 async def vlr_create_match(match_code, tournament, bot, session=None):
   if session is None:
@@ -341,10 +375,10 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   return Match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament.name, odds_source, color_hex, None, date_created, match_code)
 
 
-async def generate_matches(bot, session=None, reply_if_none=True):
+async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
   if session is None:
     with Session.begin() as session:
-      return await generate_matches(bot, session, reply_if_none)
+      return await generate_matches_from_vlr(bot, session, reply_if_none)
   
   tournaments = get_active_tournaments(session)
   
