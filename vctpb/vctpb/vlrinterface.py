@@ -169,13 +169,36 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   if len(day_matches_cards) == 0:
     return []
   
-  indexes = []
   index = 0
+  break_out = False
+  for day_matches_card in day_matches_cards:
+    for match_card in day_matches_card.find_all("a", class_="wf-module-item"):
+      status = match_card.find("div", class_="ml-status")
+      if status is not None:
+        status = status.get_text().lower()
+        if status.__contains__("live") or status.__contains__("upcoming"):
+          break_out = True
+          break
+    if break_out:
+      break
+    index += 1
+  
+  indexes = [index]
+  has_yesterday = False
+  has_today = False
   for date_label in date_labels:
     date = date_label.get_text().lower()
-    if date.__contains__("today") or date.__contains__("yesterday"):
-      indexes += [index]
-    index += 1
+    if date.__contains__("yesterday"):
+      has_yesterday = True
+    if date.__contains__("today"):
+      has_today = True
+      
+  if has_yesterday:
+    # add yesterday to front of indexes
+    indexes.insert(0, index - 1)
+  if not has_today:
+    indexes.pop(0)
+       
   print(indexes)
   
   # no games today
@@ -187,6 +210,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   for index in indexes:
     match_cards += day_matches_cards[index].find_all("a", class_="wf-module-item")
   match_codes = []
+  
   for match_card in match_cards:
     # get match link from card
     match_link = match_card.get("href")
