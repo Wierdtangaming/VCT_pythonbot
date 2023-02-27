@@ -170,7 +170,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   
   # if buffer_active is true, all matches within a day will be generated
   # activates if match within 12 hours is found
-  get_all_matches_for_day = False
+  continuos_buffer = 12
   
   match_codes = []
   for day_matches_card in day_matches_cards:
@@ -229,10 +229,13 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
             if hours is None:
               print(f"hours for {match_code} is None, eta: {eta}")
               continue_out = True
-              continue
-            if not get_all_matches_for_day:
-              if hours > 11:
-                continue_out = True
+              break
+            # if time until match is greater than both 12 and continuos_buffer dont make matches
+            if hours > 11 and hours > continuos_buffer:
+              continue_out = True
+            else:
+              if status.__contains__("upcoming"):
+                continuos_buffer = hours + 4
             break
         if continue_out:
           continue
@@ -264,7 +267,6 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
       
       if status.__contains__("upcoming"):
         match_codes.append(match_code)
-        get_all_matches_for_day = True
   
   return match_codes
 
