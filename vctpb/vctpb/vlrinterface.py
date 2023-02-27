@@ -160,104 +160,112 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   soup = BeautifulSoup(html, 'html.parser')
   
   col = soup.find("div", class_="col mod-1")
-  date_labels = col.find_all("div", class_="wf-label mod-large")
+  #date_labels = col.find_all("div", class_="wf-label mod-large")
   
   # top is not a matches card
-  day_matches_cards = soup.find_all("div", class_="wf-card")
-  day_matches_cards.pop(0)
+  day_matches_cards = col.find_all("div", class_="wf-card")
   
   if len(day_matches_cards) == 0:
     return []
   
-  index = 0
-  break_out = False
+  # if buffer_active is true, all matches within a day will be generated
+  # activates if match within 12 hours is found
+  get_all_matches_for_day = False
+  
+  match_codes = []
   for day_matches_card in day_matches_cards:
     for match_card in day_matches_card.find_all("a", class_="wf-module-item"):
-      status = match_card.find("div", class_="ml-status")
-      if status is not None:
-        status = status.get_text().lower()
-        if status.__contains__("live") or status.__contains__("upcoming"):
-          break_out = True
-          break
-    if break_out:
-      break
-    index += 1
-  
-  indexes = [index]
-  has_yesterday = False
-  has_today = False
-  for date_label in date_labels:
-    date = date_label.get_text().lower()
-    if date.__contains__("yesterday"):
-      has_yesterday = True
-    if date.__contains__("today"):
-      has_today = True
-      
-  if has_yesterday:
-    # add yesterday to front of indexes
-    indexes.insert(0, index - 1)
-  if not has_today:
-    indexes.pop(0)
-       
-  print(indexes)
-  
-  # no games today
-  if len(indexes) == 0:
-    return []
-  
-  # get all match cards from the day
-  match_cards = []
-  for index in indexes:
-    match_cards += day_matches_cards[index].find_all("a", class_="wf-module-item")
-  match_codes = []
-  
-  for match_card in match_cards:
-    # get match link from card
-    match_link = match_card.get("href")
-    if match_link is not None:
-      # get match code from link
+      #get match code
+      match_link = match_card.get("href")
+      if match_link is None:
+        print(f"match link is None {match_card}")
+        continue
       match_code = get_code(match_link)
-      # get match from db
-      match = get_match_from_vlr_code(match_code, session=session)
       
-      # get match status from card
-      status = match_card.find("div", class_="ml-status")
-      status = status.get_text().strip().lower()
-      print(f"{match_code} status: {status}")
+      # for each match card in day group
+      # get status
+      status_label = match_card.find("div", class_="ml-status")
+      if status_label is None:
+        print(f"status label for {match_code} is None")
+        continue
+      status = status_label.get_text().lower()
       
-      # check if match is live
-      if match is not None:
-        if status == "live":
-          # check if match is already closed
-          if match.date_closed is None:
-            # close match
-            print("closing live match")
-            await match.close(bot, session=session)
+      # continue if status is TBD
+      if status.__contains__("tbd"):
+        continue
+      
+      # if live match close and continue
+      if status.__contains__("live"):
+        # check if match is already closed
+        print(f"{match_code} status: {status}")
+        if (match := get_match_from_vlr_code(match_code, session)) is None:
+          print(f"live match with code {match_code} not found")
           continue
-        elif status == "completed":
-          # check if match has a winner
-          if match.winner == 0:
-            # get teams cards
-            teams_cards = match_card.find_all("div", class_="match-item-vs-team")
-            if len(teams_cards) != 2:
-              print("can't find teams")
+        if match.date_closed is None:
+          # close match
+          print(f"closing match {match_code}")
+          await match.close(bot, session=session)
+        continue
+      
+      # completed and upcoming matches
+      # get eta to match
+      eta_label = match_card.find("div", class_="ml-eta")
+      if eta_label is None:
+        print(f"eta label for {match_code} is None for status {status}")
+        continue
+      eta = eta_label.get_text().lower()
+      
+      # minute not there when day is
+      if not eta.__contains__("m"):
+        continue
+      # if hours in eta is more than 12, continue (if not matches_for_day)
+      if eta.__contains__("h"):
+        eta_groups = eta.split(" ")
+        continue_out = False
+        for eta_group in eta_groups:
+          if eta_group.__contains__("h"):
+            eta_group = eta_group.replace("h", "")
+            hours = to_digit(eta_group)
+            if hours is None:
+              print(f"hours for {match_code} is None, eta: {eta}")
+              continue_out = True
               continue
-            print(f"setting winner for match {match_code} to")
-            
-            # check which team has the "mod-winner" class and set winner
-            winner = 0
-            if teams_cards[0].get("class").__contains__("mod-winner"):
-              winner = 1
-            else:
-              winner = 2
-            await match.set_winner(winner, bot, session=session)
+            if not get_all_matches_for_day:
+              if hours > 11:
+                continue_out = True
+            break
+        if continue_out:
           continue
-      else:
-        if status == "upcoming":
-          print(f"{match_code} being created")
-        else:
+      print(f"acting on {match_code}, status: {status}, eta: {eta}")
+      
+      #if completed check if match has a winner then set winner
+      if status.__contains__("completed"):
+        if (match := get_match_from_vlr_code(match_code, session)) is None:
+          print(f"completed match with code {match_code} not found")
           continue
-      match_codes.append(match_code)
+        # check if match has a winner
+        if match.winner == 0:
+          # get teams cards
+          teams_cards = match_card.find_all("div", class_="match-item-vs-team")
+          if len(teams_cards) != 2:
+            print("can't find teams")
+            continue
+          print(f"setting winner for match {match_code} to")
+          
+          # check which team has the "mod-winner" class and set winner
+          winner = 0
+          if teams_cards[0].get("class").__contains__("mod-winner"):
+            winner = 1
+          else:
+            winner = 2
+          await match.set_winner(winner, bot, session=session)
+        continue
+      
+      
+      if status.__contains__("upcoming"):
+        match_codes.append(match_code)
+        get_all_matches_for_day = True
+  
   return match_codes
 
 def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, match_soup=None):
