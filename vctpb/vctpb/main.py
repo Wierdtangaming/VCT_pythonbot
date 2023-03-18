@@ -383,7 +383,7 @@ async def award_rename(ctx, user: Option(discord.Member, "User you want to award
     
     print(award)
     
-    await ctx.respond(f"Award {award.split(', ')[0][5:]} reawarded to {amount}.")
+    await ctx.respond(f"Award {award.split(', ')[0]} reawarded to {amount}.")
 #award rename end  
 
 bot.add_application_command(award)
@@ -1047,7 +1047,7 @@ balance_choices = [
 
 @graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
 async def graph_balances(ctx,
-  type: Option(int, "What type of graph you wany to make.", choices = balance_choices, default = 0, required = False), 
+  type: Option(int, "What type of graph you want to make.", choices = balance_choices, default = 0, required = False), 
   amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
   compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False),
@@ -1268,7 +1268,9 @@ matchscg = SlashCommandGroup(
 
 #match create modal start
 class MatchCreateModal(Modal):
-  def __init__(self, session, balance_odds=1, vlr_code=None, *args, **kwargs) -> None:
+  def __init__(self, session, balance_odds=1, soup=None, vlr_code=None, *args, **kwargs) -> None:
+    #time function
+    time = datetime.now();
     
     super().__init__(*args, **kwargs)
       
@@ -1286,15 +1288,10 @@ class MatchCreateModal(Modal):
     team1 = None
     team2 = None
     if vlr_code is not None:
-      match_link = get_match_link(vlr_code)
-      print(match_link)
-      
-      html = urlopen(match_link)
-      soup = BeautifulSoup(html, 'html.parser')
       
       t1oo, t2oo = get_odds_from_match_page(soup)
       
-      team1, team2 = get_teams_from_match_page(soup, session)
+      team1, team2 = get_teams_from_match_page(soup, session, second_query=False)
       
       tournament_name, tournament_code = get_tournament_name_and_code_from_match_page(soup)
       
@@ -1609,8 +1606,17 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
     if (match := get_match_from_vlr_code(vlr_code, session)) is not None:
       await ctx.respond(f"Match {match.t1} vs {match.t2} already exists.", ephemeral=True)
       return
-    
-    match_modal = MatchCreateModal(session, vlr_code=vlr_code, title="Generate Match")
+    match_link = get_match_link(vlr_code)
+    time = datetime.now()
+    html = urlopen(match_link)
+    if html is None:
+      await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
+      return
+    soup = BeautifulSoup(html, 'html.parser')
+    if soup is None:
+      await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
+      return
+    match_modal = MatchCreateModal(session, vlr_code=vlr_code, soup=soup, title="Generate Match")
     await ctx.interaction.response.send_modal(match_modal)
 #match generate end
 

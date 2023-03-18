@@ -7,6 +7,7 @@ from collections import Counter
 import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
 from urllib.request import urlopen
+from utils import tuple_to_hex
 
 #entered_tournament_link = "https://www.vlr.gg/event/1188/champions-tour-2023-lock-in-s-o-paulo"
 
@@ -95,7 +96,7 @@ def get_img_link(soup, team_name):
 
 def get_color_from_vlr_page(soup, team_name):
   img_link = get_img_link(soup, team_name)
-  color = get_most_common_color(img_link)
+  return tuple_to_hex(get_most_common_color(img_link))
 
 team_code = get_code(entered_team_link)
 team_link = get_team_link(team_code)
