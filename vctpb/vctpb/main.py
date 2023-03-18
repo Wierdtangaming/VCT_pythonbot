@@ -313,7 +313,7 @@ async def award_list(ctx, user: Option(discord.Member, "User you want to list aw
 
 #award rename start
 @award.command(name = "rename", description = """Renames an award.""")
-async def award_rename(ctx, user: Option(discord.Member, "User you wannt to award"), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete), description: Option(str, "Unique description of why the award is given.")):
+async def award_rename(ctx, user: Option(discord.Member, "User you want to award"), award: Option(str, "Description of award you want to rename.", autocomplete=user_awards_autocomplete), description: Option(str, "Unique description of why the award is given.")):
   
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, user, session)) is None: return
@@ -341,8 +341,9 @@ async def award_rename(ctx, user: Option(discord.Member, "User you wannt to awar
       return
     
     if user.change_award_name(award, description, session) is None:
-      print(f"change_award_name not found. {award}\n{num}\n{user.code}.")
-      await ctx.respond(f"Award not working {description}, {award}\n{num}\n{user.code}.", ephemeral = True)
+      print(f"change award name not found. {award} {user.code}.")
+      await ctx.respond(f"Award not working {description}, {award} {user.code}.", ephemeral = True)
+      return
     
     print(award)
     award_t = award.split(", ")[:-2]
@@ -352,7 +353,38 @@ async def award_rename(ctx, user: Option(discord.Member, "User you wannt to awar
     await ctx.respond(f"Award {award} renamed to {description}.")
 #award rename end  
 
-
+#award reaward start
+@award.command(name = "reaward", description = """Changes the amount of an award.""")
+async def award_rename(ctx, user: Option(discord.Member, "User you want to award"), award: Option(str, "Description of award you want to reaward.", autocomplete=user_awards_autocomplete), amount: Option(str, "New Amount.")):
+  with Session.begin() as session:
+    amount = to_digit(amount)
+    if amount is None:
+      await ctx.respond("Amount not valid.", ephemeral = True)
+      return
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
+    
+    award_labels = user.get_award_strings()
+    
+    if len(award) == 8:
+      if award_label.endswith(award):
+        award = award_label
+    else:
+      for award_label in award_labels:
+        if award_label == award:
+          award = award_label
+          break
+      else:
+        await ctx.respond("Award not found.", ephemeral = True)
+        return
+    
+    if user.change_award_amount(award, amount, session) is None:
+      print(f"change award name not found. {award}  --  {amount}  --  {user.code}.")
+      await ctx.respond(f"Award not working {award}, {amount}, {user.code}.", ephemeral = True)
+    
+    print(award)
+    
+    await ctx.respond(f"Award {award.split(', ')[0][5:]} reawarded to {amount}.")
+#award rename end  
 
 bot.add_application_command(award)
 #award end

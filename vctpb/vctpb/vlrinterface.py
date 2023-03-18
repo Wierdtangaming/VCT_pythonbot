@@ -215,6 +215,13 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
         continue
       eta = eta_label.get_text().lower()
       
+      # continue if eta ends with "mo"
+      if eta.endswith("mo"):
+        continue
+      # continue if eta ends with "y"
+      if eta.endswith("y"):
+        continue
+      
       # minute not there when day is
       if not eta.__contains__("m"):
         continue
@@ -317,17 +324,17 @@ def get_odds_from_match_page(soup):
   t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
   
   if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
-    print(f"1 odds not found")
+    print(f"label not found odds not found")
     return None, None
   
   t1oo = to_float(t1_vlr_odds_label.get_text().strip())
   t2oo = to_float(t2_vlr_odds_label.get_text().strip())
   
   if t1oo is None or t2oo is None:
-    print(f"2 odds not found")
+    print(f"not valid number odds not found")
     return None, None
   if t1oo <= 1 or t2oo <= 1:
-    print(f"3 odds not found")
+    print(f"{t1oo} to {t2oo} odds not found")
     return None, None
   
   return t1oo, t2oo
