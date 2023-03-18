@@ -261,6 +261,29 @@ class User():
       return None
     return self
   
+  def change_award_amount(self, award_label, amount, session=None):
+    if session is None:
+      with Session.begin() as session:
+        self.change_award_amount(award_label, amount, session=session)
+    updating = False
+    diff = 0
+    for i, balance in enumerate(self.balances):
+      if updating:
+        if balance[0].startswith("reset_"):
+          print("breaking") 
+          break
+        self.balances[self.balances.index(balance)] = (balance[0], balance[1] + diff, balance[2] )
+        continue
+      if balance[0].startswith("award_") and balance[0][6:14] == award_label[-8:]:
+        # balance[1] is total balance, need toi get total from previous balance
+        print(balance[1], type(balance[1]), amount, type(amount))
+        diff = amount - (balance[1] - self.balances[i-1][1])
+        self.balances[self.balances.index(balance)] = (balance[0], balance[1] + diff, balance[2])
+        updating = True;
+    
+    if not updating:
+      return None
+    return self
   
   def get_award_strings(self):
     last_amount = Decimal(0)
