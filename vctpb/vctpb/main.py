@@ -1038,7 +1038,6 @@ graph = SlashCommandGroup(
 )
 
 
-
 #graph balance start
 balance_choices = [
   OptionChoice(name="season", value=0),
@@ -1323,6 +1322,7 @@ class MatchCreateModal(Modal):
   
   async def callback(self, interaction: discord.Interaction):
     with Session.begin() as session:
+      wait_msg = await interaction.response.send_message(f"Generating Match.", ephemeral=True)
       team_one = self.children[0].value.strip()
       team_two = self.children[1].value.strip()
       
@@ -1356,18 +1356,18 @@ class MatchCreateModal(Modal):
           team_one_old_odds, team_two_old_odds = "".join(_ for _ in odds_combined if _ in f".1234567890{spliter}").split(spliter)
           break
       else:
-        await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].", ephemeral=True)
+        await wait_msg.edit_original_message(content = f"Odds are not valid. Odds must be [odds 1]/[odds 2].")
         return
       
       if (to_float(team_one_old_odds) is None) or (to_float(team_two_old_odds) is None): 
-        await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].", ephemeral=True)
+        await wait_msg.edit_original_message(content = f"Odds are not valid. Odds must be [odds 1]/[odds 2].")
         return
       
       team_one_old_odds = to_float(team_one_old_odds)
       team_two_old_odds = to_float(team_two_old_odds)
       
       if team_one_old_odds <= 1 or team_two_old_odds <= 1:
-        await interaction.response.send_message(f"Odds must be greater than 1.", ephemeral=True)
+        await wait_msg.edit_original_message(content = f"Odds must be greater than 1.")
         return
       
       if self.balance_odds == 1:
@@ -1383,13 +1383,10 @@ class MatchCreateModal(Modal):
       
       
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
-
-      if (channel := await bot.fetch_channel(get_channel_from_db("match", session))) == interaction.channel:
-        inter = await interaction.response.send_message(embed=embedd)
-        msg = await inter.original_message()
-      else:
-        msg = await channel.send(embed=embedd)
-        await interaction.response.send_message(f"Match created in {channel.mention}.", ephemeral = True)
+      
+      channel = await bot.fetch_channel(get_channel_from_db("match", session))
+      msg = await channel.send(embed=embedd)
+      await wait_msg.edit_original_message(content = f"Match created in {channel.mention}.")
         
       match.message_ids.append((msg.id, msg.channel.id))
       add_to_db(match, session)
@@ -1607,7 +1604,6 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
       await ctx.respond(f"Match {match.t1} vs {match.t2} already exists.", ephemeral=True)
       return
     match_link = get_match_link(vlr_code)
-    time = datetime.now()
     html = urlopen(match_link)
     if html is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
