@@ -7,7 +7,6 @@ from urllib.request import urlopen
 from PIL import Image
 from collections import Counter
 import requests
-import time
 
 from sqlaobjs import Session
 from convert import get_active_tournaments
@@ -96,10 +95,13 @@ def get_team_logo_img(soup, team_name):
   return "http:" + img.get("src")
 
 def get_team_color_from_vlr_page(soup, team_name):
-  img_link = get_team_logo_img(soup, team_name)
-  color = get_most_common_color(img_link)
-  print(f"{team_name}'s new color: {color}")
-  return tuple_to_hex(color)
+  try:
+    img_link = get_team_logo_img(soup, team_name)
+    color = get_most_common_color(img_link)
+    print(f"{team_name}'s new color: {color}")
+    return tuple_to_hex(color)
+  except:
+    return get_random_hex_color()
 
 def get_tournament_logo_img(soup, tournament_name):
   img = soup.find("img",  alt=tournament_name)
@@ -113,11 +115,13 @@ def get_tournament_color_from_vlr_page(soup, tournament_name, tournament_code = 
   
   if soup is None:
     soup = BeautifulSoup(urlopen(get_tournament_link(tournament_code)), 'html.parser')
-    
-  img_link = get_tournament_logo_img(soup, tournament_name)
-  color = get_most_common_color(img_link)
-  print(f"{tournament_name}'s color: {color}")
-  return tuple_to_hex(color)
+  try:
+    img_link = get_tournament_logo_img(soup, tournament_name)
+    color = get_most_common_color(img_link)
+    print(f"{tournament_name}'s color: {color}")
+    return tuple_to_hex(color)
+  except:
+    return get_random_hex_color()
 
 def get_team_name_from_team_vlr(soup):
   team_name = soup.find("h1", class_="wf-title")
@@ -126,7 +130,7 @@ def get_team_name_from_team_vlr(soup):
   return team_name.get_text().strip()
 
 
-def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, force_color_update = False):
+def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, force_color_update = False, do_query_site = True):
   updated_vlr_code = False
   if team.vlr_code is None:
     if team_vlr_code is None:
@@ -137,15 +141,16 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
   else:
     team_vlr_code = team.vlr_code
     
-  if team_vlr_code is not None:
-    if soup is None:
-      html = urlopen(get_team_link(team_vlr_code))
-      soup = BeautifulSoup(html, 'html.parser')
-      name = get_team_name_from_team_vlr(soup)
-      if name is not None:
-        team.set_name(name, session)
-    if updated_vlr_code or force_color_update:
-      team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
+  if do_query_site:
+    if team_vlr_code is not None:
+      if soup is None:
+        html = urlopen(get_team_link(team_vlr_code))
+        soup = BeautifulSoup(html, 'html.parser')
+        name = get_team_name_from_team_vlr(soup)
+        if name is not None:
+          team.set_name(name, session)
+      if updated_vlr_code or force_color_update:
+        team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
 async def vlr_get_today_matches(bot, tournament_code, session) -> list:
@@ -277,14 +282,14 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   
   return match_codes
 
-def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, match_soup=None):
+def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, match_soup=None, second_query=True):
   if session is None:
     with Session.begin() as session:
-      get_or_create_team(team_name, team_vlr_code, team_soup, session)
-      
+      get_or_create_team(team_name, team_vlr_code, session, team_soup, match_soup, second_query)
+  
   team = get_from_db("Team", team_name, session)
   if team is not None:
-    update_team_with_vlr_code(team, team_vlr_code, team_soup, session)
+    update_team_with_vlr_code(team, team_vlr_code, team_soup, session, do_query_site=second_query)
     return team
   
   if team_vlr_code is not None:
@@ -292,17 +297,20 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, m
     if team is not None:
       team.set_name(team_name, session)
       return team
-    
     if team_soup is None:
       if match_soup is None:
-        html = urlopen(get_team_link(team_vlr_code))
-        team_soup = BeautifulSoup(html, 'html.parser')
+        if second_query:
+          html = urlopen(get_team_link(team_vlr_code))
+          team_soup = BeautifulSoup(html, 'html.parser')
       else:
         team_soup = match_soup
-    color = get_team_color_from_vlr_page(team_soup, team_name)
+    if team_soup is not None:
+      color = get_team_color_from_vlr_page(team_soup, team_name)
+    else:
+      color = get_random_hex_color()
   else:
     color = get_random_hex_color()
-    
+  
   team = Team(team_name, team_vlr_code, color)
   add_to_db(team, session)
   return team
@@ -356,14 +364,13 @@ def get_team_names_from_match_page(soup):
   
   return t1_name, t2_name
 
-def get_teams_from_match_page(soup, session):
+def get_teams_from_match_page(soup, session, second_query=True):
   t1_vlr_code, t2_vlr_code = get_team_codes_from_match_page(soup)
   t1_name, t2_name = get_team_names_from_match_page(soup)
   if t1_vlr_code is None or t1_name is None:
     return None, None
-  
-  team1 = get_or_create_team(t1_name, t1_vlr_code, session, None, match_soup=soup)
-  team2 = get_or_create_team(t2_name, t2_vlr_code, session, None, match_soup=soup)
+  team1 = get_or_create_team(t1_name, t1_vlr_code, session, match_soup=soup, second_query=second_query)
+  team2 = get_or_create_team(t2_name, t2_vlr_code, session, match_soup=soup, second_query=second_query)
   return team1, team2
 
 def get_tournament_name_and_code_from_match_page(soup):
