@@ -4,7 +4,7 @@
 import re
 from bs4 import BeautifulSoup
 import lxml
-import cchardet
+#import cchardet
 from urllib.request import urlopen
 from PIL import Image
 from collections import Counter

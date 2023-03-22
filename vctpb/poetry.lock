@@ -132,14 +132,6 @@ python-versions = "*"
 beautifulsoup4 = "*"
 
 [[package]]
-name = "cchardet"
-version = "2.1.7"
-description = "cChardet is high speed universal character encoding detector."
-category = "main"
-optional = false
-python-versions = "*"
-
-[[package]]
 name = "certifi"
 version = "2021.10.8"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -778,7 +770,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "2082523c973ecb816b2e7e5631499cc707765ce6acb8d54a2268c468dd473272"
+content-hash = "e99b1977cee808f0826976b54d7041b5f84ad0e522c123543f6f9f621a56ea3e"
 
 [metadata.files]
 aiohttp = []
@@ -790,7 +782,6 @@ attrs = []
 "backports.zoneinfo" = []
 beautifulsoup4 = []
 bs4 = []
-cchardet = []
 certifi = []
 cffi = []
 charset-normalizer = []

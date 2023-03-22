@@ -9,7 +9,7 @@ from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
 import lxml
-import cchardet
+#import cchardet
 import requests
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
