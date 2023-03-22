@@ -8,6 +8,8 @@ from io import BytesIO
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
+import lxml
+import cchardet
 import requests
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
@@ -1606,24 +1608,22 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
       return
     match_link = get_match_link(vlr_code)
     time = datetime.now();
-    print(f"time 1: {datetime.now() - time}")
-    time = datetime.now();
-    session = requests.Session()
-    response = session.get(match_link)
+    web_session = requests.Session()
+    response = web_session.get(match_link)
     if response is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
       return
-    print(f"time 2: {datetime.now() - time}")
+    print(f"time 1: {datetime.now() - time}")
     time = datetime.now();
-    soup = BeautifulSoup(response.content, 'html.parser')
-    print(f"time 3: {datetime.now() - time}")
+    soup = BeautifulSoup(response.text, 'lxml')
+    print(f"time 2: {datetime.now() - time}")
     time = datetime.now();
     if soup is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
       return
     match_modal = MatchCreateModal(session, vlr_code=vlr_code, soup=soup, title="Generate Match")
     await ctx.interaction.response.send_modal(match_modal)
-    print(f"time 4: {datetime.now() - time}")
+    print(f"time 3: {datetime.now() - time}")
     time = datetime.now();
 #match generate end
 
