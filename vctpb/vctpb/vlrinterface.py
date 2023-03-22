@@ -3,6 +3,8 @@
 #import libraries
 import re
 from bs4 import BeautifulSoup
+import lxml
+import cchardet
 from urllib.request import urlopen
 from PIL import Image
 from collections import Counter
@@ -114,7 +116,9 @@ def get_tournament_color_from_vlr_page(soup, tournament_name, tournament_code = 
     return get_random_hex_color()
   
   if soup is None:
-    soup = BeautifulSoup(urlopen(get_tournament_link(tournament_code)), 'html.parser')
+    web_session = requests.Session()
+    response = web_session.get(get_tournament_link(tournament_code))
+    soup = BeautifulSoup(response.text, 'lxml')
   try:
     img_link = get_tournament_logo_img(soup, tournament_name)
     color = get_most_common_color(img_link)
@@ -144,8 +148,9 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
   if do_query_site:
     if team_vlr_code is not None:
       if soup is None:
-        html = urlopen(get_team_link(team_vlr_code))
-        soup = BeautifulSoup(html, 'html.parser')
+        web_session = requests.Session()
+        response = web_session.get(get_team_link(team_vlr_code))
+        soup = BeautifulSoup(response.text, 'lxml')
         name = get_team_name_from_team_vlr(soup)
         if name is not None:
           team.set_name(name, session)
@@ -161,8 +166,9 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
       return await vlr_get_today_matches(bot, tournament_code, session)
     
   tournament_link = get_tournament_link(tournament_code)
-  html = urlopen(tournament_link)
-  soup = BeautifulSoup(html, 'html.parser')
+  web_session = requests.Session()
+  response = web_session.get(tournament_link)
+  soup = BeautifulSoup(response.text, 'lxml')
   
   col = soup.find("div", class_="col mod-1")
   #date_labels = col.find_all("div", class_="wf-label mod-large")
@@ -300,8 +306,9 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, m
     if team_soup is None:
       if match_soup is None:
         if second_query:
-          html = urlopen(get_team_link(team_vlr_code))
-          team_soup = BeautifulSoup(html, 'html.parser')
+          web_session = requests.Session()
+          response = web_session.get(get_team_link(team_vlr_code))
+          team_soup = BeautifulSoup(response.text, 'lxml')
       else:
         team_soup = match_soup
     if team_soup is not None:
@@ -400,8 +407,9 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
       return None
     
   match_link = get_match_link(match_code)
-  html = urlopen(match_link)
-  soup = BeautifulSoup(html, 'html.parser')
+  web_session = requests.Session()
+  response = web_session.get(match_link)
+  soup = BeautifulSoup(response.text, 'lxml')
   
   t1oo, t2oo = get_odds_from_match_page(soup)
   if t1oo is None:
@@ -507,9 +515,10 @@ def generate_tournament(vlr_code, session=None):
   
   # get the tournament page from the vlr code
   tournament_link = get_tournament_link(vlr_code)
+  web_session = requests.Session()
+  response = web_session.get(tournament_link)
+  soup = BeautifulSoup(response.text, 'lxml')
   print(f"generating tournament from link: {tournament_link}")
-  html = urlopen(tournament_link)
-  soup = BeautifulSoup(html, 'html.parser')
   
   # get the tournament name and color from the page
   tournament_name = soup.find("h1", class_="wf-title").get_text().strip()
@@ -537,9 +546,9 @@ def generate_team(vlr_code, session=None):
   team_link = get_team_link(vlr_code)
   print(f"generating team from link: {team_link}")
   # open team link
-  html = urlopen(team_link)
-  # parse html
-  team_soup = BeautifulSoup(html, 'html.parser')
+  web_session = requests.Session()
+  response = web_session.get(team_link)
+  team_soup = BeautifulSoup(response.text, 'lxml')
   # get team name from team link
   team_name = get_team_name_from_team_vlr(team_soup)
   
