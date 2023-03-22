@@ -8,6 +8,7 @@ from io import BytesIO
 from urllib.request import urlopen
 
 from bs4 import BeautifulSoup
+import requests
 #git clone https://github.com/Pycord-Development/pycord
 #cd pycord
 #python3 -m pip install -U .[voice]
@@ -1607,13 +1608,14 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
     time = datetime.now();
     print(f"time 1: {datetime.now() - time}")
     time = datetime.now();
-    html = urlopen(match_link)
-    if html is None:
+    session = requests.Session()
+    response = session.get(match_link)
+    if response is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
       return
     print(f"time 2: {datetime.now() - time}")
     time = datetime.now();
-    soup = BeautifulSoup(html, 'html.parser')
+    soup = BeautifulSoup(response.content, 'html.parser')
     print(f"time 3: {datetime.now() - time}")
     time = datetime.now();
     if soup is None:
