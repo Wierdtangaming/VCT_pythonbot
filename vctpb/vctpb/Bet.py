@@ -5,7 +5,7 @@ from sqltypes import JSONLIST
 from datetime import datetime
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
-from utils import mix_colors
+from utils import mix_colors, get_random_hex_color
 
 
 @mapper_registry.mapped
@@ -94,7 +94,10 @@ class Bet():
       match = self.match
       
     team_hex = team1.color_hex if self.team_num == 1 else team2.color_hex
-    hex = mix_colors([(team_hex, 3), (user.color_hex, 3), (match.color_hex, 1)])
+    if self.hidden:
+      hex = get_random_hex_color()
+    else:
+      hex = mix_colors([(team_hex, 3), (user.color_hex, 3), (match.color_hex, 1)])
     self.color_hex = hex
   
   
