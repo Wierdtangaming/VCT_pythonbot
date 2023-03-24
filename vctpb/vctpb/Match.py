@@ -108,6 +108,7 @@ class Match():
     for bet in self.bets:
       if bet.hidden == True:
         bet.hidden = False
+        bet.set_color(session)
     embedd = create_match_embedded(self, "Placeholder", session)
     if ctx is not None:
       await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
