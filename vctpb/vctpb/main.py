@@ -141,12 +141,12 @@ def print_all_balances(user_ambig, session=None):
   [print(bal[0], bal[1]) for bal in user.balances]
 
 
-def create_user(user_id, username, session=None):
+def create_user(user_id, username, session):
   random.seed()
   color = secrets.token_hex(3)
   user = User(user_id, username, color, get_date())
   print(jsonpickle.encode(user), session)
-  add_to_db("User", user)
+  add_to_db(user, session)
   return user
 
 
@@ -280,7 +280,7 @@ async def award_give(ctx,
       bet_id = f"award_{code}_{description}"
       
       print(bet_id)
-      
+      date = get_date()
       first = True
       for user in users:
         abu = add_balance_user(user, amount, bet_id, get_date(), session)
@@ -290,17 +290,21 @@ async def award_give(ctx,
           first = False
         else:
           await ctx.interaction.followup.send(embed=embedd)
+        while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
+          user.pay_loan(date)
       return
-    
-    if (user := await get_user_from_ctx(ctx, user, session)) is None: return
-    bet_id = "award_" + user.get_unique_bal_code() + "_" + description
-    print(bet_id)
-    abu = add_balance_user(user, amount, bet_id, get_date(), session)
-    if abu is None:
-      await ctx.respond("User not found.", ephemeral = True)
     else:
-      embedd = create_user_embedded(user, session)
-      await ctx.respond(embed=embedd)
+      if (user := await get_user_from_ctx(ctx, user, session)) is None: return
+      bet_id = "award_" + user.get_unique_bal_code() + "_" + description
+      print(bet_id)
+      abu = add_balance_user(user, amount, bet_id, get_date(), session)
+      if abu is None:
+        await ctx.respond("User not found.", ephemeral = True)
+      else:
+        while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
+          user.pay_loan(date)
+        embedd = create_user_embedded(user, session)
+        await ctx.respond(embed=embedd)
 #award give end
 
 #award list start
