@@ -152,49 +152,60 @@ def create_user(user_id, username, session):
 
 @bot.event
 async def on_ready():
-  print("Logged in as {0.user}".format(bot))
-  print(bot.guilds)
-  
-  save_savedata_from_github()
-  zip_savedata()
-  #if savedata does not exist pull
-  if not os.path.exists("savedata"):
-    print("savedata folder does not exist")
-    print("-----------Pulling Savesdata-----------")
-    pull_from_github()
-  if (not are_equivalent("backup.zip", "gitbackup.zip")):
-    print("savedata not is not synced with github")
-    git_savedata = get_setting("git_savedata")
-    if git_savedata == "override":
-      print("-----------Overriding Savedata-----------")
-    elif git_savedata == "pull":
+  try:
+    print("Logged in as {0.user}".format(bot))
+    print(bot.guilds)
+    
+    save_savedata_from_github()
+    zip_savedata()
+    #if savedata does not exist pull
+    if not os.path.exists("savedata"):
+      print("savedata folder does not exist")
       print("-----------Pulling Savesdata-----------")
       pull_from_github()
-    elif git_savedata == "quit":
-      print("-----------Missmatch Savedata-----------")
-      print("-----------Quitting-----------")
-      atexit.unregister(backup_full)
-      quit()
-    elif git_savedata == "once":
-      print("-----------pushing then setting to quit-----------")
-      set_setting("git_savedata", "quit")
-      
-  
-  auto_backup_timer.start()
-  print("\n-----------Bot Starting-----------\n")
-  auto_generate_matches_from_vlr_timer.start()
+    if (not are_equivalent("backup.zip", "gitbackup.zip")):
+      print("savedata not is not synced with github")
+      git_savedata = get_setting("git_savedata")
+      if git_savedata == "override":
+        print("-----------Overriding Savedata-----------")
+      elif git_savedata == "pull":
+        print("-----------Pulling Savesdata-----------")
+        pull_from_github()
+      elif git_savedata == "quit":
+        print("-----------Missmatch Savedata-----------")
+        print("-----------Quitting-----------")
+        atexit.unregister(backup_full)
+        quit()
+      elif git_savedata == "once":
+        print("-----------pushing then setting to quit-----------")
+        set_setting("git_savedata", "quit")
+        
+    
+    auto_backup_timer.start()
+    print("\n-----------Bot Starting-----------\n")
+    auto_generate_matches_from_vlr_timer.start()
+  except:
+    print("-----------Bot Failed to Start-----------")
+    quit()
 
 
 @tasks.loop(hours=1)
 async def auto_backup_timer():
-  backup_full()
+  try:
+    backup_full()
+  except:
+    print("-----------Backup Failed-----------")
+    
 
 
 @tasks.loop(minutes=5)
 async def auto_generate_matches_from_vlr_timer():
-  print("-----------Generating Matches-----------")
-  with Session.begin() as session:
-    await generate_matches_from_vlr(bot, session, reply_if_none=False)
+  try:
+    print("-----------Generating Matches-----------")
+    with Session.begin() as session:
+      await generate_matches_from_vlr(bot, session, reply_if_none=False)
+  except:
+    print("-----------Generating Matches Failed-----------")
   
 
 #choices start
