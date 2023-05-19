@@ -401,7 +401,7 @@ class User():
   def get_graph_image(self, balance_range_ambig, dpi, session=None):
     if session is None:
       with Session.begin() as session:
-        return self.get_graph_image(balance_range_ambig, session)
+        return self.get_graph_image(balance_range_ambig, dpi, session)
     
     from dbinterface import get_all_db, get_from_db
     start = time()
@@ -421,10 +421,13 @@ class User():
         else:
           users = get_all_db("User", session)
           for user in users:
-            resets = user.get_resets()
-            if len(resets) > 0:
-              xlabel = user.balance[resets[-1]][0][15:]
-              break
+            try:
+              resets = user.get_resets()
+              if len(resets) > 0:
+                xlabel = user.balance[resets[-1]][0][15:]
+                break
+            except:
+              print("error")
     
     elif isinstance(balance_range_ambig, int):
       balance = self.balances[-balance_range_ambig:]
