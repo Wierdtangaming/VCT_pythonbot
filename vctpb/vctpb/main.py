@@ -1635,7 +1635,7 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
     print(f"time 1: {datetime.now() - time}")
     time = datetime.now();
     print("soup 1")
-    strainer = SoupStrainer('div')
+    strainer = SoupStrainer('div', class_='col mod-3')
     soup = BeautifulSoup(response.text, 'lxml', parseOnlyThese=strainer)
     print(f"time 2: {datetime.now() - time}")
     time = datetime.now();
