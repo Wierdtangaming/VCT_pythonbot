@@ -118,6 +118,7 @@ def get_tournament_color_from_vlr_page(soup, tournament_name, tournament_code = 
   if soup is None:
     web_session = requests.Session()
     response = web_session.get(get_tournament_link(tournament_code))
+    print("soup 2")
     soup = BeautifulSoup(response.text, 'lxml')
   try:
     img_link = get_tournament_logo_img(soup, tournament_name)
@@ -150,11 +151,13 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
       if soup is None:
         web_session = requests.Session()
         response = web_session.get(get_team_link(team_vlr_code))
+        print("soup 3")
         soup = BeautifulSoup(response.text, 'lxml')
         name = get_team_name_from_team_vlr(soup)
         if name is not None:
           team.set_name(name, session)
       if updated_vlr_code or force_color_update:
+        print("updating color")
         team.set_color(get_team_color_from_vlr_page(soup, team.name), session)
   
 
@@ -168,6 +171,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   tournament_link = get_tournament_link(tournament_code)
   web_session = requests.Session()
   response = web_session.get(tournament_link)
+  print("soup 4")
   soup = BeautifulSoup(response.text, 'lxml')
   
   col = soup.find("div", class_="col mod-1")
@@ -308,6 +312,7 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, m
         if second_query:
           web_session = requests.Session()
           response = web_session.get(get_team_link(team_vlr_code))
+          print("soup 5")
           team_soup = BeautifulSoup(response.text, 'lxml')
       else:
         team_soup = match_soup
@@ -409,6 +414,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   match_link = get_match_link(match_code)
   web_session = requests.Session()
   response = web_session.get(match_link)
+  print("soup 6")
   soup = BeautifulSoup(response.text, 'lxml')
   
   t1oo, t2oo = get_odds_from_match_page(soup)
@@ -517,6 +523,7 @@ def generate_tournament(vlr_code, session=None):
   tournament_link = get_tournament_link(vlr_code)
   web_session = requests.Session()
   response = web_session.get(tournament_link)
+  print("soup 7")
   soup = BeautifulSoup(response.text, 'lxml')
   print(f"generating tournament from link: {tournament_link}")
   
@@ -548,6 +555,7 @@ def generate_team(vlr_code, session=None):
   # open team link
   web_session = requests.Session()
   response = web_session.get(team_link)
+  print("soup 8")
   team_soup = BeautifulSoup(response.text, 'lxml')
   # get team name from team link
   team_name = get_team_name_from_team_vlr(team_soup)

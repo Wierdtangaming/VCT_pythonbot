@@ -7,7 +7,7 @@
 from io import BytesIO
 from urllib.request import urlopen
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
 import lxml
 #import cchardet
 import requests
@@ -1305,13 +1305,17 @@ class MatchCreateModal(Modal):
     team1 = None
     team2 = None
     if vlr_code is not None:
-      
+      time2 = datetime.now()
       t1oo, t2oo = get_odds_from_match_page(soup)
-      
+      print("time 2.1", datetime.now() - time2)
+      time2 = datetime.now()
       team1, team2 = get_teams_from_match_page(soup, session, second_query=False)
-      
+      print("time 2.2", datetime.now() - time2)
+      time2 = datetime.now()
       tournament_name, tournament_code = get_tournament_name_and_code_from_match_page(soup)
+      print("time 2.3", datetime.now() - time2)
       
+    print("time 2.5", datetime.now() - time)
     if t1oo is not None:
       odds_source = "VLR.gg"
     
@@ -1630,7 +1634,9 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
       return
     print(f"time 1: {datetime.now() - time}")
     time = datetime.now();
-    soup = BeautifulSoup(response.text, 'lxml')
+    print("soup 1")
+    strainer = SoupStrainer('div')
+    soup = BeautifulSoup(response.text, 'lxml', parseOnlyThese=strainer)
     print(f"time 2: {datetime.now() - time}")
     time = datetime.now();
     if soup is None:
