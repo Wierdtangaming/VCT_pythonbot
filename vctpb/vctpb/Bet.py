@@ -103,7 +103,7 @@ class Bet():
   
   def to_string(self):
     date_formatted = self.date_created.strftime("%d/%m/%Y at %H:%M:%S")
-    return "Match ID: " + str(self.match_id) + ", User ID: " + str(self.user_id) + ", Amount Bet: " + str(self.amount_bet) + ", Team Bet On: " + str(self.team_num) + ", Date Created: " + str(date_formatted) + ", Date Closed: " + str(self.date_closed) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
+    return "Match ID: " + str(self.match_id) + ", User ID: " + str(self.user_id) + ", Amount Bet: " + str(self.amount_bet) + ", Team Bet On: " + str(self.team_num) + ", Date Created: " + str(date_formatted) + ", Winner: " + str(self.winner) + ", Identifyer: " + str(self.code) + ", Message IDs: " + str(self.message_ids)
     
     
   def get_team(self):
@@ -173,7 +173,7 @@ class Bet():
 
     (team, winner) = self.get_team_and_winner()
 
-    return f"{self.t1} vs {self.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {math.floor(self.amount_bet)}, balance change: {math.floor(balances)}"
+    return f"{self.t1} vs {self.t2}, Bet on: {team}, Winner: {winner}, Amount bet: {self.amount_bet}, balance change: {math.floor(balances)}"
 
 def is_valid_bet(code, t1, t2, tournament_name, winner, amount_bet, team_num, color, match_id, user_id, date_created, message_ids):
   errors = [False for _ in range(12)]
