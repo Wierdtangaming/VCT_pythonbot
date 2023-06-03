@@ -49,7 +49,8 @@ from vlrinterface import generate_matches_from_vlr, get_code, generate_tournamen
 from sqlaobjs import Session
 from utils import *
 
-  
+# issue with Option in command function
+# pyright: reportGeneralTypeIssues=false
 
 
 intents = discord.Intents.all()
@@ -281,6 +282,7 @@ async def award_give(ctx,
     await ctx.respond("You must have either compare or user.", ephemeral = True)
     return
   
+  date = get_date()
   with Session.begin() as session:
     if users is not None:
       users = get_users_from_multiuser(users, session)
@@ -291,7 +293,6 @@ async def award_give(ctx,
       bet_id = f"award_{code}_{description}"
       
       print(bet_id)
-      date = get_date()
       first = True
       for user in users:
         abu = add_balance_user(user, amount, bet_id, get_date(), session)
@@ -475,7 +476,13 @@ class BetCreateModal(Modal):
     else:
       amount_label = error[1]
     self.add_item(InputText(label=amount_label, placeholder=f"Your available balance is {math.floor(user.get_balance(session))}", min_length=1, max_length=20))
-
+    
+    # is hidden
+    if hidden:
+      hidden_default = "Yes"
+    else:
+      hidden_default = "No"
+    self.add_item(InputText(label="Hide bet from others", value=hidden_default, placeholder="Yes/No or Y/N", min_length=1, max_length=5, required=False))
 
 
   async def callback(self, interaction: discord.Interaction):
@@ -523,6 +530,12 @@ class BetCreateModal(Modal):
           errortext += error[1]
         await interaction.response.send_message(errortext, ephemeral = True)
         return
+      
+      hidden_string = self.children[2].value.lower()
+      if hidden_string == "yes" or hidden_string == "y":
+        self.hidden = True
+      elif hidden_string == "no" or hidden_string == "n":
+        self.hidden = False
       
       bet = Bet(code, match.t1, match.t2, match.tournament_name, int(amount), int(team_num), match.code, user.code, get_date(), self.hidden)
       add_to_db(bet, session)
@@ -584,6 +597,23 @@ class BetEditModal(Modal):
 
     amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance(session) + bet.amount_bet)}"
     self.add_item(InputText(label=amount_label, placeholder = bet.amount_bet, min_length=1, max_length=20, required=False))
+    
+    
+    if hide == 1:
+      hidden_default = "Yes"
+    elif hide == 0:
+      hidden_default = "No"
+    else:
+      hidden_default = ""
+      
+    if hide != -1:
+      hide_placeholder = "Yes/No or Y/N"
+    else:
+      if bet.hidden == 1:
+        hide_placeholder = "Yes"
+      elif bet.hidden == 0:
+        hide_placeholder = "No"
+    self.add_item(InputText(label="Hide bet from others", value=hidden_default, placeholder=hide_placeholder, min_length=1, max_length=5, required=False))
 
   async def callback(self, interaction: discord.Interaction):
     with Session.begin() as session:
@@ -639,8 +669,15 @@ class BetEditModal(Modal):
       
       bet.amount_bet = int(amount)
       bet.team_num = int(team_num)
-      if self.hide != -1:
-        bet.hidden = self.hide
+      
+      hidden_string = self.children[2].value.lower()
+      if hidden_string == "yes" or hidden_string == "y":
+        self.hide = 1
+      elif hidden_string == "no" or hidden_string == "n":
+        self.hide = 0
+      else:
+        self.hide = bet.hidden
+      bet.hidden = self.hide
       
       if bet.hidden:
         title = f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}"
@@ -653,6 +690,9 @@ class BetEditModal(Modal):
       msg = await inter.original_message()
       
       bet.message_ids.append((msg.id, msg.channel.id))
+      if self.hide:
+        embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
+        inter = await interaction.followup.send(embed = embeddd, ephemeral = True) 
     await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet edit modal end
 
@@ -927,7 +967,9 @@ async def color_list(ctx):
   
 #color add start
 @colorscg.command(name = "add", description = "Adds the color to color list.")
-async def color_add(ctx, custom_color_name:Option(str, "Name of color you want to add.", required=False), hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False), xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False)):
+async def color_add(ctx, custom_color_name: Option(str, "Name of color you want to add.", required=False), 
+                         hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False), 
+                         xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False)):
   if xkcd_color_name is not None:
     if hex is not None:
       await ctx.respond("You can't add a hex code and a xkcd color name.", ephemeral=True)
