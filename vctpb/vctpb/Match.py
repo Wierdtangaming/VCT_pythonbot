@@ -102,17 +102,23 @@ class Match():
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
   async def close(self, bot, ctx=None, session=None):
-    from objembed import create_bet_list_embedded, create_match_embedded
+    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded
     from convert import edit_all_messages
     self.date_closed = get_date()
+    old_hidden = []
     for bet in self.bets:
       if bet.hidden == True:
         bet.hidden = False
         bet.set_color(session)
-    embedd = create_match_embedded(self, "Placeholder", session)
+        old_hidden.append(bet)
+    embedd = create_match_embedded(self, "Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
     if ctx is not None:
       await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
     await edit_all_messages(bot, self.message_ids, embedd)
+    for bet in old_hidden:
+      embedd = create_bet_embedded(bet, "Placeholder", session)
+      await edit_all_messages(bot, bet.message_ids, embedd)
+    
   
   
   async def set_winner(self, team_num, bot, ctx=None, session=None):
