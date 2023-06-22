@@ -30,7 +30,13 @@ def is_new_day():
 
 def pull_from_github():
   token = get_setting("github_token")
+  if token is None:
+    print("github token not found")
+    return
   g = Github(token)
+  if g is None:
+    print("github token not valid")
+    return
   repo_name = get_setting("save_repo")
   repo = g.get_user().get_repo(repo_name)
   contents = repo.get_contents("")
@@ -63,8 +69,12 @@ def save_to_github(message):
     return
   
   token = get_setting("github_token")
+  if token is None:
+    return
   #print(f"github: {token}")
   g = Github(token)
+  if g is None:
+    return
   
   repo_name = get_setting("save_repo")
   repo = g.get_user().get_repo(repo_name)
