@@ -30,16 +30,17 @@ def create_match_embedded(match_ambig, title, session=None):
   bet_str = str(", ".join(bet_codes))
   if bet_str == "":
     bet_str = "None"
-  embed.add_field(name="Bet IDs:", value=bet_str, inline=True)
-  date_formatted = match.date_created.strftime("%m/%d/%Y at %H:%M:%S")
-  embed.add_field(name="Created On:", value=date_formatted, inline=True)
+  #embed.add_field(name="Bet IDs:", value=bet_str, inline=True)
+  #date_formatted = match.date_created.strftime("%m/%d/%Y at %H:%M:%S")
+  #embed.add_field(name="Created On:", value=date_formatted, inline=True)
   if match.date_closed is None:
     embed.add_field(name="Betting Open:", value="Yes", inline=True)
   else:
     embed.add_field(name="Betting Open:", value="No", inline=True)
 
   if int(match.winner) == 0:
-    embed.add_field(name="Winner:", value="None", inline=True)
+    #embed.add_field(name="Winner:", value="None", inline=True)
+    pass
   else:
     winner_team = ""
     if int(match.winner) == 1:
@@ -49,7 +50,7 @@ def create_match_embedded(match_ambig, title, session=None):
 
     embed.add_field(name="Winner:", value=winner_team, inline=True)
 
-  embed.add_field(name="Identifier:", value=match.code, inline=False)
+  #embed.add_field(name="Identifier:", value=match.code, inline=False)
   return embed
 
 
@@ -69,7 +70,7 @@ def create_match_list_embedded(embed_title, matches_ambig, session=None):
   if all(isinstance(s, str) for s in matches_ambig):
     matches_ambig = get_mult_from_db("Match", matches_ambig, session)
   for match in matches_ambig:
-    embed.add_field(name="\n" + "Match: " + match.code, value=match.short_to_string() + "\n", inline=False)
+    embed.add_field(name=f"Teams: {match.t1} vs {match.t2}, Odds: {match.t1o} / {match.t2o}" , value="", inline=False)
   return embed
 
 async def channel_send_match_list_embedded(channel, embed_title, matches_ambig, session=None):
@@ -110,12 +111,12 @@ def create_bet_hidden_embedded(bet_ambig, title, session=None):
   
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   #when teams done this has to be diff color
-  match = bet.match
   embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
-  embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
+  embed.add_field(name="Teams:", value=bet.t1 + " vs " + bet.t2, inline=True)
 
   if int(bet.winner) == 0:
-    embed.add_field(name="Winner:", value="None", inline=True)
+    #embed.add_field(name="Winner:", value="None", inline=True)
+    pass
   else:
     winner_team = ""
     if int(bet.winner) == 1:
@@ -125,10 +126,10 @@ def create_bet_hidden_embedded(bet_ambig, title, session=None):
 
     embed.add_field(name="Winner:", value=winner_team, inline=True)
 
-  date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
-  embed.add_field(name="Created On:", value=date_formatted, inline=True)
-  embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
-  embed.add_field(name="Identifier:", value=bet.code, inline=False)
+  #date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
+  #embed.add_field(name="Created On:", value=date_formatted, inline=True)
+  #embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  #embed.add_field(name="Identifier:", value=bet.code, inline=False)
   return embed
 
 
@@ -150,7 +151,8 @@ def create_bet_embedded(bet_ambig, title, session=None):
   embed.add_field(name="Payout On Win:", value=math.floor(payout), inline=True)
 
   if int(bet.winner) == 0:
-    embed.add_field(name="Winner:", value="None", inline=True)
+    #embed.add_field(name="Winner:", value="None", inline=True)
+    pass
   else:
     winner_team = ""
     if int(bet.winner) == 1:
@@ -160,11 +162,11 @@ def create_bet_embedded(bet_ambig, title, session=None):
 
     embed.add_field(name="Winner:", value=winner_team, inline=True)
 
-  date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
-  embed.add_field(name="Created On:", value=date_formatted, inline=True)
-  embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
-  embed.add_field(name="Visiblity:", value=("Hidden" if bet.hidden else "Shown"), inline=True)
-  embed.add_field(name="Identifier:", value=bet.code, inline=False)
+  #date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
+  #embed.add_field(name="Created On:", value=date_formatted, inline=True)
+  #embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  #embed.add_field(name="Visiblity:", value=("Hidden" if bet.hidden else "Shown"), inline=True)
+  #embed.add_field(name="Identifier:", value=bet.code, inline=False)
   return embed
 
 
@@ -174,17 +176,41 @@ def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None)
       create_bet_list_embedded(embed_title, bets_ambig, session)
   if bets_ambig is None:
     return None
+  too_many = False
+  if len(bets_ambig) > 24:
+    bets_ambig = bets_ambig[:24]
+    too_many = True
+  
+  if too_many:
+    embed_title = "First 24 Bets (too many to show do /match bets)"
+    
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
   if all(isinstance(s, str) for s in bets_ambig):
     bets_ambig = get_mult_from_db("Bet", bets_ambig, session)
   if len(bets_ambig) == 0:
     return None
-  bets_ambig.sort(key=lambda x: x.match_id)
+  
+  bets_ambig.sort(key=lambda x: x.match.date_created)
+
+  visible_bets = []
+  hidden_bets = []
+  for bet in bets_ambig:
+    if bet.hidden:
+      hidden_bets.append(bet)
+    else:
+      visible_bets.append(bet)
+      
+  bets_ambig = visible_bets + hidden_bets
+  
   for bet in bets_ambig:
     if bet.hidden and (show_hidden == False):
-      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.t1} vs {bet.t2}", value = bet.short_to_hidden_string() + "\n", inline=False)
+      embed.add_field(name=f"{bet.user.username}'s Hidden Bet, Teams: {bet.t1} vs {bet.t2}", value="", inline=False)
     else:
-      embed.add_field(name=f"{bet.user.username}'s Bet on {bet.get_team()}", value = bet.short_to_string() + "\n", inline=False)
+      text = f" Bet, Team: {bet.t1}, Amount: {bet.amount_bet}, Payout on Win: {int(math.floor(bet.get_payout()))}"
+      if bet.hidden:
+        text = " Hidden" + text
+      text = f"{bet.user.username}'s" + text
+      embed.add_field(name=text, value="", inline=False)
   return embed
 
 

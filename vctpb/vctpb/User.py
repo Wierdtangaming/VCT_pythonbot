@@ -549,6 +549,12 @@ class User():
       #plt.scatter(range(len(balances)), balances, s=30, color = colors, zorder=10)
       ax.set_xticks(range(len(balances)), labels, rotation='vertical')
       ax.set_xlabel(xlabel)
+      
+      y_ticks = ax.get_yticks()
+      for tick in y_ticks:
+        # add horizontal line
+        ax.axhline(y=tick, linestyle=':', alpha=0.5, color='grey', zorder=1)
+      
 
       for ticklabel, tickcolor in zip(ax.get_xticklabels(), label_colors):
         ticklabel.set_color(tickcolor)
@@ -597,6 +603,7 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
           xlabel = user.balances[resets[-1]][0][15:]
           break
   elif isinstance(balance_range_ambig, int):
+    # amount set
     for i, user in enumerate(users):
       for balance in user.balances:
         all_balances.append((i, balance))
@@ -606,15 +613,25 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
   
   all_balances = sorted(all_balances, key=lambda x: x[1][2])
   
+  unique_x_tick = [] # for bets it is match code else it is the full
   if isinstance(balance_range_ambig, int):
     unique = 0
     x = 0
-    last = None
-    #for all_balances reversed
+    # for all_balances reversed
     for balance in all_balances[::-1]:
-      if balance[1][0] != last:
-        unique += 1
-      last = balance[1][0]
+      # amount set
+      bet_id = balance[1][0]
+      if bet_id.startswith('id_'):
+        bet = get_from_db("Bet", balance[1][0][3:], session)
+        match = bet.match
+        if match.code not in unique_x_tick:
+          unique_x_tick.append(match.code)
+          unique += 1
+      else:
+        if bet_id not in unique_x_tick:
+          unique_x_tick.append(bet_id)
+          unique += 1
+      
       if unique > balance_range_ambig:
         break
       x += 1
@@ -787,7 +804,12 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
 
     ax.xaxis.grid(linestyle=':')
     ax.margins(x=1/((x_length-0.8)*6))
-
+    
+    y_ticks = ax.get_yticks()
+    for tick in y_ticks:
+      # add horizontal line
+      ax.axhline(y=tick, linestyle=':', alpha=0.5, color='grey', zorder=1)
+      
     plt.tight_layout()
 
     fig_width, fig_height = fig.get_size_inches()

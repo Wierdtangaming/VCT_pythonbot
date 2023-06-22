@@ -188,7 +188,7 @@ class Match():
     new_leader = get_first_place(users)
 
     embedd = create_payout_list_embedded(f"Payouts of {self.t1} vs {self.t2}:", self, bet_user_payouts)
-    channel = await bot.fetch_channel(get_channel_from_db("match", session))
+    channel = await bot.fetch_channel(get_channel_from_db("result", session))
     if ctx is not None:
       await ctx.respond(content=winner_msg, embed=embedd)
     else:

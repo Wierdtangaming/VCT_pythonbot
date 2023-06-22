@@ -1143,7 +1143,7 @@ async def graph_balances(ctx,
           return
 
       with BytesIO() as image_binary:
-        gen_msg = await ctx.respond("Generating graph...")
+        gen_msg = await ctx.respond("Generating graph... (this might take a while)")
         image = user.get_graph_image(graph_type, dpi, session)
         if isinstance(image, str):
           await gen_msg.edit_original_message(content = image)
@@ -1153,7 +1153,7 @@ async def graph_balances(ctx,
         await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
       return
     
-
+    # multi
     usernames_split = compare.split(" ")
     
     users = usernames_to_users(compare, session)
@@ -1180,8 +1180,8 @@ async def graph_balances(ctx,
       highest_length = len(get_all_unique_balance_ids(users))
       if amount > highest_length:
         amount = highest_length
-        if amount <= 1:
-          await ctx.respond("Amount needs to be higher.", ephemeral = True)
+      if amount <= 1:
+        await ctx.respond("Amount needs to be higher.", ephemeral = True)
       graph_type = amount
     else:
       if type == 0:
@@ -1193,7 +1193,7 @@ async def graph_balances(ctx,
         return
 
     with BytesIO() as image_binary:
-      gen_msg = await ctx.respond("Generating graph...")
+      gen_msg = await ctx.respond("Generating graph... (this might take a while)")
       image = get_multi_graph_image(users, graph_type, dpi, session)
       if isinstance(image, str):
         await gen_msg.edit_original_message(content = image)

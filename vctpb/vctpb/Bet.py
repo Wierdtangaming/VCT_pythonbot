@@ -112,6 +112,13 @@ class Bet():
     elif self.team_num == 2:
       return self.t2
     
+  def get_payout(self):
+    match = self.match
+    
+    if self.team_num == 1:
+      return self.amount_bet * match.t1o
+    elif self.team_num == 2:
+      return self.amount_bet * match.t2o
     
   def get_team_and_payout(self, session = None):
     if session is None:
