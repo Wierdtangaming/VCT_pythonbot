@@ -74,6 +74,7 @@ def save_to_github(message):
   #print(f"github: {token}")
   g = Github(token)
   if g is None:
+    print("github token not valid")
     return
   
   repo_name = get_setting("save_repo")
@@ -153,7 +154,13 @@ def zip_savedata():
 def save_savedata_from_github(content=None):
   if content is None:
     token = get_setting("github_token")
+    if token is None:
+      print("github token not found")
+      return
     g = Github(token)
+    if g is None:
+      print("github token not valid")
+      return
     repo_name = get_setting("save_repo")
     repo = g.get_user().get_repo(repo_name)
     contents = repo.get_contents("")
