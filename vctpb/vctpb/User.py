@@ -28,7 +28,7 @@ alert_association_table = Table(
 class User():
   __tablename__ = "user"
   
-  code = Column(String(8), primary_key=True)
+  code = Column(String(32), primary_key=True)
   username = Column(String(32), nullable=False)
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")

@@ -70,6 +70,8 @@ class Match():
   async def send_warning(self, bot, session):
     from dbinterface import get_channel_from_db
     from objembed import create_match_embedded
+    from convert import id_to_mention
+    
     self.alerted = True
     if (match_channel := await bot.fetch_channel(get_channel_from_db("match", session))) is None:
       return
@@ -77,10 +79,13 @@ class Match():
     users = self.tournament.alert_users
     embedd = create_match_embedded(self, f"Last chance for Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
     pings = ""
+    bet_users = [bet.user_id for bet in self.bets]
     for user in users:
-      pings += user.mention + " "
-    msg = await match_channel.send(embed=embedd)
+      if user.code not in bet_users:
+        pings += id_to_mention(user.code) + " "
+    msg = await match_channel.send(content=pings, embed=embedd)
     self.message_ids.append((msg.id, msg.channel.id))
+    #await msg.edit(content="")
     
   
   def set_color(self, session=None):
