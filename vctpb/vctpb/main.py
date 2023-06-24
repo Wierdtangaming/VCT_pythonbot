@@ -1734,6 +1734,14 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
     match.message_ids.append((msg.id, msg.channel.id))
 #match find end
 
+#match alert start
+@matchscg.command(name = "alert", description = "Alerts you when the match is closed.")
+async def match_alert(ctx, match: Option(str, "Match you want to be alerted of.", autocomplete=match_open_list_autocomplete)):
+  with Session.begin() as session:
+    if (nmatch := await obj_from_autocomplete_tuple(ctx, get_open_matches(session), match, "Match", session)) is None: return
+    match = nmatch
+    await match.send_warning(bot, session)
+#match alert end
 
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
@@ -1900,6 +1908,24 @@ tournamentsgc = SlashCommandGroup(
   description = "Start, color, and rename tournaments.",
   guild_ids = gid,
 )
+
+#tournament alert start
+@tournamentsgc.command(name = "alert", description = "Get alert when a tournament is created.")
+async def tournament_alert(ctx, tournament: Option(str, "Tournament you want to get alerts for.", autocomplete = tournament_autocomplete)):
+  with Session.begin() as session:
+    if (user := await get_user_from_ctx(None, ctx.author, session)) is None: return
+    if (ntournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), tournament, "Tournament", session)) is None:
+      await ctx.respond(f'Tournament "{tournament}" not found.', ephemeral = True)
+      return
+    tournament = ntournament
+    
+    has_alert = user.toggle_alert(tournament)
+    
+    if has_alert:
+      await ctx.respond(f"You are added to alerts for {tournament.name}.", ephemeral = True)
+    else:
+      await ctx.respond(f"You are removed from alerts for {tournament.name}.", ephemeral = True)
+#tournament alert end
 
 #tournament start start
 @tournamentsgc.command(name = "start", description = "Startes a tournament. Pick one color to fill")

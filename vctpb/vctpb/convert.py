@@ -74,7 +74,7 @@ def get_user_from_id(id, session=None):
   return get_from_db("User", id, session)
   
 
-def id_to_metion(id):
+def id_to_mention(id):
   if id is None:
     return "Bot"
   return f"<@!{id}>"

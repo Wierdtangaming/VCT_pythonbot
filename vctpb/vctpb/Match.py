@@ -1,5 +1,5 @@
 from decimal import Decimal
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from sqltypes import JSONLIST, DECIMAL
@@ -9,7 +9,6 @@ from utils import mix_colors, get_date, get_random_hex_color
 
 @mapper_registry.mapped
 class Match():
-  
   __tablename__ = "match"
   
   code = Column(String(8), primary_key = True, nullable=False)
@@ -36,10 +35,11 @@ class Match():
   date_closed = Column(DateTime(timezone = True))
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
   message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of int
+  alert = Column(Boolean, nullable=False, default=False)
   
   @property
   def has_bets(self):
-      return bool(self.bets)
+    return bool(self.bets)
   
   def __init__(self, code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, color_hex, creator_id, date_created, vlr_code=None):
     self.full__init__(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, 0, odds_source, color_hex, creator_id, date_created, None, None, [], vlr_code)
@@ -66,6 +66,27 @@ class Match():
   
   def __repr__(self):
     return f"<Match {self.code}>"
+  
+  async def send_warning(self, bot, session):
+    from dbinterface import get_channel_from_db
+    from objembed import create_match_embedded
+    from convert import id_to_mention
+    
+    self.alerted = True
+    if (match_channel := await bot.fetch_channel(get_channel_from_db("match", session))) is None:
+      return
+    
+    users = self.tournament.alert_users
+    embedd = create_match_embedded(self, f"Last chance for Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    pings = ""
+    bet_users = [bet.user_id for bet in self.bets]
+    for user in users:
+      if user.code not in bet_users:
+        pings += id_to_mention(user.code) + " "
+    msg = await match_channel.send(content=pings, embed=embedd)
+    self.message_ids.append((msg.id, msg.channel.id))
+    #await msg.edit(content="")
+    
   
   def set_color(self, session=None):
     if session is None:
@@ -113,7 +134,8 @@ class Match():
         old_hidden.append(bet)
     embedd = create_match_embedded(self, "Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
     if ctx is not None:
-      await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
+      msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
+      self.message_ids.append((msg.id, msg.channel.id))
     await edit_all_messages(bot, self.message_ids, embedd)
     for bet in old_hidden:
       embedd = create_bet_embedded(bet, "Placeholder", session)

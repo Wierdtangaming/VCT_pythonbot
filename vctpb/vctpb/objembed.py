@@ -4,7 +4,7 @@ from Match import Match
 from Bet import Bet
 from Tournament import Tournament
 from User import User, get_active_users
-from convert import ambig_to_obj, id_to_metion
+from convert import ambig_to_obj, id_to_mention
 from colorinterface import hex_to_tuple
 import math
 import emoji
@@ -25,7 +25,7 @@ def create_match_embedded(match_ambig, title, session=None):
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
   embed.add_field(name="Odds Source:", value=match.odds_source, inline=True)
-  embed.add_field(name="Creator:", value=id_to_metion(match.creator_id), inline=True)
+  embed.add_field(name="Creator:", value=id_to_mention(match.creator_id), inline=True)
   bet_codes = [bet.code for bet in match.bets]
   bet_str = str(", ".join(bet_codes))
   if bet_str == "":
@@ -111,7 +111,7 @@ def create_bet_hidden_embedded(bet_ambig, title, session=None):
   
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   #when teams done this has to be diff color
-  embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
+  embed.add_field(name="User:", value=id_to_mention(bet.user_id), inline=True)
   embed.add_field(name="Teams:", value=bet.t1 + " vs " + bet.t2, inline=True)
 
   if int(bet.winner) == 0:
@@ -143,7 +143,7 @@ def create_bet_embedded(bet_ambig, title, session=None):
     return None
   
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
-  embed.add_field(name="User:", value=id_to_metion(bet.user_id), inline=True)
+  embed.add_field(name="User:", value=id_to_mention(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=bet.amount_bet, inline=True)
   (team, payout) = bet.get_team_and_payout(session)
 
@@ -220,7 +220,7 @@ def create_user_embedded(user_ambig, session=None):
     return None
 
   embed = discord.Embed(title=f"{user.username}'s balance:", color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
-  embed.add_field(name="Name:", value=id_to_metion(user.code), inline=False)
+  embed.add_field(name="Name:", value=id_to_mention(user.code), inline=False)
   embed.add_field(name="Account balance:", value=math.floor(user.balances[-1][1]), inline=True)
   embed.add_field(name="Balance Available:", value=math.floor(user.get_visible_balance(session)), inline=True)
   embed.add_field(name="Loan balance:", value=math.floor(user.loan_bal()), inline=True)

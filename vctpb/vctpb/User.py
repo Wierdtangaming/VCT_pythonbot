@@ -8,7 +8,7 @@ import random
 import math
 import secrets
 import sys
-from sqlalchemy import Column, String, BOOLEAN, ForeignKey
+from sqlalchemy import Column, String, BOOLEAN, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
@@ -16,11 +16,19 @@ from sqlaobjs import mapper_registry, Session
 
 from time import time
 
+alert_association_table = Table(
+  "alert_association_table",
+  mapper_registry.metadata,
+  Column("user_id", ForeignKey("user.code"), primary_key=True),
+  Column("tournament_id", ForeignKey("tournament.name"), primary_key=True),
+)
+
+
 @mapper_registry.mapped
 class User():
   __tablename__ = "user"
   
-  code = Column(String(8), primary_key=True)
+  code = Column(String(32), primary_key=True)
   username = Column(String(32), nullable=False)
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")
@@ -31,6 +39,8 @@ class User():
   active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
   hidden = Column(BOOLEAN, nullable=False)
+  alert_tournaments = relationship("Tournament", secondary=alert_association_table, back_populates="alert_users")
+
   
   def __init__(self, code, username, color, date_created):
     self.code = code
@@ -50,10 +60,19 @@ class User():
     #a tuple (balances, date created, date paid)
     
     self.loans = []
+    self.alert = []
     
   def __repr__(self):
     return f"<User {self.code}, {self.username}>"
-        
+  
+  def toggle_alert(self, tournament):
+    if tournament in self.alert_tournaments:
+      self.alert_tournaments.remove(tournament)
+      return False
+    else:
+      self.alert_tournaments.append(tournament)
+      return True
+  
   def set_color(self, color, session=None):
     if isinstance(color, str):
       if self.color_hex == color:

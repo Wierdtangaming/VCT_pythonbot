@@ -261,6 +261,13 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
             break
         if continue_out:
           continue
+      else:
+        if (match := get_match_from_vlr_code(match_code, session)) is None:
+          print(f"Cant send warning for {match_code} because match is None")
+        else:
+          if (not match.alerted) and match.date_closed is None:
+            await match.send_warning(bot, session)
+        
       print(f"acting on {match_code}, status: {status}, eta: {eta}")
       
       #if completed check if match has a winner then set winner
@@ -275,7 +282,6 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
           if len(teams_cards) != 2:
             print("can't find teams")
             continue
-          print(f"setting winner for match {match_code} to")
           
           # check which team has the "mod-winner" class and set winner
           winner = 0
@@ -283,7 +289,9 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
             winner = 1
           else:
             winner = 2
+          print(f"setting winner for match {match_code} to {winner}")
           await match.set_winner(winner, bot, session=session)
+          print(match.winner_name())
         continue
       
       
