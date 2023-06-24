@@ -126,6 +126,8 @@ def get_channel_from_db(channel_name, session=None):
     return channels.bet_channel_id
   elif channel_name == "match":
     return channels.match_channel_id
+  elif channel_name == "result":
+    return channels.result_channel_id
   else:
     return None
   
@@ -138,6 +140,8 @@ def set_channel_in_db(channel_name, channel_value, session=None):
     channels.bet_channel_id = channel_value
   elif channel_name == "match" or channel_name == "match_channel_id":
     channels.match_channel_id = channel_value
+  elif channel_name == "result" or channel_name == "result_channel_id":
+    channels.result_channel_id = channel_value
                            
                           
 def get_setting(setting_name):
