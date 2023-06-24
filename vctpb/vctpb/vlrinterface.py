@@ -432,7 +432,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   
   if match is not None:
     from convert import edit_all_messages
-    from objembed import create_match_embedded
+    from objembed import create_match_embedded, MatchView
     print("updating odds")
     match.t1oo = t1oo
     match.t2oo = t2oo
@@ -462,6 +462,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
   if session is None:
     with Session.begin() as session:
       return await generate_matches_from_vlr(bot, session, reply_if_none)
+  from objembed import create_match_embedded, MatchView
   
   tournaments = get_active_tournaments(session)
   
@@ -481,7 +482,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       
       if match_channel is not None:
         embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
-        msg = await match_channel.send(embed=embedd)
+        msg = await match_channel.send(embed=embedd, view=MatchView(bot))
         match.message_ids.append((msg.id, msg.channel.id))
       matches.append(match)
   

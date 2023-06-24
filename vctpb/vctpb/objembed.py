@@ -1,5 +1,5 @@
 import discord
-from dbinterface import get_mult_from_db, get_condition_db
+from dbinterface import get_mult_from_db, get_condition_db, get_from_db
 from Match import Match
 from Bet import Bet
 from Tournament import Tournament
@@ -10,6 +10,41 @@ import math
 import emoji
 from sqlaobjs import Session
 
+
+class MatchView(discord.ui.View): 
+  def __init__(self, bot):
+    self.bot = bot
+    super().__init__(timeout=None)
+  
+  def get_match(self, interaction, session):
+    fields = interaction.message.embeds[0].fields
+    for field in fields[::-1]:
+      if field.name == "Identifier:":
+        match_id = field.value
+        if (match := get_from_db("Match", match_id, session)) is None:
+          break
+        return match
+    return None
+  
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create-edit-bet", style=discord.ButtonStyle.primary)
+  async def button_callback(self, button, interaction):
+    from modals import BetEditModal, BetCreateModal
+    with Session.begin() as session:
+      match = self.get_match(interaction, session)
+      if match is None:
+        await interaction.response.send_message("Match not found. Report the bug and do /bet create.", ephemeral=True)
+        return
+      user = get_from_db("User", interaction.user.id, session)
+      if match.date_closed is None:
+        if (bet := match.user_bet(interaction.user.id)) != None:
+          bet_modal = BetEditModal(-1, match, user, bet, session, self.bot, title="Edit Bet")
+          await interaction.response.send_modal(bet_modal)
+        else:
+          bet_modal = BetCreateModal(match, user, False, session, title="Create Bet", bot=self.bot)
+          await interaction.response.send_modal(bet_modal)
+      else:
+        await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
+          
 
 def create_match_embedded(match_ambig, title, session=None):
   if session is None:
@@ -49,8 +84,8 @@ def create_match_embedded(match_ambig, title, session=None):
       winner_team = match.t2
 
     embed.add_field(name="Winner:", value=winner_team, inline=True)
-
-  #embed.add_field(name="Identifier:", value=match.code, inline=False)
+    
+  embed.add_field(name="Identifier:", value=match.code, inline=False)
   return embed
 
 
