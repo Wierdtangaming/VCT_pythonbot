@@ -1,3 +1,12 @@
+import os
+# updates the sql library, if you are too out of date it may not work
+if (os.path.exists("savedata/savedata.db")):
+  import alembic.config
+  alembicArgs = [
+      '--raiseerr',
+      'upgrade', 'head',
+  ]
+  alembic.config.main(argv=alembicArgs)
 
 # add moddifacation when no on incorrect match creation
 # test bet list with and without await
@@ -21,7 +30,6 @@ import discord
 from discord.commands import Option, OptionChoice, SlashCommandGroup
 from discord.ui import InputText, Modal
 from discord.ext import tasks, commands
-import os
 import random
 import jsonpickle
 from Match import Match
@@ -46,13 +54,13 @@ from vlrinterface import get_odds_from_match_page, get_team_names_from_match_pag
 
 from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
 
-from sqlaobjs import Session
+from sqlaobjs import Session, mapper_registry, Engine
 from utils import *
 
 # issue with Option in command function
 # pyright: reportGeneralTypeIssues=false
 
-
+mapper_registry.metadata.create_all(Engine)
 intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents)
@@ -205,7 +213,8 @@ async def auto_generate_matches_from_vlr_timer():
     print("-----------Generating Matches-----------")
     with Session.begin() as session:
       await generate_matches_from_vlr(bot, session, reply_if_none=False)
-  except:
+  except Exception as e: 
+    print(e)
     print("-----------Generating Matches Failed-----------")
   
 

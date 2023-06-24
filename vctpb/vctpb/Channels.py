@@ -8,12 +8,14 @@ class Channels():
   
   bet_channel_id = Column(Integer, primary_key=True, nullable=False)
   match_channel_id = Column(Integer, nullable=False)
+  result_channel_id = Column(Integer, nullable=False)
   
-  
-  def __init__(self, bet_channel_id, match_channel_id):
+  def __init__(self, bet_channel_id, match_channel_id, result_channel_id):
     self.bet_channel_id = bet_channel_id
     self.match_channel_id = match_channel_id
+    self.result_channel_id = result_channel_id
     
     
   def __repr__(self):
-    return f"<Channels {self.bet_channel_id}, {self.match_channel_id}>"
+    return f"<Channels {self.bet_channel_id}, {self.match_channel_id}, {self.result_channel_id}>"
+  

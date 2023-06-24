@@ -89,6 +89,32 @@ def upgrade():
     batch_op.create_foreign_key("fk_t2_name", 'team', ['t2'], ['name'])
     batch_op.create_foreign_key("fk_tournament_name", 'tournament', ['tournament_name'], ['name'])
     
-  
+    
+# not sure if downgrade will work, I just generated it with copilot
 def downgrade():
-    pass
+  with op.batch_alter_table('bet') as batch_op:
+    batch_op.drop_constraint("fk_t1_name", type_='foreignkey')
+    batch_op.drop_constraint("fk_t2_name", type_='foreignkey')
+    batch_op.drop_constraint("fk_tournament_name", type_='foreignkey')
+    
+  with op.batch_alter_table('match') as batch_op:
+    batch_op.drop_constraint("fk_t1_name", type_='foreignkey')
+    batch_op.drop_constraint("fk_t2_name", type_='foreignkey')
+    batch_op.drop_constraint("fk_tournament_name", type_='foreignkey')
+    
+  # remove vlr_code from match
+  with op.batch_alter_table('match') as batch_op:
+    batch_op.drop_column('vlr_code')
+    
+  # add color_name to match and bet
+  with op.batch_alter_table('match') as batch_op:
+    batch_op.add_column(Column('color_name', String(32), ForeignKey('color.name')))
+    
+  with op.batch_alter_table('bet') as batch_op:
+    batch_op.add_column(Column('color_name', String(32), ForeignKey('color.name')))
+  
+  # drop team table
+  op.drop_table('team')
+  
+  # drop tournament table
+  op.drop_table('tournament')
