@@ -67,6 +67,12 @@ class Match():
   def __repr__(self):
     return f"<Match {self.code}>"
   
+  def user_bet(self, user_id):
+    for bet in self.bets:
+      if bet.user_id == user_id:
+        return bet
+    return None
+  
   async def send_warning(self, bot, session):
     from dbinterface import get_channel_from_db
     from objembed import create_match_embedded
@@ -83,7 +89,7 @@ class Match():
     for user in users:
       if user.code not in bet_users:
         pings += id_to_mention(user.code) + " "
-    msg = await match_channel.send(content=pings, embed=embedd)
+    msg = await match_channel.send(content=pings, embed=embedd, view=MatchView(bot))
     self.message_ids.append((msg.id, msg.channel.id))
     #await msg.edit(content="")
     
