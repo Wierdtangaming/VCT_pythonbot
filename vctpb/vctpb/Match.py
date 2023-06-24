@@ -75,7 +75,7 @@ class Match():
   
   async def send_warning(self, bot, session):
     from dbinterface import get_channel_from_db
-    from objembed import create_match_embedded
+    from objembed import create_match_embedded, MatchView
     from convert import id_to_mention
     
     self.alerted = True
