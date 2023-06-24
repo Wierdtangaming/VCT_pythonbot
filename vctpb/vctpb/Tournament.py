@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import relationship
 from sqlaobjs import mapper_registry, Session
 from utils import get_random_hex_color, mix_colors
+from User import alert_association_table
 
 @mapper_registry.mapped
 class Tournament():
@@ -16,6 +17,7 @@ class Tournament():
   active = Column(Boolean)
   matches = relationship("Match", back_populates="tournament")
   bets = relationship("Bet", back_populates="tournament")
+  alert_users = relationship("User", secondary=alert_association_table, back_populates="alert_tournaments")
   
   def __init__(self, name, vlr_code, color):
     self.name = name
