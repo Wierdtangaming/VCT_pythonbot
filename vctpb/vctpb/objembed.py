@@ -26,8 +26,7 @@ class MatchView(discord.ui.View):
         return match
     return None
   
-  @discord.ui.button(label='Create/Edit Bet', custom_id="create-edit-bet", style=discord.ButtonStyle.primary)
-  async def button_callback(self, button, interaction):
+  async def create_bet(self, interaction, hide):
     from modals import BetEditModal, BetCreateModal
     with Session.begin() as session:
       match = self.get_match(interaction, session)
@@ -37,13 +36,22 @@ class MatchView(discord.ui.View):
       user = get_from_db("User", interaction.user.id, session)
       if match.date_closed is None:
         if (bet := match.user_bet(interaction.user.id)) != None:
-          bet_modal = BetEditModal(-1, match, user, bet, session, self.bot, title="Edit Bet")
+          bet_modal = BetEditModal(hide, match, user, bet, session, self.bot, title="Edit Bet")
           await interaction.response.send_modal(bet_modal)
         else:
-          bet_modal = BetCreateModal(match, user, False, session, title="Create Bet", bot=self.bot)
+          bet_modal = BetCreateModal(match, user, hide, session, title="Create Bet", bot=self.bot)
           await interaction.response.send_modal(bet_modal)
       else:
         await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
+  
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create-edit-bet", style=discord.ButtonStyle.primary)
+  async def button_callback(self, button, interaction):
+    await self.create_bet(interaction, 0)
+    
+  @discord.ui.button(label='Create/Edit Hidden Bet', custom_id="create-edit-hidden-bet", style=discord.ButtonStyle.secondary)
+  async def button_callback_hidden(self, button, interaction):
+    await self.create_bet(interaction, 1)
+    
           
 
 def create_match_embedded(match_ambig, title, session=None):
@@ -241,7 +249,8 @@ def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None)
     if bet.hidden and (show_hidden == False):
       embed.add_field(name=f"{bet.user.username}'s Hidden Bet, Teams: {bet.t1} vs {bet.t2}", value="", inline=False)
     else:
-      text = f" Bet, Team: {bet.t1}, Amount: {bet.amount_bet}, Payout on Win: {int(math.floor(bet.get_payout()))}"
+      team = bet.get_team()
+      text = f" Bet, Team: {team}, Amount: {bet.amount_bet}, Payout on Win: {int(math.floor(bet.get_payout()))}"
       if bet.hidden:
         text = " Hidden" + text
       text = f"{bet.user.username}'s" + text
