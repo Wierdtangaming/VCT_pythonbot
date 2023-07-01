@@ -3,6 +3,7 @@
 #import libraries
 import re
 from bs4 import BeautifulSoup
+import bs4
 import lxml
 #import cchardet
 from urllib.request import urlopen
@@ -176,6 +177,9 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   
   col = soup.find("div", class_="col mod-1")
   #date_labels = col.find_all("div", class_="wf-label mod-large")
+  if type(col) is not bs4.element.Tag:
+    print("col not Tag")
+    raise Exception("col not Tag")
   
   # top is not a matches card
   day_matches_cards = col.find_all("div", class_="wf-card")
@@ -219,7 +223,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
         if match.date_closed is None:
           # close match
           print(f"closing match {match_code}")
-          await match.close(bot, session=session)
+          await match.close(bot, session)
         continue
       
       # completed and upcoming matches
@@ -432,7 +436,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   
   if match is not None:
     from convert import edit_all_messages
-    from objembed import create_match_embedded, MatchView
+    from objembed import create_match_embedded
     print("updating odds")
     match.t1oo = t1oo
     match.t2oo = t2oo
@@ -444,7 +448,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
     return None
   
   team1, team2 = get_teams_from_match_page(soup, session)
-  if team1 is None:
+  if team1 is None or team2 is None:
     return None
   
   t1 = team1.name
@@ -479,11 +483,10 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
         continue
       add_to_db(match, session)
       
-      
       if match_channel is not None:
         embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
-        msg = await match_channel.send(embed=embedd, view=MatchView(bot))
-        match.message_ids.append((msg.id, msg.channel.id))
+        msg = await match_channel.send(embed=embedd, view=MatchView(bot, match))
+        await match.message_ids.append(msg)
       matches.append(match)
   
   if match_channel is not None:
@@ -537,7 +540,11 @@ def generate_tournament(vlr_code, session=None):
   print(f"generating tournament from link: {tournament_link}")
   
   # get the tournament name and color from the page
-  tournament_name = soup.find("h1", class_="wf-title").get_text().strip()
+  tournament_text = soup.find("h1", class_="wf-title")
+  if tournament_text is None:
+    print("tournament text is none")
+    return None
+  tournament_name = tournament_text.get_text().strip()
   tournament_color = get_tournament_color_from_vlr_page(soup, tournament_name)
   
   # create the tournament object

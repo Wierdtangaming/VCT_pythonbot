@@ -2,6 +2,7 @@ import discord
 from dbinterface import get_from_db, get_condition_db
 from sqlalchemy import literal
 from sqlaobjs import Session
+import asyncio
 
 from Match import Match
 from Bet import Bet
@@ -10,7 +11,7 @@ from Tournament import Tournament
 from Team import Team
 
 
-def ambig_to_obj(ambig, prefix=None, session=None):
+def ambig_to_obj(ambig, prefix=None, session=None) -> User | Match | Bet | Tournament | Team | None:
   if isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
     obj = ambig
   elif isinstance(ambig, int) or isinstance(ambig, str):
@@ -374,9 +375,8 @@ def get_tournament_from_vlr_code(vlr_code, session=None):
     return None
   return tournament[0]
 
-async def edit_all_messages(bot, ids, embedd, new_title=None):
-  ids.reverse()
-  for id in ids:
+async def edit_all_messages(bot, ids, embedd, new_title=None, view : int | discord.ui.View | None = -1):
+  async def edit_message(id):
     try:
       channel = await bot.fetch_channel(id[1])
       msg = await channel.fetch_message(id[0])
@@ -387,6 +387,15 @@ async def edit_all_messages(bot, ids, embedd, new_title=None):
         else:
           title = title.split(":")[0] + ":" + ":".join(new_title.split(":")[1:])
       embedd.title = title
-      await msg.edit(embed=embedd)
+      args = {}
+      args["embed"] = embedd
+      if view != -1:
+        args["view"] = view
+      await msg.edit(**args)
     except Exception:
-      print(id, "no msg found")
+      print(type(id), id, "no msg found")
+
+  tasks = [edit_message(id) for id in ids]
+  await asyncio.gather(*tasks)
+      
+  

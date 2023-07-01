@@ -196,7 +196,7 @@ async def on_ready():
   except:
     print("-----------Bot Failed to Start-----------")
     quit()
-  bot.add_view(MatchView(bot))
+  bot.add_view(MatchView(bot, None))
 
 
 @tasks.loop(hours=1)
@@ -462,7 +462,7 @@ async def bet_create(ctx, match: Option(str, "Match you want to bet on.",  autoc
     match = nmatch
     
     if match.date_closed is not None:
-      await ctx.respond("Betting has closed.", ephemeral=True)
+      await ctx.respond("Match betting has closed, you cannot create the bet.", ephemeral=True)
       return
     
     for bet in user.active_bets:
@@ -539,15 +539,13 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
       embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
       inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
       if not bet.hidden:
-        msg = await inter.original_message()
-        bet.message_ids.append((msg.id, msg.channel.id))
+        await bet.message_ids.append(inter)
     else:
       embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
       
       inter = await ctx.respond(embed=embedd, ephemeral=(bet.hidden and (bet.user_id == ctx.user.id)))
       if not(bet.hidden and (bet.user_id == ctx.user.id)):
-        msg = await inter.original_message()
-        bet.message_ids.append((msg.id, msg.channel.id))
+        await bet.message_ids.append(inter)
 #bet find end
 
 
@@ -575,8 +573,7 @@ async def bet_hide(ctx, bet: Option(str, "Bet you want to hide.", autocomplete=u
     title = f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}"
     embedd = create_bet_hidden_embedded(bet, title, session)
     inter = await ctx.respond(embed=embedd)
-    msg = await inter.original_message()
-    bet.message_ids.append((msg.id, msg.channel.id))
+    await bet.message_ids.append(inter)
   await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet hide end
 
@@ -606,8 +603,7 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
     title = f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}"
     embedd = create_bet_embedded(bet, title, session)
     inter = await ctx.respond(embed=embedd)
-    msg = await inter.original_message()
-    bet.message_ids.append((msg.id, msg.channel.id))
+    await bet.message_ids.append(inter)
   await edit_all_messages(bot, bet.message_ids, embedd, title)
 #bet show end
 
@@ -660,11 +656,10 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
           else:
             embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
           if i == 0:
-            inter = await ctx.respond(embed=embedd)
-            msg = await inter.original_message()
+            msg = await ctx.respond(embed=embedd)
           else:
             msg = await ctx.interaction.followup.send(embed=embedd)
-          bet.message_ids.append((msg.id, msg.channel.id))
+          await bet.message_ids.append(msg)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
@@ -818,7 +813,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
 
 #profile username start
 @profile.command(name = "username", description = "Sets the username for embeds.")
-async def profile_username(ctx, username: Option(str, "New username.", required=False, max_value=32)):
+async def profile_username(ctx, username: Option(str, "New username.", required=False, max_length=32)):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if username is None:
@@ -1115,11 +1110,10 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
           else:
             embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
           if i == 0:
-            inter = await ctx.respond(embed=embedd)
-            msg = await inter.original_message()
+            msg = await ctx.respond(embed=embedd)
           else:
             msg = await ctx.interaction.followup.send(embed=embedd)
-          bet.message_ids.append((msg.id, msg.channel.id))
+          await bet.message_ids.append(msg)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
@@ -1136,13 +1130,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
 async def match_open(ctx, match: Option(str, "Match you want to open.", autocomplete=match_close_list_autocomplete)):
   with Session.begin() as session:
     if (match := await obj_from_autocomplete_tuple(ctx, get_closed_matches(session), match, "Match", session)) is None: return
-    if match.date_closed == None:
-      await ctx.respond(f"Match {match.t1} vs {match.t2} is already open.", ephemeral=True)
-      return
-    match.date_closed = None
-    await ctx.respond(f"{match.t1} vs {match.t2} betting has opened.")
-    embedd = create_match_embedded(match, "Placeholder", session)
-  await edit_all_messages(bot, match.message_ids, embedd)
+    await match.open(bot, session, ctx)
 #match open end
 
 
@@ -1155,7 +1143,7 @@ async def match_close(ctx, match: Option(str, "Match you want to close.", autoco
     if match.date_closed != None:
       await ctx.respond(f"Match {match.t1} vs {match.t2} is already closed.", ephemeral=True)
       return
-    await match.close(bot, ctx, session)
+    await match.close(bot, session, ctx)
 #match close end
 
 #match create start
@@ -1212,7 +1200,7 @@ async def match_delete(ctx, match: Option(str, "Match you want to delete.", auto
       return
       
     embedd = create_match_embedded(match, f"Deleted Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}, and all bets on the match.", session)
-    await ctx.respond(embed=embedd, view=MatchView(bot))
+    await ctx.respond(embed=embedd, view=MatchView(bot, match))
       
     await delete_from_db(match, bot, session=session)
 #match delete end
@@ -1228,9 +1216,8 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
         return
     match = nmatch
     embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
-    inter = await ctx.respond(embed=embedd, view=MatchView(bot))
-    msg = await inter.original_message()
-    match.message_ids.append((msg.id, msg.channel.id))
+    inter = await ctx.respond(embed=embedd, view=MatchView(bot, match))
+    await match.message_ids.append(inter)
 #match find end
 
 #match alert start
@@ -1275,11 +1262,10 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
       for i, match in enumerate(matches):
         embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
         if i == 0:
-          inter = await ctx.respond(embed=embedd, view=MatchView(bot))
-          msg = await inter.original_message()
+          msg = await ctx.respond(embed=embedd, view=MatchView(bot, match))
         else:
-          msg = await ctx.interaction.followup.send(embed=embedd, view=MatchView(bot))
-        match.message_ids.append((msg.id, msg.channel.id))
+          msg = await ctx.interaction.followup.send(embed=embedd, view=MatchView(bot, match))
+        await match.message_ids.append(msg)
 #match list end
   
   
@@ -1462,11 +1448,10 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
       for i, match in enumerate(matches):
         embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
         if i == 0:
-          inter = await ctx.respond(embed=embedd, view=MatchView(bot))
-          msg = await inter.original_message()
+          msg = await ctx.respond(embed=embedd, view=MatchView(bot, match))
         else:
-          msg = await ctx.interaction.followup.send(embed=embedd, view=MatchView(bot))
-          match.message_ids.append((msg.id, msg.channel.id))
+          msg = await ctx.interaction.followup.send(embed=embedd, view=MatchView(bot, match))
+        await match.message_ids.append(msg)
 #tournament matches end
 
 #tournament recolor start

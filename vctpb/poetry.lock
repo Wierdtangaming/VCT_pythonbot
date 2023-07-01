@@ -162,25 +162,6 @@ python-versions = ">=3.5.0"
 unicode_backport = ["unicodedata2"]
 
 [[package]]
-name = "click"
-version = "8.0.4"
-description = "Composable command line interface toolkit"
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-colorama = {version = "*", markers = "platform_system == \"Windows\""}
-
-[[package]]
-name = "colorama"
-version = "0.4.4"
-description = "Cross-platform colored terminal text."
-category = "main"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
-
-[[package]]
 name = "cycler"
 version = "0.11.0"
 description = "Composable style cycles"
@@ -212,24 +193,6 @@ python-versions = "*"
 
 [package.extras]
 dev = ["pytest", "coverage", "coveralls"]
-
-[[package]]
-name = "flask"
-version = "2.0.3"
-description = "A simple framework for building complex web applications."
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-click = ">=7.1.2"
-itsdangerous = ">=2.0"
-Jinja2 = ">=3.0"
-Werkzeug = ">=2.0"
-
-[package.extras]
-async = ["asgiref (>=3.2)"]
-dotenv = ["python-dotenv"]
 
 [[package]]
 name = "fonttools"
@@ -309,28 +272,6 @@ zipp = {version = ">=3.1.0", markers = "python_version < \"3.10\""}
 [package.extras]
 docs = ["sphinx", "jaraco.packaging (>=9)", "rst.linker (>=1.9)"]
 testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-cov", "pytest-enabler (>=1.0.1)", "pytest-black (>=0.3.7)", "pytest-mypy (>=0.9.1)"]
-
-[[package]]
-name = "itsdangerous"
-version = "2.1.1"
-description = "Safely pass data to untrusted environments and back."
-category = "main"
-optional = false
-python-versions = ">=3.7"
-
-[[package]]
-name = "jinja2"
-version = "3.0.3"
-description = "A very fast and expressive template engine."
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.dependencies]
-MarkupSafe = ">=2.0"
-
-[package.extras]
-i18n = ["Babel (>=2.7)"]
 
 [[package]]
 name = "jsonpickle"
@@ -447,18 +388,19 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "py-cord"
-version = "2.0.0b7"
+version = "2.4.1"
 description = "A Python wrapper for the Discord API"
 category = "main"
 optional = false
-python-versions = ">=3.8.0"
+python-versions = ">=3.8"
 
 [package.dependencies]
 aiohttp = ">=3.6.0,<3.9.0"
+typing-extensions = {version = ">=4,<5", markers = "python_version < \"3.11\""}
 
 [package.extras]
-docs = ["sphinx (==4.5.0)", "sphinxcontrib-trio (==1.1.2)", "sphinxcontrib-websupport", "myst-parser"]
-speed = ["orjson (>=3.5.4)", "aiodns (>=1.1)", "brotlipy", "cchardet"]
+docs = ["sphinx (==5.3.0)", "sphinxcontrib-trio (==1.1.2)", "sphinxcontrib-websupport (==1.2.4)", "myst-parser (==0.18.1)", "sphinxext-opengraph (==0.8.1)", "sphinx-copybutton (==0.5.1)", "furo", "sphinx-autodoc-typehints (==1.22)"]
+speed = ["orjson (>=3.5.4)", "aiohttp"]
 voice = ["PyNaCl (>=1.3.0,<1.6)"]
 
 [[package]]
@@ -566,21 +508,6 @@ python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
 tzdata = {version = "*", markers = "python_version >= \"3.6\""}
 
 [[package]]
-name = "replit"
-version = "3.2.4"
-description = "A library for interacting with features of repl.it"
-category = "main"
-optional = false
-python-versions = ">=3.8,<4.0"
-
-[package.dependencies]
-aiohttp = ">=3.6.2,<4.0.0"
-Flask = ">=2.0.0,<3.0.0"
-requests = ">=2.25.1,<3.0.0"
-typing_extensions = ">=3.7.4,<4.0.0"
-Werkzeug = ">=2.0.0,<3.0.0"
-
-[[package]]
 name = "requests"
 version = "2.27.1"
 description = "Python HTTP for Humans."
@@ -672,11 +599,11 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "typing-extensions"
-version = "3.10.0.2"
-description = "Backported and Experimental Type Hints for Python 3.5+"
+version = "4.7.0"
+description = "Backported and Experimental Type Hints for Python 3.7+"
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=3.7"
 
 [[package]]
 name = "tzdata"
@@ -725,17 +652,6 @@ secure = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "cer
 socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
-name = "werkzeug"
-version = "2.0.3"
-description = "The comprehensive WSGI web application library."
-category = "main"
-optional = false
-python-versions = ">=3.6"
-
-[package.extras]
-watchdog = ["watchdog"]
-
-[[package]]
 name = "wrapt"
 version = "1.14.0"
 description = "Module for decorators, wrappers and monkey patching."
@@ -770,7 +686,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "e99b1977cee808f0826976b54d7041b5f84ad0e522c123543f6f9f621a56ea3e"
+content-hash = "f3e158bdd6e6649cf4e43bffaf1b331e3fe8375283f807e51a142f6ddc829e3a"
 
 [metadata.files]
 aiohttp = []
@@ -785,20 +701,15 @@ bs4 = []
 certifi = []
 cffi = []
 charset-normalizer = []
-click = []
-colorama = []
 cycler = []
 deprecated = []
 emoji = []
-flask = []
 fonttools = []
 frozenlist = []
 greenlet = []
 idna = []
 importlib-metadata = []
 importlib-resources = []
-itsdangerous = []
-jinja2 = []
 jsonpickle = []
 kiwisolver = []
 lxml = []
@@ -819,7 +730,6 @@ pyparsing = []
 python-dateutil = []
 pytz = []
 pytz-deprecation-shim = []
-replit = []
 requests = []
 setuptools-scm = []
 six = []
@@ -831,7 +741,6 @@ tzdata = []
 tzlocal = []
 ujson = []
 urllib3 = []
-werkzeug = []
 wrapt = []
 yarl = []
 zipp = []

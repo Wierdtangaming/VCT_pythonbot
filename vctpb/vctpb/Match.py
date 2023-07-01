@@ -2,7 +2,7 @@ from decimal import Decimal
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from sqltypes import JSONLIST, DECIMAL
+from sqltypes import JSONLIST, DECIMAL, MsgMutableList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from utils import mix_colors, get_date, get_random_hex_color
@@ -34,7 +34,7 @@ class Match():
   date_winner = Column(DateTime(timezone = True))
   date_closed = Column(DateTime(timezone = True))
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
-  message_ids = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of int
+  message_ids = Column(MsgMutableList.as_mutable(JSONLIST), nullable=False) #array of int
   alert = Column(Boolean, nullable=False, default=False)
   
   @property
@@ -89,15 +89,15 @@ class Match():
     for user in users:
       if user.code not in bet_users:
         pings += id_to_mention(user.code) + " "
-    msg = await match_channel.send(content=pings, embed=embedd, view=MatchView(bot))
-    self.message_ids.append((msg.id, msg.channel.id))
+    msg = await match_channel.send(content=pings, embed=embedd, view=MatchView(bot, self))
+    await self.message_ids.append(msg)
     #await msg.edit(content="")
     
   
   def set_color(self, session=None):
     if session is None:
       with Session.begin() as session:
-        return self.set_color(hex, session)
+        return self.set_color(session)
 
     team1 = self.team1
     team2 = self.team2
@@ -128,7 +128,7 @@ class Match():
   def basic_to_string(self):
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
-  async def close(self, bot, ctx=None, session=None):
+  async def close(self, bot, session, ctx=None, close_session=True):
     from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded
     from convert import edit_all_messages
     self.date_closed = get_date()
@@ -138,18 +138,40 @@ class Match():
         bet.hidden = False
         bet.set_color(session)
         old_hidden.append(bet)
-    embedd = create_match_embedded(self, "Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    embedd = create_match_embedded(self, f"Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
     if ctx is not None:
-      msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embeds=[embedd, create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)])
-      self.message_ids.append((msg.id, msg.channel.id))
-    await edit_all_messages(bot, self.message_ids, embedd)
+      msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embed=embedd)
+      await self.message_ids.append(msg)
+      bet_list = create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)
+      if bet_list is not None:
+        await ctx.followup.send(content="All bets on this match:", embed=bet_list)
+    if close_session:
+      session.commit()
+      session.close()
+    await edit_all_messages(bot, self.message_ids, embedd, view=None)
     for bet in old_hidden:
       embedd = create_bet_embedded(bet, "Placeholder", session)
       await edit_all_messages(bot, bet.message_ids, embedd)
-    
+  
+  async def open(self, bot, session, ctx=None, close_session=True):
+    from objembed import create_match_embedded, MatchView
+    from convert import edit_all_messages
+    if self.date_closed == None:
+      if ctx is not None:
+        await ctx.respond(f"Match {self.t1} vs {self.t2} is already open.", ephemeral=True)
+      return
+    self.date_closed = None
+    embedd = create_match_embedded(self, f"Opened Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    if ctx is not None:
+      msg = await ctx.respond(f"{self.t1} vs {self.t2} betting has opened.", embed=embedd, view=MatchView(bot, self))
+      await self.message_ids.append(msg)
+    if close_session:
+      session.commit()
+      session.close()
+    await edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self))
   
   
-  async def set_winner(self, team_num, bot, ctx=None, session=None):
+  async def set_winner(self, team_num, bot, ctx=None, session=None, close_session=True):
     if session is None:
       with Session.begin() as session:
         return await self.set_winner(team_num, bot, ctx, session)
@@ -174,7 +196,7 @@ class Match():
       print(f"Invalid team name of {team_num} please enter {self.t1} or {self.t2}.")
       return
     
-    if int(self.winner) != 0:
+    if self.winner != 0:
       if ctx is not None:
         await ctx.respond(f"Winner has already been set to {self.winner_name()}", ephemeral = True)
       print(f"Winner has already been set to {self.winner_name()}")
@@ -235,6 +257,9 @@ class Match():
         if leader.has_leader_profile():
           print("start")
           leader.set_color(get_random_hex_color(), session)
+    if close_session:
+      session.commit()
+      session.close()
     await edit_all_messages(bot, self.message_ids, m_embedd)
     [await edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
   
