@@ -282,11 +282,13 @@ class BetCreateModal(Modal):
       team_label = error[0]
       
     if team == 1:
-      team_label = str(match.t1)
+      team = str(match.t1)
     elif team == 2:
-      team_label = str(match.t2)
+      team = str(match.t2)
+    else:
+      team = ""
       
-    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
+    self.add_item(InputText(label=team_label, value=team, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
 
     if error[1] is None: 
       amount_label = "Amount you want to bet."
@@ -409,15 +411,14 @@ class BetEditModal(Modal):
                   if len(team_label) >= 45:
                     team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
     
-    
     if team == 1:
-      team = bet.t1
+      team = str(bet.t1)
     elif team == 2:
-      team = bet.t2
+      team = str(bet.t2) 
     else:
-      team = bet.get_team()
+      team = ""
     
-    self.add_item(InputText(label=team_label, placeholder=team, min_length=1, max_length=100, required=False))
+    self.add_item(InputText(label=team_label, value=team, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
     amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance(session) + bet.amount_bet)}"
     self.add_item(InputText(label=amount_label, placeholder = bet.amount_bet, min_length=1, max_length=20, required=False))
