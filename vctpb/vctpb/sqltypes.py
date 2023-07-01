@@ -2,6 +2,18 @@ from sqlalchemy.types import TypeDecorator, VARCHAR, String
 import pickle
 from decimal import Decimal
 import time
+from sqlalchemy.ext.mutable import MutableList
+from discord import Message, Interaction
+
+class MsgMutableList(MutableList):
+  async def append(self, ambig):
+    if issubclass(type(ambig), Message):
+      return super().append((ambig.id, ambig.channel.id))
+    elif issubclass(type(ambig), Interaction):
+      ambig = await ambig.original_response()
+      return super().append((ambig.id, ambig.channel.id))
+    else:
+      return super().append(ambig)
 
 class JSONLIST(TypeDecorator):
   

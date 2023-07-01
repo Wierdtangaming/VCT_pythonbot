@@ -136,10 +136,10 @@ class MatchCreateModal(Modal):
       embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
       
       channel = await self.bot.fetch_channel(get_channel_from_db("match", session))
-      msg = await channel.send(embed=embedd, view=MatchView(self.bot))
+      msg = await channel.send(embed=embedd, view=MatchView(self.bot, match))
       await wait_msg.edit_original_message(content = f"Match created in {channel.mention}.")
-        
-      match.message_ids.append((msg.id, msg.channel.id))
+      
+      await match.message_ids.append(msg)
       add_to_db(match, session)
 #match create modal end
 
@@ -174,7 +174,7 @@ class MatchEditModal(Modal):
         team_one, team_two, tournament_name, betting_site = vals
       else:
         team_one, team_two, odds_combined, tournament_name, betting_site = vals
-        
+
         if odds_combined.count(" ") > 1:
           odds_combined.strip(" ")
         if odds_combined == "":
@@ -189,7 +189,8 @@ class MatchEditModal(Modal):
       if betting_site == "":
         betting_site = match.odds_source
       
-      if not odds_locked:
+      
+      if not odds_locked or odds_combined == "":
         splits = [" ", "/", "\\", ";", ":", ",", "-", "_", "|"]
         for spliter in splits:
           if odds_combined.count(spliter) == 1:
@@ -199,12 +200,10 @@ class MatchEditModal(Modal):
           await interaction.response.send_message(f"Odds are not valid. Odds must be [odds 1]/[odds 2].", ephemeral=True)
           return
           
-        if (to_float(team_one_old_odds) is None) or (to_float(team_two_old_odds) is None): 
+        if ((team_one_old_odds := to_float(team_one_old_odds)) is None) or ((team_two_old_odds := to_float(team_two_old_odds) ) is None): 
           await interaction.response.send_message(f"Odds are not valid. Odds must be valid decimal numbers.", ephemeral=True)
           return
         
-        team_one_old_odds = to_float(team_one_old_odds)
-        team_two_old_odds = to_float(team_two_old_odds)
         if team_one_old_odds <= 1 or team_two_old_odds <= 1:
           await interaction.response.send_message(f"Odds must be greater than 1.", ephemeral=True)
           return
@@ -244,17 +243,16 @@ class MatchEditModal(Modal):
       title = f"Edited Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}."
       embedd = create_match_embedded(match, title, session)
       
-      inter = await interaction.response.send_message(embed=embedd, view=MatchView(self.bot))
-      msg = await inter.original_message()
+      inter = await interaction.response.send_message(embed=embedd, view=MatchView(self.bot, match))
       await edit_all_messages(self.bot, match.message_ids, embedd, title)
-      match.message_ids.append((msg.id, msg.channel.id))
+      await match.message_ids.append(inter)
 #match edit modal end
 
 
 #bet create modal start
 class BetCreateModal(Modal):
   
-  def __init__(self, match: Match, user: User, hidden, session, error=[None, None], bot=None, *args, **kwargs) -> None:
+  def __init__(self, match: Match, user: User, hidden, session, error=[None, None], bot=None, team=-1, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
@@ -283,7 +281,14 @@ class BetCreateModal(Modal):
     else:
       team_label = error[0]
       
-    self.add_item(InputText(label=team_label, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
+    if team == 1:
+      team = str(match.t1)
+    elif team == 2:
+      team = str(match.t2)
+    else:
+      team = ""
+      
+    self.add_item(InputText(label=team_label, value=team, placeholder=f'"1" for {match.t1} and "2" for {match.t2}', min_length=1, max_length=100))
 
     if error[1] is None: 
       amount_label = "Amount you want to bet."
@@ -363,8 +368,7 @@ class BetCreateModal(Modal):
         shown_embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
         
       if (channel := await self.bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
-        inter = await interaction.response.send_message(embed=shown_embedd)
-        msg = await inter.original_message()
+        msg = await interaction.response.send_message(embed=shown_embedd)
       else:
         await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral=True)
         msg = await channel.send(embed=shown_embedd)
@@ -372,14 +376,14 @@ class BetCreateModal(Modal):
       if self.hidden:
         embedd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
         inter = await interaction.followup.send(embed = embedd, ephemeral = True)
-      bet.message_ids.append((msg.id, msg.channel.id))
+      await bet.message_ids.append(msg)
 #bet create modal end
 
 
 #bet edit modal start
 class BetEditModal(Modal):
   
-  def __init__(self, hide, match: Match, user: User, bet: Bet, session, bot, *args, **kwargs) -> None:
+  def __init__(self, hide, match: Match, user: User, bet: Bet, session, bot, team=-1, *args, **kwargs) -> None:
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
@@ -407,8 +411,14 @@ class BetEditModal(Modal):
                   if len(team_label) >= 45:
                     team_label = f"{firstt1w[:15]}/{firstt2w[:15]}, {match.t1o}/{match.t2o}"
     
-      
-    self.add_item(InputText(label=team_label, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
+    if team == 1:
+      team = str(bet.t1)
+    elif team == 2:
+      team = str(bet.t2) 
+    else:
+      team = ""
+    
+    self.add_item(InputText(label=team_label, value=team, placeholder=bet.get_team(), min_length=1, max_length=100, required=False))
 
     amount_label = f"Amount to bet. Balance: {math.floor(user.get_balance(session) + bet.amount_bet)}"
     self.add_item(InputText(label=amount_label, placeholder = bet.amount_bet, min_length=1, max_length=20, required=False))
@@ -501,10 +511,9 @@ class BetEditModal(Modal):
         title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
         embedd = create_bet_embedded(bet, title, session)
       
-      inter = await interaction.response.send_message(embed=embedd)
-      msg = await inter.original_message()
+      msg = await interaction.response.send_message(embed=embedd)
       
-      bet.message_ids.append((msg.id, msg.channel.id))
+      await bet.message_ids.append(msg)
       if self.hide:
         embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
         inter = await interaction.followup.send(embed = embeddd, ephemeral = True) 

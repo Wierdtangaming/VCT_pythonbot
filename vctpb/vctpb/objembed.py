@@ -12,45 +12,67 @@ from sqlaobjs import Session
 
 
 class MatchView(discord.ui.View): 
-  def __init__(self, bot):
+  def __init__(self, bot, match):
     self.bot = bot
     super().__init__(timeout=None)
+    if match is not None:
+      t1_button = self.get_item("create_bet_t1")
+      t1_button.label = f"Bet on {match.t1}" # type: ignore
+      t2_button = self.get_item("create_bet_t2")
+      t2_button.label = f"Bet on {match.t2}" # type: ignore
+      t1_hidden_button = self.get_item("create_hidden_bet_t1")
+      t1_hidden_button.label = f"Hidden Bet on {match.t1}" # type: ignore
+      t2_hidden_button = self.get_item("create_hidden_bet_t2")
+      t2_hidden_button.label = f"Hidden Bet on {match.t2}" # type: ignore
   
-  def get_match(self, interaction, session):
+  async def get_match(self, interaction, session):
+    match = None
     fields = interaction.message.embeds[0].fields
     for field in fields[::-1]:
       if field.name == "Identifier:":
         match_id = field.value
-        if (match := get_from_db("Match", match_id, session)) is None:
-          break
-        return match
-    return None
+        match = get_from_db("Match", match_id, session)
+        break
+    if match is None and interaction is not None:
+      await interaction.response.send_message("Match not found. Report the bug and do /bet create instead.", ephemeral=True)
+    return match
   
-  async def create_bet(self, interaction, hide):
+  async def create_bet(self, interaction, hide, team, match, session):
     from modals import BetEditModal, BetCreateModal
-    with Session.begin() as session:
-      match = self.get_match(interaction, session)
-      if match is None:
-        await interaction.response.send_message("Match not found. Report the bug and do /bet create.", ephemeral=True)
-        return
-      user = get_from_db("User", interaction.user.id, session)
-      if match.date_closed is None:
-        if (bet := match.user_bet(interaction.user.id)) != None:
-          bet_modal = BetEditModal(hide, match, user, bet, session, self.bot, title="Edit Bet")
-          await interaction.response.send_modal(bet_modal)
-        else:
-          bet_modal = BetCreateModal(match, user, hide, session, title="Create Bet", bot=self.bot)
-          await interaction.response.send_modal(bet_modal)
+    user = get_from_db("User", interaction.user.id, session)
+    if match.date_closed is None:
+      if (bet := match.user_bet(interaction.user.id)) != None:
+        bet_modal = BetEditModal(int(hide), match, user, bet, session, self.bot, title="Edit Bet", team=team)
+        await interaction.response.send_modal(bet_modal)
       else:
-        await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
+        bet_modal = BetCreateModal(match, user, int(hide), session, title="Create Bet", bot=self.bot, team=team)
+        await interaction.response.send_modal(bet_modal)
+    else:
+      await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
   
-  @discord.ui.button(label='Create/Edit Bet', custom_id="create-edit-bet", style=discord.ButtonStyle.primary)
-  async def button_callback(self, button, interaction):
-    await self.create_bet(interaction, 0)
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t1", style=discord.ButtonStyle.primary)
+  async def create_bet_t1_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      await self.create_bet(interaction, False, 1, match, session)
+      
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t2", style=discord.ButtonStyle.primary)
+  async def create_bet_t2_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      await self.create_bet(interaction, False, 2, match, session)
     
-  @discord.ui.button(label='Create/Edit Hidden Bet', custom_id="create-edit-hidden-bet", style=discord.ButtonStyle.secondary)
-  async def button_callback_hidden(self, button, interaction):
-    await self.create_bet(interaction, 1)
+  @discord.ui.button(label='Create/Edit Hidden Bet', custom_id="create_hidden_bet_t1", style=discord.ButtonStyle.secondary, row=1)
+  async def create_hidden_bet_t1_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      await self.create_bet(interaction, True, 1, match, session)
+  
+  @discord.ui.button(label='Create/Edit Hidden Bet', custom_id="create_hidden_bet_t2", style=discord.ButtonStyle.secondary, row=1)
+  async def create_hidden_bet_t2_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      await self.create_bet(interaction, True, 2, match, session)
     
           
 
