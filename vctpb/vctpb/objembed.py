@@ -96,7 +96,7 @@ class MatchView(discord.ui.View):
         await interaction.response.send_message("No undecided bets.", ephemeral=True)
         return
       if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
-        await interaction.response.send_message(embed=embedd)
+        await interaction.response.send_message(embed=embedd, ephemeral=True)
       if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
         await interaction.followup.send(embed=hidden_embedd, ephemeral=True)
     
