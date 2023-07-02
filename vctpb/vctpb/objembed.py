@@ -16,6 +16,9 @@ class MatchView(discord.ui.View):
     self.bot = bot
     super().__init__(timeout=None)
     if match is not None:
+      if match.date_closed is not None:
+        self.clear_items()
+        return
       t1_button = self.get_item("create_bet_t1")
       t1_button.label = f"Bet on {match.t1}" # type: ignore
       t2_button = self.get_item("create_bet_t2")
