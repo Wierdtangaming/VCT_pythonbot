@@ -269,7 +269,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
         if (match := get_match_from_vlr_code(match_code, session)) is None:
           print(f"Cant send warning for {match_code} because match is None")
         else:
-          if (not match.alerted) and match.date_closed is None:
+          if (not match.alert) and match.date_closed is None:
             await match.send_warning(bot, session)
         
       print(f"acting on {match_code}, status: {status}, eta: {eta}")

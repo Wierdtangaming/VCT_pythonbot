@@ -4,7 +4,7 @@ from Match import Match
 from Bet import Bet
 from Tournament import Tournament
 from User import User, get_active_users
-from convert import ambig_to_obj, id_to_mention
+from convert import ambig_to_obj, id_to_mention, get_user_from_ctx, get_users_hidden_match_bets
 from colorinterface import hex_to_tuple
 import math
 import emoji
@@ -17,17 +17,23 @@ class MatchView(discord.ui.View):
     super().__init__(timeout=None)
     if match is not None:
       if match.date_closed is not None:
-        self.clear_items()
-        return
-      t1_button = self.get_item("create_bet_t1")
-      t1_button.label = f"Bet on {match.t1}" # type: ignore
-      t2_button = self.get_item("create_bet_t2")
-      t2_button.label = f"Bet on {match.t2}" # type: ignore
-      t1_hidden_button = self.get_item("create_hidden_bet_t1")
-      t1_hidden_button.label = f"Hidden Bet on {match.t1}" # type: ignore
-      t2_hidden_button = self.get_item("create_hidden_bet_t2")
-      t2_hidden_button.label = f"Hidden Bet on {match.t2}" # type: ignore
+        self.hide_buttons()
+      else:
+        self.set_buttons(match)
   
+  def hide_buttons(self):
+    self.remove_item(self.get_item("create_bet_t1")) # type: ignore
+    self.remove_item(self.get_item("create_bet_t2")) # type: ignore
+    self.remove_item(self.get_item("create_hidden_bet_t1")) # type: ignore
+    self.remove_item(self.get_item("create_hidden_bet_t2")) # type: ignore
+  
+  def set_buttons(self, match):
+    self.get_item("create_bet_t1").label = f"{match.t1} ({match.t1o})" # type: ignore
+    self.get_item("create_bet_t2").label = f"{match.t2} ({match.t2o})" # type: ignore
+    self.get_item("create_hidden_bet_t1").label = f"{match.t1} ({match.t1o})" # type: ignore
+    self.get_item("create_hidden_bet_t2").label = f"{match.t2} ({match.t2o})" # type: ignore
+    
+    
   async def get_match(self, interaction, session):
     match = None
     fields = interaction.message.embeds[0].fields
@@ -53,13 +59,13 @@ class MatchView(discord.ui.View):
     else:
       await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
   
-  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t1", style=discord.ButtonStyle.primary)
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t1", style=discord.ButtonStyle.primary, row=0)
   async def create_bet_t1_callback(self, button, interaction):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
       await self.create_bet(interaction, False, 1, match, session)
       
-  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t2", style=discord.ButtonStyle.primary)
+  @discord.ui.button(label='Create/Edit Bet', custom_id="create_bet_t2", style=discord.ButtonStyle.primary, row=0)
   async def create_bet_t2_callback(self, button, interaction):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
@@ -76,6 +82,23 @@ class MatchView(discord.ui.View):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
       await self.create_bet(interaction, True, 2, match, session)
+      
+  # show all bets
+  @discord.ui.button(label='Show Bets', custom_id="show_bets", style=discord.ButtonStyle.green, row=2)
+  async def show_bets_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      hidden_bets = []
+      if (user := get_from_db("User", interaction.user.id, session)) is not None:
+        hidden_bets = get_users_hidden_match_bets(user, match.code, session)
+      bets = match.bets
+      if len(bets) == 0:
+        await interaction.response.send_message("No undecided bets.", ephemeral=True)
+        return
+      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
+        await interaction.response.send_message(embed=embedd)
+      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
+        await interaction.followup.send(embed=hidden_embedd, ephemeral=True)
     
           
 
@@ -272,14 +295,14 @@ def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, session=None)
   
   for bet in bets_ambig:
     if bet.hidden and (show_hidden == False):
-      embed.add_field(name=f"{bet.user.username}'s Hidden Bet, Teams: {bet.t1} vs {bet.t2}", value="", inline=False)
+      embed.add_field(name=f"{bet.user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", value=f"Teams: {bet.t1} vs {bet.t2}", inline=False)
     else:
       team = bet.get_team()
-      text = f" Bet, Team: {team}, Amount: {bet.amount_bet}, Payout on Win: {int(math.floor(bet.get_payout()))}"
+      text = f" Bet on {bet.t1} vs {bet.t2}"
       if bet.hidden:
         text = " Hidden" + text
       text = f"{bet.user.username}'s" + text
-      embed.add_field(name=text, value="", inline=False)
+      embed.add_field(name=text, value=f"Team: {team}, Amount: {bet.amount_bet}, Payout on Win: {int(math.floor(bet.get_payout()))}", inline=False)
   return embed
 
 

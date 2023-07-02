@@ -511,9 +511,10 @@ class BetEditModal(Modal):
         title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
         embedd = create_bet_embedded(bet, title, session)
       
-      msg = await interaction.response.send_message(embed=embedd)
-      
-      await bet.message_ids.append(msg)
+      if not bet.hidden:
+        msg = await interaction.response.send_message(embed=embedd)
+        await bet.message_ids.append(msg)
+        
       if self.hide:
         embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
         inter = await interaction.followup.send(embed = embeddd, ephemeral = True) 
