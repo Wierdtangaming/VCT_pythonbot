@@ -77,8 +77,7 @@ class Match():
     from dbinterface import get_channel_from_db
     from objembed import create_match_embedded, MatchView
     from convert import id_to_mention
-    
-    self.alerted = True
+    self.alert = True
     if (match_channel := await bot.fetch_channel(get_channel_from_db("match", session))) is None:
       return
     
@@ -129,7 +128,7 @@ class Match():
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
   async def close(self, bot, session, ctx=None, close_session=True):
-    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded
+    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView
     from convert import edit_all_messages
     self.date_closed = get_date()
     old_hidden = []
@@ -148,7 +147,7 @@ class Match():
     if close_session:
       session.commit()
       session.close()
-    await edit_all_messages(bot, self.message_ids, embedd, view=None)
+    await edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self))
     for bet in old_hidden:
       embedd = create_bet_embedded(bet, "Placeholder", session)
       await edit_all_messages(bot, bet.message_ids, embedd)
