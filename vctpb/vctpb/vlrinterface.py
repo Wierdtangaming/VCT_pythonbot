@@ -17,7 +17,7 @@ from convert import get_active_tournaments
 from Tournament import Tournament
 from Team import Team
 from Match import Match
-from objembed import create_match_embedded, channel_send_match_list_embedded
+from objembed import create_match_embedded, send_match_list_embedded
 from dbinterface import get_channel_from_db, get_from_db, add_to_db, get_unique_code
 from autocompletes import get_team_from_vlr_code, get_match_from_vlr_code, get_tournament_from_vlr_code
 from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit, tuple_to_hex
@@ -491,7 +491,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
   
   if match_channel is not None:
     if len(matches) != 1 and (reply_if_none or len(matches) != 0):
-      await channel_send_match_list_embedded(match_channel, "Generated Matches:", matches, session)
+      await send_match_list_embedded(f"Generated Matches:", matches, bot, match_channel)
 
 
 def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None, activate_on_create=True):
