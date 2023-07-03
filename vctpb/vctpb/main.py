@@ -1217,15 +1217,6 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
     await match.message_ids.append(inter)
 #match find end
 
-#match alert start
-@matchscg.command(name = "alert", description = "Alerts you when the match is closed.")
-async def match_alert(ctx, match: Option(str, "Match you want to be alerted of.", autocomplete=match_open_list_autocomplete)):
-  with Session.begin() as session:
-    if (nmatch := await obj_from_autocomplete_tuple(ctx, get_open_matches(session), match, "Match", session)) is None: return
-    match = nmatch
-    await match.send_warning(bot, session)
-#match alert end
-
 #match edit start
 @matchscg.command(name = "edit", description = "Edit a match.")
 async def match_edit(ctx, match: Option(str, "Match you want to edit.", autocomplete=match_list_autocomplete), balance_odds: Option(int, "balance the odds? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
@@ -1253,7 +1244,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 
     if type == 0:
       #short
-      await respond_send_match_list_embedded(ctx, "Matches: ", matches, session, bot=bot)
+      await send_match_list_embedded(f"Matches: ", matches, bot, ctx)
     elif type == 1:
       #full
       for i, match in enumerate(matches):
@@ -1439,7 +1430,7 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
     
     if type == 0:
       #short
-      await respond_send_match_list_embedded(ctx, f"Matches in {tournament.name}: ", matches, session)
+      await send_match_list_embedded(f"Matches in {tournament.name}: ", matches, bot, ctx)
     elif type == 1:
       #full
       for i, match in enumerate(matches):

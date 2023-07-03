@@ -6,15 +6,17 @@ from Match import Match
 from Bet import Bet
 from Tournament import Tournament
 from User import User, get_active_users
-from convert import ambig_to_obj, id_to_mention, get_user_from_ctx, get_users_hidden_match_bets
+from convert import ambig_to_obj, id_to_mention, get_user_from_ctx, get_users_hidden_match_bets, get_current_matches
 from colorinterface import hex_to_tuple
 import math
 import emoji
 from sqlaobjs import Session
 from functools import partial
 
+async def show_matches(interaction, session, bot):
+  await send_match_list_embedded(f"Matches: ", get_current_matches(session), bot, interaction, ephemeral=True)
 
-async def show_bets(match, user, interaction, session):
+async def show_match_bets(match, user, interaction, session):
   if match is None: return
   hidden_bets = []
   if user is not None:
@@ -114,7 +116,12 @@ class MatchView(View):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
       user = get_from_db("User", interaction.user.id, session)
-      await show_bets(match, user, interaction, session)
+      await show_match_bets(match, user, interaction, session)
+      
+  @discord.ui.button(label='Show All Matches', custom_id="bet_show_all_matches", style=discord.ButtonStyle.primary, row=3)
+  async def show_all_matches_callback(self, button, interaction):
+    with Session.begin() as session:
+      await show_matches(interaction, session, self.bot)
     
 class BetView(View):
   async def get_bet(self, interaction, session):
@@ -177,7 +184,12 @@ class BetView(View):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
       user = get_from_db("User", interaction.user.id, session)
-      await show_bets(match, user, interaction, session)
+      await show_match_bets(match, user, interaction, session)
+  
+  @discord.ui.button(label='Show All Matches', custom_id="bet_show_all_matches", style=discord.ButtonStyle.primary, row=2)
+  async def show_all_matches_callback(self, button, interaction):
+    with Session.begin() as session:
+      await show_matches(interaction, session, self.bot)
   
   
 class MatchListView(View):
@@ -261,52 +273,34 @@ def create_match_embedded(match_ambig, title, session=None):
   embed.add_field(name="ID:", value=match.code, inline=True)
   return embed
 
-
-def create_match_list_embedded(embed_title, matches_ambig, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return create_match_list_embedded(embed_title, matches_ambig, session)
-    
-  if len(matches_ambig) > 24:
-    embeds = []
-    while len(matches_ambig) > 0:
-      embeds.append(create_match_list_embedded(embed_title, matches_ambig[:24], session))
-      matches_ambig = matches_ambig[24:]
-    return embeds
+limit = 25
+async def send_match_list_embedded(embed_title, matches, bot, sender, followup=False, ephemeral=False):
+  follow = followup
+  if len(matches) > limit:
+    while len(matches) > 0:
+      await send_match_list_embedded(embed_title, matches[:limit], bot, sender, followup=follow, ephemeral=ephemeral)
+      follow = True
+      matches = matches[limit:]
+    return
   
   embed = discord.Embed(title=embed_title, color=discord.Color.red())
-  if all(isinstance(s, str) for s in matches_ambig):
-    matches_ambig = get_mult_from_db("Match", matches_ambig, session)
-  for match in matches_ambig:
+  for match in matches:
     embed.add_field(name=f"{match.t1} vs {match.t2}, Odds: {match.t1o} / {match.t2o}, ID: {match.code}", value="", inline=False)
-  return embed
-
-async def channel_send_match_list_embedded(channel, embed_title, matches_ambig, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return await channel_send_match_list_embedded(channel, embed_title, matches_ambig, session)
-    
-  embeds = create_match_list_embedded(embed_title, matches_ambig, session)
-  if isinstance(embeds, list):
-    for embed in embeds:
-      await channel.send(embed=embed)
+  
+  args = {"embed": embed, "view": MatchListView(bot, matches), "ephemeral": ephemeral}
+  # Send
+  if isinstance(sender, discord.TextChannel):
+    await sender.send(**args)
+  elif isinstance(sender, discord.commands.context.ApplicationContext):
+    await sender.respond(**args)
+  elif isinstance(sender, discord.Interaction):
+    if not followup:
+      await sender.response.send_message(**args)
+    else:
+      await sender.followup.send(**args)
   else:
-    await channel.send(embed=embeds)
-
-async def respond_send_match_list_embedded(ctx, embed_title, matches_ambig, session=None, bot=None):
-  if session is None:
-    with Session.begin() as session:
-      return await channel_send_match_list_embedded(ctx, embed_title, matches_ambig, session)
-  embeds = create_match_list_embedded(embed_title, matches_ambig, session)
-  if isinstance(embeds, list):
-    for i, embedd in enumerate(embeds):
-      if i == 0:
-        await ctx.respond(embed=embedd, view=MatchListView(bot, matches_ambig))
-      else:
-        await ctx.interaction.followup.send(embed=embedd)
-  else:
-    await ctx.respond(embed=embeds, view=MatchListView(bot, matches_ambig))
-
+    print("Error: sender is not a valid type", type(sender))
+  
 def create_bet_hidden_embedded(bet_ambig, title, session=None):
   if session is None:
     with Session.begin() as session:
