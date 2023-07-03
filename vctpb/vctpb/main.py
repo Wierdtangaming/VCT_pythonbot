@@ -197,6 +197,7 @@ async def on_ready():
     print("-----------Bot Failed to Start-----------")
     quit()
   bot.add_view(MatchView(bot, None))
+  bot.add_view(BetView(bot, None))
 
 
 @tasks.loop(hours=1)
@@ -537,13 +538,13 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
     user = bet.user
     if bet.user_id == ctx.user.id or bet.hidden == False:
       embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
-      inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden)
+      inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden, view=BetView(bot, bet))
       if not bet.hidden:
         await bet.message_ids.append(inter)
     else:
       embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
-      
-      inter = await ctx.respond(embed=embedd, ephemeral=(bet.hidden and (bet.user_id == ctx.user.id)))
+      ephemeral = (bet.hidden and (bet.user_id == ctx.user.id))
+      inter = await ctx.respond(embed=embedd, ephemeral=ephemeral, view=BetView(bot, bet))
       if not(bet.hidden and (bet.user_id == ctx.user.id)):
         await bet.message_ids.append(inter)
 #bet find end
@@ -602,9 +603,10 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
     user = bet.user
     title = f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}"
     embedd = create_bet_embedded(bet, title, session)
-    inter = await ctx.respond(embed=embedd)
+    view = BetView(bot, bet)
+    inter = await ctx.respond(embed=embedd, view=view)
     await bet.message_ids.append(inter)
-  await edit_all_messages(bot, bet.message_ids, embedd, title)
+  await edit_all_messages(bot, bet.message_ids, embedd, title, view=view)
 #bet show end
 
 
@@ -623,11 +625,10 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
       
     
     
+    hidden_bets = []
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_users_hidden_current_bets(user, session)
-    else:
-      hidden_bets = []
     
     
     if type == 0:
@@ -655,19 +656,21 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
             embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
           else:
             embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          view = BetView(bot, bet)
           if i == 0:
-            msg = await ctx.respond(embed=embedd)
+            msg = await ctx.respond(embed=embedd, view=view)
           else:
-            msg = await ctx.interaction.followup.send(embed=embedd)
+            msg = await ctx.interaction.followup.send(embed=embedd, view=view)
           await bet.message_ids.append(msg)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
           embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          view = BetView(bot, bet)
           if i == 0:
-            await ctx.respond(embed=embedd, ephemeral=True)
+            await ctx.respond(embed=embedd, ephemeral=True, view=view)
           else:
-            await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
+            await ctx.interaction.followup.send(embed=embedd, ephemeral=True, view=view)
 #bet list end
 
 bot.add_application_command(betscg)
@@ -1077,11 +1080,10 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     match = nmatch
     
     
+    hidden_bets = []
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_users_hidden_match_bets(user, match.code, session)
-    else:
-      hidden_bets = []
     
     
     if type == 0:
@@ -1109,19 +1111,21 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
             embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
           else:
             embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          view = BetView(bot, bet)
           if i == 0:
-            msg = await ctx.respond(embed=embedd)
+            msg = await ctx.respond(embed=embedd, view=view)
           else:
-            msg = await ctx.interaction.followup.send(embed=embedd)
+            msg = await ctx.interaction.followup.send(embed=embedd, view=view)
           await bet.message_ids.append(msg)
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
           embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.", session)
+          view = BetView(bot, bet)
           if i == 0:
-            await ctx.respond(embed=embedd, ephemeral=True)
+            await ctx.respond(embed=embedd, ephemeral=True, view=view)
           else:
-            await ctx.interaction.followup.send(embed=embedd, ephemeral=True)
+            await ctx.interaction.followup.send(embed=embedd, ephemeral=True, view=view)
 #match bets end
 
 
@@ -1353,7 +1357,7 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       add_balance_user(user, payout, "id_" + str(bet.code), date)
 
       embedd = create_bet_embedded(bet, "Placeholder", session)
-      msg_ids.append((bet.message_ids, embedd))
+      msg_ids.append((bet.message_ids, embedd, bet))
       users.append(user.code)
 
     no_same_list_user = []
@@ -1362,8 +1366,8 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       embedd = create_user_embedded(user, session)
       await ctx.respond(embed=embedd)
 
-    await edit_all_messages(bot, match.message_ids, m_embedd)
-    [await edit_all_messages(bot, tup[0], tup[1]) for tup in msg_ids]
+  await edit_all_messages(bot, match.message_ids, m_embedd, view=MatchView(bot, match))
+  [await edit_all_messages(bot, tup[0], tup[1], view=BetView(bot, tup[2])) for tup in msg_ids]
 #match reset end
   
   
