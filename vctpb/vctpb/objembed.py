@@ -30,9 +30,9 @@ async def show_bets(match, user, interaction, session):
     embeds.append(hidden_embedd)
   await interaction.response.send_message(embeds=embeds, ephemeral=True)
     
-async def show_match(match, interaction, session):
+async def show_match(match, interaction, session, bot):
   if (embedd := create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)) is not None:
-    await interaction.response.send_message(embed=embedd, ephemeral=True)
+    await interaction.response.send_message(embed=embedd, ephemeral=True, view=MatchView(bot, match))
   else:
     await interaction.response.send_message("Match not found. Report the bug.", ephemeral=True)
 
@@ -166,18 +166,18 @@ class BetView(View):
       
       await delete_from_db(bet, self.bot, session=session)
   
+  @discord.ui.button(label='Show Match', custom_id="bet_show_match", style=discord.ButtonStyle.primary, row=1)
+  async def show_match_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(interaction, session)) is None: return
+      await show_match(match, interaction, session, self.bot)
+      
   @discord.ui.button(label='Show Bets', custom_id="bet_show_bets", style=discord.ButtonStyle.primary, row=1)
   async def show_bets_callback(self, button, interaction):
     with Session.begin() as session:
       if (match := await self.get_match(interaction, session)) is None: return
       user = get_from_db("User", interaction.user.id, session)
       await show_bets(match, user, interaction, session)
-  
-  @discord.ui.button(label='Show Match', custom_id="bet_show_match", style=discord.ButtonStyle.primary, row=1)
-  async def show_match_callback(self, button, interaction):
-    with Session.begin() as session:
-      if (match := await self.get_match(interaction, session)) is None: return
-      await show_match(match, interaction, session)
   
   
 class MatchListView(View):
@@ -215,7 +215,7 @@ class MatchListView(View):
   async def match_list_callback(self, button, interaction):
     with Session.begin() as session:
       if (match := await self.get_match(button, interaction, session)) is None: return
-      await create_edit_bet(interaction, -1, -1, match, session, self.bot)
+      await show_match(match, interaction, session, self.bot)
   
   
 
