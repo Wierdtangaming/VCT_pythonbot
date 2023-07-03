@@ -198,6 +198,7 @@ async def on_ready():
     quit()
   bot.add_view(MatchView(bot, None))
   bot.add_view(BetView(bot, None))
+  bot.add_view(MatchListView(bot, None))
 
 
 @tasks.loop(hours=1)
@@ -350,17 +351,13 @@ async def award_rename(ctx, user: Option(discord.Member, "User you want to award
     
     award_labels = user.get_award_strings()
     
-    if len(award) == 8:
-      if award_label.endswith(award):
+    for award_label in award_labels:
+      if award_label == award:
         award = award_label
+        break
     else:
-      for award_label in award_labels:
-        if award_label == award:
-          award = award_label
-          break
-      else:
-        await ctx.respond("Award not found.", ephemeral = True)
-        return
+      await ctx.respond("Award not found.", ephemeral = True)
+      return
       
     users = get_all_db("User", session)
     
@@ -395,17 +392,13 @@ async def award_rename(ctx, user: Option(discord.Member, "User you want to award
     
     award_labels = user.get_award_strings()
     
-    if len(award) == 8:
-      if award_label.endswith(award):
+    for award_label in award_labels:
+      if award_label == award:
         award = award_label
+        break
     else:
-      for award_label in award_labels:
-        if award_label == award:
-          award = award_label
-          break
-      else:
-        await ctx.respond("Award not found.", ephemeral = True)
-        return
+      await ctx.respond("Award not found.", ephemeral = True)
+      return
     
     if user.change_award_amount(award, amount, session) is None:
       print(f"change award name not found. {award}  --  {amount}  --  {user.code}.")
@@ -1260,7 +1253,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 
     if type == 0:
       #short
-      await respond_send_match_list_embedded(ctx, "Matches: ", matches, session)
+      await respond_send_match_list_embedded(ctx, "Matches: ", matches, session, bot=bot)
     elif type == 1:
       #full
       for i, match in enumerate(matches):

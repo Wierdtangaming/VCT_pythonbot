@@ -1,4 +1,6 @@
 import discord
+from discord.ui import View, Button
+from discord.ui.item import ItemCallbackType
 from dbinterface import get_mult_from_db, get_condition_db, get_from_db, delete_from_db
 from Match import Match
 from Bet import Bet
@@ -9,6 +11,7 @@ from colorinterface import hex_to_tuple
 import math
 import emoji
 from sqlaobjs import Session
+from functools import partial
 
 
 async def show_bets(match, user, interaction, session):
@@ -23,7 +26,7 @@ async def show_bets(match, user, interaction, session):
   embeds = []
   if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
     embeds.append(embedd)
-  if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", bets, True, session)) is not None:
+  if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
     embeds.append(hidden_embedd)
   await interaction.response.send_message(embeds=embeds, ephemeral=True)
     
@@ -46,7 +49,7 @@ async def create_edit_bet(interaction, hide, team, match, session, bot):
     else:
       await interaction.response.send_message("Betting on this match has closed.", ephemeral=True)
       
-class MatchView(discord.ui.View): 
+class MatchView(View): 
   def __init__(self, bot, match):
     self.bot = bot
     super().__init__(timeout=None)
@@ -73,7 +76,7 @@ class MatchView(discord.ui.View):
     match = None
     fields = interaction.message.embeds[0].fields
     for field in fields[::-1]:
-      if field.name == "Identifier:":
+      if field.name == "ID:":
         match_id = field.value
         match = get_from_db("Match", match_id, session)
         break
@@ -113,12 +116,12 @@ class MatchView(discord.ui.View):
       user = get_from_db("User", interaction.user.id, session)
       await show_bets(match, user, interaction, session)
     
-class BetView(discord.ui.View):
+class BetView(View):
   async def get_bet(self, interaction, session):
     bet = None
     fields = interaction.message.embeds[0].fields
     for field in fields[::-1]:
-      if field.name == "Identifier:":
+      if field.name == "ID:":
         bet_id = field.value
         bet = get_from_db("Bet", bet_id, session)
         break
@@ -177,6 +180,44 @@ class BetView(discord.ui.View):
       await show_match(match, interaction, session)
   
   
+class MatchListView(View):
+  async def get_match(self, button, interaction, session):
+    match = None
+    fields = interaction.message.embeds[0].fields
+    view = self.from_message(interaction.message)
+    label = view.get_item(button.custom_id).label # type: ignore
+    for field in fields:
+      if label in field.name:
+        match_id = field.name.split("ID: ")[-1]
+        match = get_from_db("Match", match_id, session)
+        break
+    if match is None and interaction is not None:
+      await interaction.response.send_message("Match not found. Report the bug.", ephemeral=True)
+    return match
+  
+  def __init__(self, bot, matches):
+    self.bot = bot
+    super().__init__(timeout=None)
+    
+    if matches is not None:
+      i = 0
+      for match in matches:
+        button = Button(label=f"{match.t1} vs {match.t2}", custom_id=f"match_list_{i}", style=discord.ButtonStyle.primary)
+        self.add_item(button)
+        button.callback = partial(self.match_list_callback, button)
+        i += 1
+    else:
+      for i in range(0, 25):
+        button = Button(label=str(i), custom_id=f"match_list_{i}", style=discord.ButtonStyle.primary, disabled=True)
+        self.add_item(button)
+        button.callback = partial(self.match_list_callback, button)
+  
+  async def match_list_callback(self, button, interaction):
+    with Session.begin() as session:
+      if (match := await self.get_match(button, interaction, session)) is None: return
+      await create_edit_bet(interaction, -1, -1, match, session, self.bot)
+  
+  
 
 def create_match_embedded(match_ambig, title, session=None):
   if session is None:
@@ -188,7 +229,7 @@ def create_match_embedded(match_ambig, title, session=None):
     return None
   
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
-  embed.add_field(name="Teams:", value=match.t1 + " vs " + match.t2, inline=True)
+  embed.add_field(name="Teams:", value=f"{match.t1} vs {match.t2}", inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
   embed.add_field(name="Tournament Name:", value=match.tournament_name, inline=True)
   embed.add_field(name="Odds Source:", value=match.odds_source, inline=True)
@@ -217,7 +258,7 @@ def create_match_embedded(match_ambig, title, session=None):
 
     embed.add_field(name="Winner:", value=winner_team, inline=True)
     
-  embed.add_field(name="Identifier:", value=match.code, inline=True)
+  embed.add_field(name="ID:", value=match.code, inline=True)
   return embed
 
 
@@ -237,7 +278,7 @@ def create_match_list_embedded(embed_title, matches_ambig, session=None):
   if all(isinstance(s, str) for s in matches_ambig):
     matches_ambig = get_mult_from_db("Match", matches_ambig, session)
   for match in matches_ambig:
-    embed.add_field(name=f"Teams: {match.t1} vs {match.t2}, Odds: {match.t1o} / {match.t2o}" , value="", inline=False)
+    embed.add_field(name=f"{match.t1} vs {match.t2}, Odds: {match.t1o} / {match.t2o}, ID: {match.code}", value="", inline=False)
   return embed
 
 async def channel_send_match_list_embedded(channel, embed_title, matches_ambig, session=None):
@@ -252,20 +293,19 @@ async def channel_send_match_list_embedded(channel, embed_title, matches_ambig, 
   else:
     await channel.send(embed=embeds)
 
-async def respond_send_match_list_embedded(ctx, embed_title, matches_ambig, session=None):
+async def respond_send_match_list_embedded(ctx, embed_title, matches_ambig, session=None, bot=None):
   if session is None:
     with Session.begin() as session:
       return await channel_send_match_list_embedded(ctx, embed_title, matches_ambig, session)
-    
   embeds = create_match_list_embedded(embed_title, matches_ambig, session)
   if isinstance(embeds, list):
     for i, embedd in enumerate(embeds):
       if i == 0:
-        await ctx.respond(embed=embedd)
+        await ctx.respond(embed=embedd, view=MatchListView(bot, matches_ambig))
       else:
         await ctx.interaction.followup.send(embed=embedd)
   else:
-    await ctx.respond(embed=embeds)
+    await ctx.respond(embed=embeds, view=MatchListView(bot, matches_ambig))
 
 def create_bet_hidden_embedded(bet_ambig, title, session=None):
   if session is None:
@@ -295,8 +335,8 @@ def create_bet_hidden_embedded(bet_ambig, title, session=None):
 
   #date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   #embed.add_field(name="Created On:", value=date_formatted, inline=True)
-  #embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
-  embed.add_field(name="Identifier:", value=str(bet.code), inline=True)
+  #embed.add_field(name="Match ID:", value=bet.match_id, inline=True)
+  embed.add_field(name="ID:", value=str(bet.code), inline=True)
   return embed
 
 
@@ -331,9 +371,9 @@ def create_bet_embedded(bet_ambig, title, session=None):
 
   #date_formatted = bet.date_created.strftime("%m/%d/%Y at %H:%M:%S")
   #embed.add_field(name="Created On:", value=date_formatted, inline=True)
-  #embed.add_field(name="Match Identifier:", value=bet.match_id, inline=True)
+  #embed.add_field(name="Match ID:", value=bet.match_id, inline=True)
   #embed.add_field(name="Visiblity:", value=("Hidden" if bet.hidden else "Shown"), inline=True)
-  embed.add_field(name="Identifier:", value=str(bet.code), inline=True)
+  embed.add_field(name="ID:", value=str(bet.code), inline=True)
   return embed
 
 
