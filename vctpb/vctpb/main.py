@@ -199,6 +199,7 @@ async def on_ready():
   bot.add_view(MatchView(bot, None))
   bot.add_view(BetView(bot, None))
   bot.add_view(MatchListView(bot, None))
+  bot.add_view(BetListView(bot))
 
 
 @tasks.loop(hours=1)
@@ -607,18 +608,9 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
 @betscg.command(name = "list", description = "Sends embed with all undecided bets. If type is full it sends the whole embed of each bet.")
 async def bet_list(ctx, type: Option(int, "If type is full it sends the whole embed of each bet.", choices = list_choices, default = 0, required = False), show_hidden: Option(int, "Show your hidden bets? Defualt is Yes.", choices = yes_no_choices, default = 1, required = False)):
   with Session.begin() as session:
-    #debug: Option(int, "Show debug info? Defualt is No.", choices = yes_no_choices, default = 0, required = False)
-    #if debug == 1:
-    #  bets = get_current_bets(session)
-    #  if (embedd := create_bet_list_embedded("Bets:", bets, True, session)) is not None:
-    #    await ctx.respond(embed=embedd)
-    #  else:
-    #    await ctx.respond("No bets found.")
-    #  return
-      
-    
     
     hidden_bets = []
+    user = None
     if show_hidden == 1:
       if (user := await get_user_from_ctx(ctx, session=session)) is not None:
         hidden_bets = get_users_hidden_current_bets(user, session)
@@ -626,15 +618,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     
     if type == 0:
       #short
-      bets = get_current_bets(session)
-      if len(bets) == 0:
-        await ctx.respond("No undecided bets.", ephemeral=True)
-        return
-      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
-        await ctx.respond(embed=embedd)
-      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
-        await ctx.respond(embed=hidden_embedd, ephemeral=True)
-          
+      await send_bet_list_embedded("Bets: ", get_current_bets(session), bot, ctx, user=user) 
     
     elif type == 1:
       #full
@@ -1071,7 +1055,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     if (nmatch := await obj_from_autocomplete_tuple(None, get_current_matches(session), match, "Match", session)) is None:
       if (nmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: return
     match = nmatch
-    
+    if (user := await get_user_from_ctx(ctx, session=session)) is None: return
     
     hidden_bets = []
     if show_hidden == 1:
@@ -1081,14 +1065,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     
     if type == 0:
       #short
-      bets = match.bets
-      if len(bets) == 0:
-        await ctx.respond("No undecided bets.", ephemeral=True)
-        return
-      if (embedd := create_bet_list_embedded("Bets:", bets, False, session)) is not None:
-        await ctx.respond(embed=embedd)
-      if (hidden_embedd := create_bet_list_embedded("Your Hidden Bets:", hidden_bets, True, session)) is not None:
-        await ctx.respond(embed=hidden_embedd, ephemeral=True)
+      await send_bet_list_embedded("Bets: ", get_current_bets(session), bot, ctx, user=user)
           
     
     elif type == 1:

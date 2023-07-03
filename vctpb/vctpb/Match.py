@@ -128,7 +128,7 @@ class Match():
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
   async def close(self, bot, session, ctx=None, close_session=True):
-    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView, BetView
+    from objembed import send_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView, BetView
     from convert import edit_all_messages
     self.date_closed = get_date()
     old_hidden = []
@@ -141,9 +141,7 @@ class Match():
     if ctx is not None:
       msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embed=embedd)
       await self.message_ids.append(msg)
-      bet_list = create_bet_list_embedded(f"All bets on {self.t1} vs {self.t2}:", self.bets, True, session)
-      if bet_list is not None:
-        await ctx.followup.send(content="All bets on this match:", embed=bet_list)
+      await send_bet_list_embedded("Bets: ", self.bets, bot, ctx, followup=True)
     if close_session:
       session.commit()
       session.close()

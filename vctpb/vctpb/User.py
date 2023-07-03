@@ -8,7 +8,7 @@ import random
 import math
 import secrets
 import sys
-from sqlalchemy import Column, String, BOOLEAN, ForeignKey, Table
+from sqlalchemy import Column, String, BOOLEAN, ForeignKey, Table, Integer
 from sqlalchemy.orm import relationship
 from sqltypes import JSONLIST
 from sqlalchemy.ext.mutable import MutableList
@@ -28,7 +28,7 @@ alert_association_table = Table(
 class User():
   __tablename__ = "user"
   
-  code = Column(String(32), primary_key=True)
+  code = Column(Integer, primary_key=True)
   username = Column(String(32), nullable=False)
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")
