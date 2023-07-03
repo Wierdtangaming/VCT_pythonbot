@@ -128,7 +128,7 @@ class Match():
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
   async def close(self, bot, session, ctx=None, close_session=True):
-    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView
+    from objembed import create_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView, BetView
     from convert import edit_all_messages
     self.date_closed = get_date()
     old_hidden = []
@@ -150,7 +150,7 @@ class Match():
     await edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self))
     for bet in old_hidden:
       embedd = create_bet_embedded(bet, "Placeholder", session)
-      await edit_all_messages(bot, bet.message_ids, embedd)
+      await edit_all_messages(bot, bet.message_ids, embedd, view=BetView(bot, bet))
   
   async def open(self, bot, session, ctx=None, close_session=True):
     from objembed import create_match_embedded, MatchView
@@ -174,7 +174,7 @@ class Match():
     if session is None:
       with Session.begin() as session:
         return await self.set_winner(team_num, bot, ctx, session)
-    from objembed import create_match_embedded, create_bet_embedded, create_payout_list_embedded
+    from objembed import create_match_embedded, create_bet_embedded, create_payout_list_embedded, BetView
     from dbinterface import get_all_db, get_channel_from_db
     from User import add_balance_user, get_first_place
     from convert import edit_all_messages
@@ -260,7 +260,7 @@ class Match():
       session.commit()
       session.close()
     await edit_all_messages(bot, self.message_ids, m_embedd)
-    [await edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}")) for tup in msg_ids]
+    [await edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}"), view=BetView(bot, tup[0])) for tup in msg_ids]
   
 def is_valid_match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, winner, color, creator_id, date_created, date_winner, date_closed, bet_ids, message_ids):
   errors = [False for _ in range(17)]

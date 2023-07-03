@@ -8,7 +8,7 @@ from dbinterface import get_unique_code, add_to_db, get_channel_from_db, get_fro
 from Match import Match
 from Bet import Bet
 from User import User
-from objembed import create_match_embedded, create_bet_embedded, create_bet_hidden_embedded, MatchView
+from objembed import create_match_embedded, create_bet_embedded, create_bet_hidden_embedded, MatchView, BetView
 from convert import edit_all_messages
 
 #match create modal start
@@ -256,6 +256,8 @@ class BetCreateModal(Modal):
     super().__init__(*args, **kwargs)
     self.match = match
     self.user = user
+    if hidden == -1:
+      hidden = 0
     self.hidden = hidden
     self.bot = bot
     if error[0] is None: 
@@ -368,14 +370,14 @@ class BetCreateModal(Modal):
         shown_embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
         
       if (channel := await self.bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
-        msg = await interaction.response.send_message(embed=shown_embedd)
+        msg = await interaction.response.send_message(embed=shown_embedd, view=BetView(self.bot, bet))
       else:
         await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral=True)
         msg = await channel.send(embed=shown_embedd)
         
       if self.hidden:
         embedd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
-        inter = await interaction.followup.send(embed = embedd, ephemeral = True)
+        inter = await interaction.followup.send(embed = embedd, ephemeral = True, view=BetView(self.bot, bet))
       await bet.message_ids.append(msg)
 #bet create modal end
 
@@ -388,6 +390,8 @@ class BetEditModal(Modal):
     self.match = match
     self.user = user
     self.bet = bet
+    if hide == -1:
+      hide = bet.hidden
     self.hide = hide
     self.bot = bot
     
@@ -510,13 +514,13 @@ class BetEditModal(Modal):
       else:
         title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
         embedd = create_bet_embedded(bet, title, session)
-      
+      view=BetView(self.bot, bet)
       if not bet.hidden:
-        msg = await interaction.response.send_message(embed=embedd)
+        msg = await interaction.response.send_message(embed=embedd, view=view)
         await bet.message_ids.append(msg)
         
       if self.hide:
         embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
-        inter = await interaction.response.send_message(embed = embeddd, ephemeral = True) 
-    await edit_all_messages(self.bot, bet.message_ids, embedd, title)
+        inter = await interaction.response.send_message(embed = embeddd, ephemeral = True, view=view) 
+    await edit_all_messages(self.bot, bet.message_ids, embedd, title, view=view)
 #bet edit modal end
