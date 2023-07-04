@@ -56,7 +56,7 @@ from vlrinterface import generate_matches_from_vlr, get_code, generate_tournamen
 from sqlaobjs import Session, mapper_registry, Engine
 from utils import *
 from modals import MatchCreateModal, MatchEditModal, BetCreateModal, BetEditModal
-
+from views import *
 # issue with Option in command function
 # pyright: reportGeneralTypeIssues=false
 
@@ -118,19 +118,11 @@ def get_last_odds_source(amount, session=None):
         return list(name_set)[0]
       return list(name_set)
 
-def get_last_tournament_and_odds(session=None):
-  match = get_new_db("Match", session)
-  return (match.tournament_name, match.odds_source)
-
       
-def rename_balance_id(user_ambig, balance_id, new_balance_id, session=None):
-  if session is None:
-    with Session.begin() as session:
-      return rename_balance_id(user_ambig, balance_id, new_balance_id, session)
-  
-  user = ambig_to_obj(user_ambig, "User", session)
+def rename_balance_id(user, balance_id, new_balance_id):
   if user is None:
     return "User not found"
+  
   indices = [i for i, x in enumerate(user.balances) if x[0] == balance_id]
   if len(indices) > 1:
     return "More than one balance_id found"
@@ -140,13 +132,7 @@ def rename_balance_id(user_ambig, balance_id, new_balance_id, session=None):
     balat = user.balances[indices[0]]
     user.balances[indices[0]] = (new_balance_id, balat[1], balat[2])
 
-
-
-def print_all_balances(user_ambig, session=None):
-  user = ambig_to_obj(user_ambig, "User", session)
-  if user is None:
-    return None
-
+def print_all_balances(user):
   [print(bal[0], bal[1]) for bal in user.balances]
 
 
@@ -208,8 +194,6 @@ async def auto_backup_timer():
     backup_full()
   except:
     print("-----------Backup Failed-----------")
-    
-
 
 @tasks.loop(minutes=5)
 async def auto_generate_matches_from_vlr_timer():
@@ -236,8 +220,6 @@ open_close_choices = [
   OptionChoice(name="close", value=1),
 ]
 #choices end
-
-
 
 
 #assign start
@@ -308,7 +290,7 @@ async def award_give(ctx,
       print(bet_id)
       first = True
       for user in users:
-        abu = add_balance_user(user, amount, bet_id, get_date(), session)
+        abu = add_balance_user(user, amount, bet_id, get_date())
         embedd = create_user_embedded(abu, session)
         if first:
           await ctx.respond(embed=embedd)
@@ -322,7 +304,7 @@ async def award_give(ctx,
       if (user := await get_user_from_ctx(ctx, user, session)) is None: return
       bet_id = "award_" + user.get_unique_bal_code() + "_" + description
       print(bet_id)
-      abu = add_balance_user(user, amount, bet_id, get_date(), session)
+      abu = add_balance_user(user, amount, bet_id, get_date())
       if abu is None:
         await ctx.respond("User not found.", ephemeral = True)
       else:
@@ -618,7 +600,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
     
     if type == 0:
       #short
-      await send_bet_list_embedded("Bets: ", get_current_bets(session), bot, ctx, user=user) 
+      await send_bet_list_embedded("Bets", get_current_bets(session), bot, ctx, user=user) 
     
     elif type == 1:
       #full
@@ -764,7 +746,7 @@ profile = SlashCommandGroup(
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session)) is None: return
     if color_name == "First place gold":
       if user.is_in_first_place(get_all_db("User", session)):
         user.set_color(xkcd_colors["xkcd:gold"][1:], session)
@@ -795,7 +777,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
 @profile.command(name = "username", description = "Sets the username for embeds.")
 async def profile_username(ctx, username: Option(str, "New username.", required=False, max_length=32)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session)) is None: return
     if username is None:
       await ctx.respond(f"Your username is {user.username}.", ephemeral = True)
       return
@@ -976,7 +958,7 @@ loanscg = SlashCommandGroup(
 @loanscg.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session)) is None: return
 
     if user.get_clean_bal_loan() >= 100:
       await ctx.respond("You must have less than 100 to make a loan", ephemeral = True)
@@ -999,7 +981,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 @loanscg.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session)) is None: return
       
     loan_amount = user.loan_bal()
     if loan_amount == 0:
@@ -1065,7 +1047,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
     
     if type == 0:
       #short
-      await send_bet_list_embedded("Bets: ", get_current_bets(session), bot, ctx, user=user)
+      await send_bet_list_embedded("Bets", get_current_bets(session), bot, ctx, user=user)
           
     
     elif type == 1:
@@ -1221,7 +1203,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
 
     if type == 0:
       #short
-      await send_match_list_embedded(f"Matches: ", matches, bot, ctx)
+      await send_match_list_embedded(f"Matches", matches, bot, ctx)
     elif type == 1:
       #full
       for i, match in enumerate(matches):
@@ -1350,11 +1332,11 @@ async def backup(ctx):
 @bot.slash_command(name = "hide_from_leaderboard", description = "Do not user command if not Pig, Hides you from alot of interations.")
 async def hide_from_leaderboard(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(None, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     user.hidden = not user.hidden
     print(user.hidden)
 
-#tournament start
+#tournament start 
 tournamentsgc = SlashCommandGroup(
   name = "tournament", 
   description = "Start, color, and rename tournaments.",
@@ -1365,7 +1347,7 @@ tournamentsgc = SlashCommandGroup(
 @tournamentsgc.command(name = "alert", description = "Get alert when a tournament is created.")
 async def tournament_alert(ctx, tournament: Option(str, "Tournament you want to get alerts for.", autocomplete = tournament_autocomplete)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(None, ctx.author, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, ctx.author, session)) is None: return
     if (ntournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), tournament, "Tournament", session)) is None:
       await ctx.respond(f'Tournament "{tournament}" not found.', ephemeral = True)
       return
@@ -1409,7 +1391,7 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
     
     if type == 0:
       #short
-      await send_match_list_embedded(f"Matches in {tournament.name}: ", matches, bot, ctx)
+      await send_match_list_embedded(f"Matches in {tournament.name}", matches, bot, ctx)
     elif type == 1:
       #full
       for i, match in enumerate(matches):

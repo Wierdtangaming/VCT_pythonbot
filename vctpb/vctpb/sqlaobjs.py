@@ -1,5 +1,4 @@
-from sqlalchemy.orm import registry
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, registry
 from sqlalchemy import create_engine
 
 

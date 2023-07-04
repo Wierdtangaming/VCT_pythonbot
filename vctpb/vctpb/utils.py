@@ -8,7 +8,7 @@ import mixbox
 
 import matplotlib.colors as mcolors
 
-xkcd_colors = mcolors.XKCD_COLORS
+xkcd_colors = mcolors.XKCD_COLORS # type: ignore
 
 def get_xkcd_color(name):
   return xkcd_colors.get(f"xkcd:{name.lower()}")[-6:]
@@ -52,9 +52,6 @@ def get_random_hex_color():
   return str(secrets.token_hex(3))
 
 def hex_to_tuple(hex):
-  if len(hex) != 6:
-    return None
-    
   return tuple(int(hex[i:i+2], 16) for i in (0, 2, 4))
 
 def tuple_to_hex(tup):

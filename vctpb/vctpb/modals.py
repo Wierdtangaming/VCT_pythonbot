@@ -8,14 +8,15 @@ from dbinterface import get_unique_code, add_to_db, get_channel_from_db, get_fro
 from Match import Match
 from Bet import Bet
 from User import User
-from objembed import create_match_embedded, create_bet_embedded, create_bet_hidden_embedded, MatchView, BetView
+from views import MatchView, BetView
+from objembed import create_match_embedded, create_bet_embedded, create_bet_hidden_embedded
 from convert import edit_all_messages
 
 #match create modal start
 class MatchCreateModal(Modal):
   def __init__(self, session, balance_odds=1, soup=None, vlr_code=None, bot=None, *args, **kwargs) -> None:
     #time function
-    time = datetime.now();
+    time = datetime.now()
     
     super().__init__(*args, **kwargs)
       
@@ -48,7 +49,7 @@ class MatchCreateModal(Modal):
     if t1oo is not None:
       odds_source = "VLR.gg"
     
-    if team1 is not None:
+    if team1 is not None and team2 is not None:
       t1, t2 = team1.name, team2.name
       self.team1_name = team1.name
       self.team2_name = team2.name
@@ -74,14 +75,18 @@ class MatchCreateModal(Modal):
   async def callback(self, interaction: discord.Interaction):
     with Session.begin() as session:
       wait_msg = await interaction.response.send_message(f"Generating Match.", ephemeral=True)
+      if (self.children[0].value is None) or (self.children[1].value is None) or (self.children[2].value is None) or (self.children[3].value is None) or (self.children[4].value is None):
+        await wait_msg.edit_original_message(content="Error in match creation, report bug.")
+        return
+        
       team_one = self.children[0].value.strip()
       team_two = self.children[1].value.strip()
       
       t1_code, t2_code = None, None
       if self.team1_name == team_one:
-        t1_code = self.team1_vlr_code;
+        t1_code = self.team1_vlr_code
       if self.team2_name == team_two:
-        t2_code = self.team2_vlr_code;
+        t2_code = self.team2_vlr_code
         
       if (t1_code is None) or (t2_code is None):
         self.vlr_code = None

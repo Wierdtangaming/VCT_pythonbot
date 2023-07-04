@@ -5,3 +5,4 @@
 settings.ini
 */savedata
 __pycache__/
+.vscode

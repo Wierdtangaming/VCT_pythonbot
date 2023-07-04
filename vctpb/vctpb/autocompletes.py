@@ -234,7 +234,8 @@ async def team_autocomplete(ctx: discord.AutocompleteContext):
 
 #season autocomplete start
 async def seasons_autocomplete(ctx: discord.AutocompleteContext):
-  user = ambig_to_obj(ctx.interaction.user, "User")
+  
+  if(user := get_user_from_ctx(ctx, send=False)) is None: return []
   
   reset_labels = user.get_reset_strings()
   reset_labels.reverse()

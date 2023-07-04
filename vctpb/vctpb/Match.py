@@ -2,7 +2,7 @@ from decimal import Decimal
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from sqltypes import JSONLIST, DECIMAL, MsgMutableList
+from sqltypes import JSONList, DECIMAL, MsgList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from utils import mix_colors, get_date, get_random_hex_color
@@ -35,7 +35,7 @@ class Match():
   date_winner = Column(DateTime(timezone = True))
   date_closed = Column(DateTime(timezone = True))
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
-  message_ids = Column(MsgMutableList.as_mutable(JSONLIST), nullable=False) #array of int
+  message_ids = Column(MsgList.as_mutable(JSONList), nullable=False) #array of int
   alert = Column(Boolean, nullable=False, default=False)
   
   @property
@@ -76,7 +76,8 @@ class Match():
   
   async def send_warning(self, bot, session):
     from dbinterface import get_channel_from_db
-    from objembed import create_match_embedded, MatchView
+    from views import MatchView
+    from objembed import create_match_embedded
     from convert import id_to_mention
     self.alert = True
     if (match_channel := await bot.fetch_channel(get_channel_from_db("match", session))) is None:
@@ -129,7 +130,8 @@ class Match():
     return f"Match: {self.code}, Teams: {self.t1} vs {self.t2}, Odds: {self.t1o} vs {self.t2o}, Tournament Name: {self.tournament_name}"
   
   async def close(self, bot, session, ctx=None, close_session=True):
-    from objembed import send_bet_list_embedded, create_match_embedded, create_bet_embedded, MatchView, BetView
+    from views import MatchView, BetView
+    from objembed import send_bet_list_embedded, create_match_embedded, create_bet_embedded
     from convert import edit_all_messages
     self.date_closed = get_date()
     old_hidden = []
@@ -142,20 +144,21 @@ class Match():
     if ctx is not None:
       msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embed=embedd)
       await self.message_ids.append(msg)
-      await send_bet_list_embedded("Bets: ", self.bets, bot, ctx, followup=True)
+      await send_bet_list_embedded("Bets", self.bets, bot, ctx, followup=True)
     if close_session:
       session.commit()
       session.close()
     tasks = []
     tasks.append(edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self)))
     for bet in self.bets:
-      embedd = create_bet_embedded(bet, "Placeholder", session)
+      embedd = create_bet_embedded(bet, "Placeholder")
       tasks.append(edit_all_messages(bot, bet.message_ids, embedd, view=BetView(bot, bet)))
     await asyncio.gather(*tasks)
       
   
   async def open(self, bot, session, ctx=None, close_session=True):
-    from objembed import create_match_embedded, MatchView
+    from views import MatchView
+    from objembed import create_match_embedded
     from convert import edit_all_messages
     if self.date_closed == None:
       if ctx is not None:
@@ -173,13 +176,11 @@ class Match():
   
   
   async def set_winner(self, team_num, bot, ctx=None, session=None, close_session=True):
-    if session is None:
-      with Session.begin() as session:
-        return await self.set_winner(team_num, bot, ctx, session)
-    from objembed import create_match_embedded, create_bet_embedded, create_payout_list_embedded, BetView
+    from objembed import create_match_embedded, create_bet_embedded, create_payout_list_embedded
     from dbinterface import get_all_db, get_channel_from_db
     from User import add_balance_user, get_first_place
     from convert import edit_all_messages
+    from views import MatchView, BetView
     
     time = get_date()
     
@@ -229,10 +230,10 @@ class Match():
         payout += bet.amount_bet * odds
       user = bet.user
       new_users.append(user)
-      add_balance_user(user, payout, "id_" + str(bet.code), date, session)
+      add_balance_user(user, payout, "id_" + str(bet.code), date)
       while user.loan_bal() != 0 and user.get_clean_bal_loan() > 500:
         user.pay_loan(date)
-      embedd = create_bet_embedded(bet, "Placeholder", session)
+      embedd = create_bet_embedded(bet, "Placeholder")
       msg_ids.append((bet, embedd))
       bet_user_payouts.append((bet, user, payout))
 
@@ -258,11 +259,11 @@ class Match():
         if leader.has_leader_profile():
           print("start")
           leader.set_color(get_random_hex_color(), session)
-    if close_session:
+    if close_session and session is not None:
       session.commit()
       session.close()
     tasks = []
-    tasks.append(edit_all_messages(bot, self.message_ids, m_embedd))
+    tasks.append(edit_all_messages(bot, self.message_ids, m_embedd, view=MatchView(bot, self)))
     [tasks.append(edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}"), view=BetView(bot, tup[0]))) for tup in msg_ids]
     asyncio.gather(*tasks)
   
