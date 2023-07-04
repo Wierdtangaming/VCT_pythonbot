@@ -1327,8 +1327,10 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
       embedd = create_user_embedded(user, session)
       await ctx.respond(embed=embedd)
 
-  await edit_all_messages(bot, match.message_ids, m_embedd, view=MatchView(bot, match))
-  [await edit_all_messages(bot, tup[0], tup[1], view=BetView(bot, tup[2])) for tup in msg_ids]
+  tasks = []
+  tasks.append(edit_all_messages(bot, match.message_ids, m_embedd, view=MatchView(bot, match)))
+  [tasks.append(edit_all_messages(bot, tup[0], tup[1], view=BetView(bot, tup[2]))) for tup in msg_ids]
+  await asyncio.gather(*tasks)
 #match reset end
   
   

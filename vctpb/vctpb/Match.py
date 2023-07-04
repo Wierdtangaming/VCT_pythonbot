@@ -6,6 +6,7 @@ from sqltypes import JSONLIST, DECIMAL, MsgMutableList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from utils import mix_colors, get_date, get_random_hex_color
+import asyncio
 
 @mapper_registry.mapped
 class Match():
@@ -145,10 +146,13 @@ class Match():
     if close_session:
       session.commit()
       session.close()
-    await edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self))
-    for bet in old_hidden:
+    tasks = []
+    tasks.append(edit_all_messages(bot, self.message_ids, embedd, view=MatchView(bot, self)))
+    for bet in self.bets:
       embedd = create_bet_embedded(bet, "Placeholder", session)
-      await edit_all_messages(bot, bet.message_ids, embedd, view=BetView(bot, bet))
+      tasks.append(edit_all_messages(bot, bet.message_ids, embedd, view=BetView(bot, bet)))
+    await asyncio.gather(*tasks)
+      
   
   async def open(self, bot, session, ctx=None, close_session=True):
     from objembed import create_match_embedded, MatchView
@@ -257,8 +261,10 @@ class Match():
     if close_session:
       session.commit()
       session.close()
-    await edit_all_messages(bot, self.message_ids, m_embedd)
-    [await edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}"), view=BetView(bot, tup[0])) for tup in msg_ids]
+    tasks = []
+    tasks.append(edit_all_messages(bot, self.message_ids, m_embedd))
+    [tasks.append(edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}"), view=BetView(bot, tup[0]))) for tup in msg_ids]
+    asyncio.gather(*tasks)
   
 def is_valid_match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, winner, color, creator_id, date_created, date_winner, date_closed, bet_ids, message_ids):
   errors = [False for _ in range(17)]
