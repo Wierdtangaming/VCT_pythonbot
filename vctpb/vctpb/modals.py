@@ -244,8 +244,9 @@ class MatchEditModal(Modal):
       embedd = create_match_embedded(match, title, session)
       
       inter = await interaction.response.send_message(embed=embedd, view=MatchView(self.bot, match))
-      await edit_all_messages(self.bot, match.message_ids, embedd, title)
+      ids = match.message_ids
       await match.message_ids.append(inter)
+    await edit_all_messages(self.bot, ids, embedd, title)
 #match edit modal end
 
 

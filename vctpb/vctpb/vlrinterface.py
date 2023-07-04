@@ -444,6 +444,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
     match.t1o = t1o
     match.t2o = t2o
     embedd = create_match_embedded(match, "Placeholder", session)
+    # works because updating is never time sensitive
     await edit_all_messages(bot, match.message_ids, embedd)
     return None
   
