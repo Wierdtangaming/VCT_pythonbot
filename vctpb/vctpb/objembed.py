@@ -320,6 +320,8 @@ async def send_match_list_embedded(embed_title, matches, bot, sender, followup=F
   args = {"embed": embed, "view": MatchListView(bot, matches), "ephemeral": ephemeral}
   # Send
   if isinstance(sender, discord.TextChannel):
+    # remove ephemeral if it's a text channel
+    args.pop("ephemeral")
     await sender.send(**args)
   elif isinstance(sender, discord.commands.context.ApplicationContext):
     await sender.respond(**args)
