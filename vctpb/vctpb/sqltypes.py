@@ -16,7 +16,6 @@ class MsgMutableList(MutableList):
       return super().append(ambig)
 
 class JSONList(TypeDecorator):
-  
   impl = String
 
   def process_bind_param(self, value, dialect):
@@ -31,7 +30,6 @@ class JSONList(TypeDecorator):
   
   
 class DECIMAL(TypeDecorator):
-      
   impl = String
   
   def load_dialect_impl(self, dialect):

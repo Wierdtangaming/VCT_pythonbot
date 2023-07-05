@@ -61,7 +61,7 @@ def create_match_embedded(match:Match, title):
   return embed
 
 limit = 20
-async def send_match_list_embedded(embed_title, matches, bot, sender, followup=False, ephemeral=False):
+async def send_match_list_embedded(embed_title, matches, bot, sender, followup=False, ephemeral=False, view:int | discord.ui.View=-1, hex=None):
   from views import MatchListView
   follow = followup
   if len(matches) > limit:
@@ -70,13 +70,19 @@ async def send_match_list_embedded(embed_title, matches, bot, sender, followup=F
       follow = True
       matches = matches[limit:]
     return
-  
-  embed = discord.Embed(title=embed_title, color=discord.Color.red())
+  if hex is None:
+    color = discord.Color.red()
+  else:
+    color = discord.Color.from_rgb(*hex_to_tuple(hex))
+  embed = discord.Embed(title=embed_title, color=color)
   for match in matches:
     embed.add_field(name=f"{match.t1} vs {match.t2}, Odds: {match.t1o} / {match.t2o}, ID: {match.code}", value="", inline=False)
   
-  args = {"embed": embed, "view": MatchListView(bot, matches), "ephemeral": ephemeral}
-  
+  args = {"embed": embed, "ephemeral": ephemeral}
+  if view != -1:
+    args["view"] = view
+  else:
+    args["view"] = MatchListView(bot, matches)
   await send_msg(sender, follow, **args)
     
 

@@ -6,11 +6,20 @@ from sqlaobjs import Session
 from functools import partial
 from objembed import send_match_list_embedded, send_bet_list_embedded, create_match_embedded, create_bet_embedded, create_bet_hidden_embedded
 
-async def show_matches(interaction, session, bot):
-  await send_match_list_embedded(f"Matches", get_current_matches(session), bot, interaction, ephemeral=True)
+async def show_match_list(interaction, bot):
+  with Session.begin() as session:
+    await send_match_list_embedded(f"Matches", get_current_matches(session), bot, interaction, ephemeral=True)
   
-async def show_bets(user, interaction, session, bot):
-  await send_bet_list_embedded(f"Bets", get_current_bets(session), bot, interaction, user=user, ephemeral=True)
+async def show_bet_list(interaction, bot):
+  with Session.begin() as session:
+    user = get_from_db("User", interaction.user.id, session)
+    await send_bet_list_embedded(f"Bets", get_current_bets(session), bot, interaction, user=user, ephemeral=True)
+  
+async def show_available_bets(interaction, bot):
+  with Session.begin() as session:
+    user = get_from_db("User", interaction.user.id, session)
+    matches = user.open_matches(session)
+    await send_match_list_embedded("Betable Matches", matches, bot, interaction, ephemeral=True, view=AvailableMatchListView(bot, matches), hex=user.color_hex)
 
 async def show_match_bets(match, user, interaction, bot):
   if match is None: return
@@ -102,17 +111,17 @@ class MatchView(View):
       user = get_from_db("User", interaction.user.id, session)
       await show_match_bets(match, user, interaction, self.bot)
       
-  @discord.ui.button(label='Show All Matches', custom_id="match_show_all_matches", style=discord.ButtonStyle.primary, row=3)
+  @discord.ui.button(label='All Matches', custom_id="match_show_all_matches", style=discord.ButtonStyle.primary, row=3)
   async def show_all_matches_callback(self, button, interaction):
-    with Session.begin() as session:
-      await show_matches(interaction, session, self.bot)
+    await show_match_list(interaction, self.bot)
       
-  @discord.ui.button(label='Show All Bets', custom_id="match_show_all_bets", style=discord.ButtonStyle.primary, row=3)
+  @discord.ui.button(label='All Bets', custom_id="match_show_all_bets", style=discord.ButtonStyle.primary, row=3)
   async def show_all_bets_callback(self, button, interaction):
-    with Session.begin() as session:
-      user = get_from_db("User", interaction.user.id, session)
-      await show_bets(user, interaction, session, self.bot)
+    await show_bet_list(interaction, self.bot)
   
+  @discord.ui.button(label='Betable Matches', custom_id="match_available_bets", style=discord.ButtonStyle.green, row=3)
+  async def available_bets_callback(self, button, interaction):
+    await show_available_bets(interaction, self.bot)
     
 class BetView(View):
   async def get_bet(self, interaction, session):
@@ -177,33 +186,33 @@ class BetView(View):
       user = get_from_db("User", interaction.user.id, session)
       await show_match_bets(match, user, interaction, self.bot)
   
-  @discord.ui.button(label='Show All Matches', custom_id="bet_show_all_matches", style=discord.ButtonStyle.primary, row=2)
+  @discord.ui.button(label='All Matches', custom_id="bet_show_all_matches", style=discord.ButtonStyle.primary, row=2)
   async def show_all_matches_callback(self, button, interaction):
-    with Session.begin() as session:
-      await show_matches(interaction, session, self.bot)
+    await show_match_list(interaction, self.bot)
       
-  @discord.ui.button(label='Show All Bets', custom_id="bet_show_all_bets", style=discord.ButtonStyle.primary, row=2)
+  @discord.ui.button(label='All Bets', custom_id="bet_show_all_bets", style=discord.ButtonStyle.primary, row=2)
   async def show_all_bets_callback(self, button, interaction):
-    with Session.begin() as session:
-      user = get_from_db("User", interaction.user.id, session)
-      await show_bets(user, interaction, session, self.bot)
+    await show_bet_list(interaction, self.bot)
+    
+  @discord.ui.button(label='Betable Matches', custom_id="match_available_bets", style=discord.ButtonStyle.green, row=2)
+  async def available_bets_callback(self, button, interaction):
+    await show_available_bets(interaction, self.bot)
   
+async def get_match_from_match_list(view, button, interaction, session):
+  match = None
+  fields = interaction.message.embeds[0].fields
+  view = view.from_message(interaction.message)
+  label = view.get_item(button.custom_id).label # type: ignore
+  for field in fields:
+    if label in field.name:
+      match_id = field.name.split("ID: ")[-1]
+      match = get_from_db("Match", match_id, session)
+      break
+  if match is None and interaction is not None:
+    await interaction.response.send_message("Match not found. Report the bug.", ephemeral=True)
+  return match
   
 class MatchListView(View):
-  async def get_match(self, button, interaction, session):
-    match = None
-    fields = interaction.message.embeds[0].fields
-    view = self.from_message(interaction.message)
-    label = view.get_item(button.custom_id).label # type: ignore
-    for field in fields:
-      if label in field.name:
-        match_id = field.name.split("ID: ")[-1]
-        match = get_from_db("Match", match_id, session)
-        break
-    if match is None and interaction is not None:
-      await interaction.response.send_message("Match not found. Report the bug.", ephemeral=True)
-    return match
-  
   def __init__(self, bot, matches):
     self.bot = bot
     super().__init__(timeout=None)
@@ -223,34 +232,64 @@ class MatchListView(View):
   
   async def match_list_callback(self, button, interaction):
     with Session.begin() as session:
-      if (match := await self.get_match(button, interaction, session)) is None: return
+      if (match := await get_match_from_match_list(self, button, interaction, session)) is None: return
       await show_match(match, interaction, session, self.bot)
-
-  @discord.ui.button(label='Show All Matches', custom_id="match_list_show_all_matches", style=discord.ButtonStyle.primary, row=4)
-  async def show_all_matches_callback(self, button, interaction):
-    with Session.begin() as session:
-      await show_matches(interaction, session, self.bot)
       
-  @discord.ui.button(label='Show All Bets', custom_id="match_list_show_all_bets", style=discord.ButtonStyle.primary, row=4)
+  @discord.ui.button(label='All Bets', custom_id="match_list_show_all_bets", style=discord.ButtonStyle.primary, row=4)
   async def show_all_bets_callback(self, button, interaction):
+    await show_bet_list(interaction, self.bot)
+    
+  @discord.ui.button(label='Betable Matches', custom_id="match_available_bets", style=discord.ButtonStyle.green, row=4)
+  async def available_bets_callback(self, button, interaction):
+    await show_available_bets(interaction, self.bot)
+    
+class AvailableMatchListView(View):
+  def __init__(self, bot, matches):
+    self.bot = bot
+    super().__init__(timeout=None)
+    
+    if matches is not None:
+      i = 0
+      for match in matches:
+        button = Button(label=f"{match.t1} vs {match.t2}", custom_id=f"available_match_list_{i}", style=discord.ButtonStyle.green)
+        self.add_item(button)
+        button.callback = partial(self.available_match_list_callback, button)
+        i += 1
+    else:
+      for i in range(0, 20):
+        button = Button(label=str(i), custom_id=f"available_match_list_{i}", style=discord.ButtonStyle.green, disabled=True)
+        self.add_item(button)
+        button.callback = partial(self.available_match_list_callback, button)
+        
+  async def available_match_list_callback(self, button, interaction):
     with Session.begin() as session:
-      user = get_from_db("User", interaction.user.id, session)
-      await show_bets(user, interaction, session, self.bot)
+      if (match := await get_match_from_match_list(self, button, interaction, session)) is None: return
+      await create_edit_bet(interaction, -1, -1, match, session, self.bot)
+      
+  @discord.ui.button(label='All Matches', custom_id="available_match_list_show_all_matches", style=discord.ButtonStyle.primary, row=4)
+  async def show_all_matches_callback(self, button, interaction):
+    await show_match_list(interaction, self.bot)
+    
+  @discord.ui.button(label='All Bets', custom_id="available_match_list_show_all_bets", style=discord.ButtonStyle.primary, row=4)
+  async def show_all_bets_callback(self, button, interaction):
+    await show_bet_list(interaction, self.bot)
+    
+  @discord.ui.button(label='Betable Matches', custom_id="match_available_bets", style=discord.ButtonStyle.green, row=4)
+  async def available_bets_callback(self, button, interaction):
+    await show_available_bets(interaction, self.bot)
+    
   
 class BetListView(View): 
   def __init__(self, bot):
     self.bot = bot
     super().__init__(timeout=None)
     
-  @discord.ui.button(label='Show All Matches', custom_id="bet_list_show_all_matches", style=discord.ButtonStyle.primary, row=4)
+  @discord.ui.button(label='All Matches', custom_id="bet_list_show_all_matches", style=discord.ButtonStyle.primary, row=4)
   async def show_all_matches_callback(self, button, interaction):
-    with Session.begin() as session:
-      await show_matches(interaction, session, self.bot)
-  
-  @discord.ui.button(label='Show All Bets', custom_id="bet_list_show_all_bets", style=discord.ButtonStyle.primary, row=4)
-  async def show_all_bets_callback(self, button, interaction):
-    with Session.begin() as session:
-      user = get_from_db("User", interaction.user.id, session)
-      await show_bets(user, interaction, session, self.bot)
+    await show_match_list(interaction, self.bot)
+    
+  @discord.ui.button(label='Betable Matches', custom_id="match_available_bets", style=discord.ButtonStyle.green, row=4)
+  async def available_bets_callback(self, button, interaction):
+    await show_available_bets(interaction, self.bot)
   
     
