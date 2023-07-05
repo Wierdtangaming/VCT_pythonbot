@@ -185,6 +185,7 @@ async def on_ready():
   bot.add_view(MatchView(bot, None))
   bot.add_view(BetView(bot, None))
   bot.add_view(MatchListView(bot, None))
+  bot.add_view(AvailableMatchListView(bot, None))
   bot.add_view(BetListView(bot))
 
 

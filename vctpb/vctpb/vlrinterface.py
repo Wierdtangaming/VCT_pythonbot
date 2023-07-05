@@ -417,10 +417,10 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   
   if (match := get_match_from_vlr_code(match_code, session)) is not None:
     if match.has_bets or match.date_closed is not None:
-      if match.date_closed is not None:
-        print(f"match {match_code} already closed")
-      else:
-        print(f"match {match_code} already has bets")
+      #if match.date_closed is not None:
+      #  print(f"match {match_code} already closed")
+      #else:
+      #  print(f"match {match_code} already has bets")
       return None
     
   match_link = get_match_link(match_code)
