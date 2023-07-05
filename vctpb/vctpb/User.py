@@ -10,9 +10,10 @@ import secrets
 import sys
 from sqlalchemy import Column, String, BOOLEAN, ForeignKey, Table, Integer
 from sqlalchemy.orm import relationship
-from sqltypes import JSONLIST
+from sqltypes import JSONList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
+from datetime import datetime
 
 from time import time
 
@@ -23,7 +24,7 @@ alert_association_table = Table(
   Column("tournament_id", ForeignKey("tournament.name"), primary_key=True),
 )
 
-
+BalanceType = list[tuple[str, Decimal, datetime]]
 @mapper_registry.mapped
 class User():
   __tablename__ = "user"
@@ -33,10 +34,10 @@ class User():
   color_name = Column(String(32), ForeignKey("color.name"))
   color = relationship("Color", back_populates="users")
   color_hex = Column(String(6), nullable=False)
-  balances = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(bet_id, balance after change, date)
-  loans = Column(MutableList.as_mutable(JSONLIST), nullable=False) #array of Tuple(balance, date created, date paid)
-  bets = relationship("Bet", back_populates="user", cascade="all, delete", overlaps="active_bets, user")
-  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets, user", cascade="all, delete")
+  balances = Column(MutableList.as_mutable(JSONList), nullable=False) #array of BalanceType
+  loans = Column(MutableList.as_mutable(JSONList), nullable=False) #array of Tuple(balance, date created, date paid)
+  bets = relationship("Bet", back_populates="user", cascade="all, delete")
+  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets,user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
   hidden = Column(BOOLEAN, nullable=False)
   alert_tournaments = relationship("Tournament", secondary=alert_association_table, back_populates="alert_users")
@@ -55,7 +56,7 @@ class User():
     #bet_id = start: start balances
     #bet_id = reset_[reset_id]_[reset_name]: changed balances with command
     
-    self.balances = [("start", Decimal(500), date_created)]
+    self.balances.append(("start", Decimal(500), date_created))
 
     #a tuple (balances, date created, date paid)
     
@@ -417,10 +418,7 @@ class User():
   
   
 
-  def get_graph_image(self, balance_range_ambig, dpi, session=None):
-    if session is None:
-      with Session.begin() as session:
-        return self.get_graph_image(balance_range_ambig, dpi, session)
+  def get_graph_image(self, balance_range_ambig:BalanceType | str | int, dpi, session=None):
     
     from dbinterface import get_all_db, get_from_db
     start = time()
@@ -433,10 +431,14 @@ class User():
         balance = self.balances
         xlabel = "All Time"
       elif balance_range_ambig == "current":
-        balance = [self.balances[x] for x in self.get_reset_range(-1)]
+        reset = self.get_reset_range(-1)
+        if reset is None:
+          print("no reset found for:", self)
+          return
+        balance = [self.balances[x] for x in reset]
         resets = self.get_resets()
         if len(resets) > 0:
-          xlabel = self.balances[resets[-1]][0][15:]
+          xlabel = self.balances[resets[-1]][0][15:] 
         else:
           users = get_all_db("User", session)
           for user in users:
@@ -447,12 +449,11 @@ class User():
                 break
             except:
               print("error")
-    
+      else:
+        return f"Invalid 2 range of {balance_range_ambig}."
     elif isinstance(balance_range_ambig, int):
       balance = self.balances[-balance_range_ambig:]
       xlabel = f"Last {balance_range_ambig}"
-    else:
-      return f"Invalid range of {balance_range_ambig}."
     
     #print(balance)
     
@@ -482,8 +483,11 @@ class User():
     resets = []
     before = None
     min = 0
-    max = 500
-    for bet_id, amount, date in balance:
+    max:int = 500
+    for bal in balance:
+      
+      bet_id, _, date = bal
+      amount:Decimal = bal[1]
       if amount < min:
         min = amount
       if amount > max:
@@ -557,17 +561,18 @@ class User():
           continue
         ax.plot([i, i+1], [balances[i], balances[i+1]], color=line_colors[i])
       ax.axhline(y=0, color='grey', linestyle='--')
-      max = int(math.ceil((max * Decimal("1.05")) / Decimal("100"))) * 100
+      val = (max * Decimal("1.05")) / Decimal("100")
+      max = int(math.ceil(val)) * 100
       if min != 0:
         min = int(math.floor((min - max * Decimal("0.05")) / Decimal("100"))) * 100
 
       x = [*range(len(balances))]
       ax.fill_between(x, 0, 1, where=[((xs in resets) or ((xs+1) in resets)) for xs in x], color='grey', alpha=0.5, transform=ax.get_xaxis_transform())
 
-      ax.set_ylim([min, max])
+      ax.set_ylim(top=max, bottom=min)
       #plt.scatter(range(len(balances)), balances, s=30, color = colors, zorder=10)
       ax.set_xticks(range(len(balances)), labels, rotation='vertical')
-      ax.set_xlabel(xlabel)
+      ax.set_xlabel(str(xlabel))
       
       y_ticks = ax.get_yticks()
       for tick in y_ticks:
@@ -602,7 +607,7 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
     with Session.begin() as session:
       return get_multi_graph_image(users, balance_range_ambig, session)
   
-  from dbinterface import get_from_db
+  from dbinterface import get_from_db, get_new_db
   start = time()
   all_balances = []
   xlabel = ""
@@ -668,6 +673,7 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
   reset_breaks = [0]
   xval = -1
   last_id = None
+  match = get_new_db("Match")
   for user_index, balance in all_balances:
     bet_id, amount = balance[:2]
 
@@ -847,7 +853,7 @@ def get_multi_graph_image(users, balance_range_ambig, dpi, session=None):
   
   
     
-def all_user_unique_code(prefix, users):
+def all_user_unique_code(prefix, users: list[User]):
   all_bal = [user.balances for user in users]
   #combine all_bal into one array
   prefix_bal = []
@@ -868,7 +874,7 @@ def all_user_unique_code(prefix, users):
   return code
 
 
-def get_all_unique_balance_ids(users):
+def get_all_unique_balance_ids(users: list[User]):
   all_bal = [user.balances for user in users]
   #combine all_bal into one array
   prefix_bal = []
@@ -925,14 +931,14 @@ def is_valid_user(code, username, color, hidden, balances, loans):
     errors[6] = True
   return errors
 
-def get_active_users(users, session=None):
+def get_active_users(users: list[User], session=None):
   if session is None:
     with Session.begin() as session:
       get_active_users(users, session)
   
   return [user for user in users if (not user.balances[-1][0].startswith("reset_")) or len(user.active_bets) > 0]
 
-def get_first_place(users):
+def get_first_place(users: list[User]):
   users = get_active_users(users)
   if len(users) == 0:
     return None
@@ -950,14 +956,6 @@ def get_first_place(users):
     return None
   return first_place
 
-def add_balance_user(user_ambig, change, description, date, session=None):
-  from convert import ambig_to_obj
-  if session is None:
-    with Session.begin() as session:
-      return add_balance_user(user_ambig, change, description, date, session=session)
-      
-  user = ambig_to_obj(user_ambig, "User")
-  if user is None:
-    return None
-  user.balances.append((description, Decimal(str(round(user.balances[-1][1] + Decimal(str(change)), 5))), date))
+def add_balance_user(user: User, change, description, date):
+  user.balances.append((description, Decimal(str(round(user.balances[-1][1] + change, 5))), date))
   return user

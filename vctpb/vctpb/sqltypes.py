@@ -15,7 +15,7 @@ class MsgMutableList(MutableList):
     else:
       return super().append(ambig)
 
-class JSONLIST(TypeDecorator):
+class JSONList(TypeDecorator):
   
   impl = String
 

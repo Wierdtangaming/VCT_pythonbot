@@ -10,18 +10,6 @@ from User import User
 from Tournament import Tournament
 from Team import Team
 
-
-def ambig_to_obj(ambig, prefix=None, session=None) -> User | Match | Bet | Tournament | Team | None:
-  if isinstance(ambig, User) or isinstance(ambig, Match) or isinstance(ambig, Bet):
-    obj = ambig
-  elif isinstance(ambig, int) or isinstance(ambig, str):
-    obj = get_from_db(prefix, ambig, session)
-  elif isinstance(ambig, discord.Member):
-    obj = get_from_db(prefix, ambig.id, session)
-  else:
-    obj = None
-  return obj
-
 def user_id_ambig(user):
   if isinstance(user, int):
     return user
@@ -61,6 +49,12 @@ def names_ambig_to_names(ambig, session=None, user=None, naming_type=1):
   elif isinstance(ambig[0], tuple):
     return [a[0] for a in ambig]
 
+def get_user_from_id(user, session):
+  if isinstance(user, User):
+    return user
+  id = user_id_ambig(user)
+  return get_from_db("User", id, session)
+
 def get_user_from_at(id, session=None):
   uid = id.replace("<", "")
   uid = uid.replace(">", "")
@@ -71,24 +65,19 @@ def get_user_from_at(id, session=None):
   else:
     return None
 
-def get_user_from_id(id, session=None):
-  return get_from_db("User", id, session)
-  
-
 def id_to_mention(id):
   if id is None:
     return "Bot"
   return f"<@!{id}>"
-
-
   
-async def get_user_from_ctx(ctx, user=None, session=None):
-  if user is None:
-    user = ctx.author
-  user = get_from_db("User", user.id, session)
-  if user is None:
+async def get_user_from_ctx(ctx, user=None, send=True, session=None):
+  us = user
+  if us is None:
+    us = ctx.author
+  us = get_from_db("User", us.id, session)
+  if us is None and send:
     await ctx.respond("User not found. To create an account do /balance", ephemeral = True)
-  return user
+  return us
 
 
 async def obj_from_autocomplete_tuple(ctx, ambig, text, prefix, session=None, user=None, naming_type=1):
