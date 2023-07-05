@@ -87,12 +87,16 @@ async def send_match_list_embedded(embed_title, matches, bot, sender, followup=F
     
 
 async def send_bet_list_embedded(embed_title, bets, bot, sender, followup=False, ephemeral=False, user=None):
+  bets.sort(key=lambda x: x.match.date_created)
+  bets.sort(key=lambda x: x.user.balances[-1][1], reverse=True)
+  bets.sort(key=lambda x: x.hidden)
+  
   hidden_bets = []
   if user is not None:
     for bet in bets:
       if bet.hidden and user.code == bet.user_id:
         hidden_bets.append(bet)
-        
+  
   await send_visible_hidden_bet_list_embedded(False, embed_title, bets, bot, sender, followup=followup, ephemeral=ephemeral)
   if len(hidden_bets) > 0:
     await send_visible_hidden_bet_list_embedded(True, embed_title, hidden_bets, bot, sender, followup=True, ephemeral=True)
@@ -171,25 +175,14 @@ def create_bet_embedded(bet: Bet, title):
   return embed
 
 
-def create_bet_list_embedded(embed_title, bets_ambig, show_hidden, ):
-  if bets_ambig is None:
+def create_bet_list_embedded(embed_title, bets, show_hidden):
+  if bets is None:
     return None
 
   embed = discord.Embed(title=embed_title, color=discord.Color.blue())
-  
-  bets_ambig.sort(key=lambda x: x.match.date_created)
 
-  visible_bets = []
-  hidden_bets = []
-  for bet in bets_ambig:
-    if bet.hidden:
-      hidden_bets.append(bet)
-    else:
-      visible_bets.append(bet)
-      
-  bets_ambig = visible_bets + hidden_bets
   
-  for bet in bets_ambig:
+  for bet in bets:
     if bet.hidden and (show_hidden == False):
       embed.add_field(name=f"{bet.user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", value=f"Teams: {bet.t1} vs {bet.t2}", inline=False)
     else:
