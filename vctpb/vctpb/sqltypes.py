@@ -5,7 +5,7 @@ import time
 from sqlalchemy.ext.mutable import MutableList
 from discord import Message, Interaction
 
-class MsgList(MutableList):
+class MsgMutableList(MutableList):
   async def append(self, ambig):
     if issubclass(type(ambig), Message):
       return super().append((ambig.id, ambig.channel.id))

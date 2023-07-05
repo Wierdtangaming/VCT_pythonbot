@@ -172,7 +172,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
   tournament_link = get_tournament_link(tournament_code)
   web_session = requests.Session()
   response = web_session.get(tournament_link)
-  print("soup 4")
+  #print("soup 4")
   soup = BeautifulSoup(response.text, 'lxml')
   
   col = soup.find("div", class_="col mod-1")
@@ -272,7 +272,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
           if (not match.alert) and match.date_closed is None:
             await match.send_warning(bot, session)
         
-      print(f"acting on {match_code}, status: {status}, eta: {eta}")
+      #print(f"acting on {match_code}, status: {status}, eta: {eta}")
       
       #if completed check if match has a winner then set winner
       if status.__contains__("completed"):
@@ -426,7 +426,7 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   match_link = get_match_link(match_code)
   web_session = requests.Session()
   response = web_session.get(match_link)
-  print("soup 6")
+  #print("soup 6")
   soup = BeautifulSoup(response.text, 'lxml')
   
   t1oo, t2oo = get_odds_from_match_page(soup)
@@ -437,15 +437,16 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
   if match is not None:
     from convert import edit_all_messages
     from objembed import create_match_embedded
-    print("updating odds")
+    from views import MatchView
+    #print("updating odds")
     match.t1oo = t1oo
     match.t2oo = t2oo
     
     match.t1o = t1o
     match.t2o = t2o
-    embedd = create_match_embedded(match, "Placeholder", session)
+    embedd = create_match_embedded(match, "Placeholder")
     # works because updating is never time sensitive
-    await edit_all_messages(bot, match.message_ids, embedd)
+    await edit_all_messages(bot, match.message_ids, embedd, view=MatchView(bot, match))
     return None
   
   team1, team2 = get_teams_from_match_page(soup, session)
@@ -478,7 +479,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
   
   for tournament in tournaments:
     match_codes = await vlr_get_today_matches(bot, tournament.vlr_code, session)
-    print(f"generating matches with codes: {match_codes}")
+    #print(f"generating matches with codes: {match_codes}")
     for match_code in match_codes:
       match = await vlr_create_match(match_code, tournament, bot, session)
       if match is None:
@@ -486,7 +487,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       add_to_db(match, session)
       
       if match_channel is not None:
-        embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)
+        embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
         msg = await match_channel.send(embed=embedd, view=MatchView(bot, match))
         await match.message_ids.append(msg)
       matches.append(match)

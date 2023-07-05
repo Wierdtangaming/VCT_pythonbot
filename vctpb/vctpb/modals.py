@@ -138,7 +138,7 @@ class MatchCreateModal(Modal):
       match = Match(code, team_one, team_two, team_one_odds, team_two_odds, team_one_old_odds, team_two_old_odds, tournament_name, betting_site, color, interaction.user.id, get_date(), self.vlr_code)
       
       
-      embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.", session)
+      embedd = create_match_embedded(match, f"New Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}.")
       
       channel = await self.bot.fetch_channel(get_channel_from_db("match", session))
       msg = await channel.send(embed=embedd, view=MatchView(self.bot, match))
@@ -246,12 +246,12 @@ class MatchEditModal(Modal):
           bet.tournament_name = tournament_name
       
       title = f"Edited Match: {team_one} vs {team_two}, {team_one_odds} / {team_two_odds}."
-      embedd = create_match_embedded(match, title, session)
+      embedd = create_match_embedded(match, title)
       
       inter = await interaction.response.send_message(embed=embedd, view=MatchView(self.bot, match))
       ids = match.message_ids
       await match.message_ids.append(inter)
-    await edit_all_messages(self.bot, ids, embedd, title)
+    await edit_all_messages(self.bot, ids, embedd, title, view=MatchView(self.bot, match))
 #match edit modal end
 
 
@@ -371,18 +371,18 @@ class BetCreateModal(Modal):
       session.expire(bet)
       
       if bet.hidden:  
-        shown_embedd = create_bet_hidden_embedded(bet, f"New Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}", session)
+        shown_embedd = create_bet_hidden_embedded(bet, f"New Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}")
       else:
-        shown_embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.", session)
+        shown_embedd = create_bet_embedded(bet, f"New Bet: {user.username}, {amount} on {bet.get_team()}.")
         
       if (channel := await self.bot.fetch_channel(get_channel_from_db("bet", session))) == interaction.channel:
         msg = await interaction.response.send_message(embed=shown_embedd, view=BetView(self.bot, bet))
       else:
         await interaction.response.send_message(f"Bet created in {channel.mention}.", ephemeral=True)
-        msg = await channel.send(embed=shown_embedd)
+        msg = await channel.send(embed=shown_embedd, view=BetView(self.bot, bet))
         
       if self.hidden:
-        embedd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
+        embedd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.")
         inter = await interaction.followup.send(embed = embedd, ephemeral = True, view=BetView(self.bot, bet))
       await bet.message_ids.append(msg)
 #bet create modal end
@@ -516,17 +516,17 @@ class BetEditModal(Modal):
       
       if bet.hidden:
         title = f"Edit Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}"
-        embedd = create_bet_hidden_embedded(bet, title, session)
+        embedd = create_bet_hidden_embedded(bet, title)
       else:
         title = f"Edit Bet: {user.username}, {amount} on {bet.get_team()}."
-        embedd = create_bet_embedded(bet, title, session)
+        embedd = create_bet_embedded(bet, title)
       view=BetView(self.bot, bet)
       if not bet.hidden:
         msg = await interaction.response.send_message(embed=embedd, view=view)
         await bet.message_ids.append(msg)
         
       if self.hide:
-        embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.", session)
+        embeddd = create_bet_embedded(bet, f"Your Hidden Bet: {amount} on {bet.get_team()}.")
         inter = await interaction.response.send_message(embed = embeddd, ephemeral = True, view=view) 
     await edit_all_messages(self.bot, bet.message_ids, embedd, title, view=view)
 #bet edit modal end

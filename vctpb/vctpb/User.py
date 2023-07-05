@@ -37,7 +37,7 @@ class User():
   balances = Column(MutableList.as_mutable(JSONList), nullable=False) #array of BalanceType
   loans = Column(MutableList.as_mutable(JSONList), nullable=False) #array of Tuple(balance, date created, date paid)
   bets = relationship("Bet", back_populates="user", cascade="all, delete")
-  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", cascade="all, delete")
+  active_bets = relationship("Bet", primaryjoin="and_(Bet.winner == 0, Bet.user_id == User.code)", overlaps="bets,user", cascade="all, delete")
   matches = relationship("Match", back_populates="creator")
   hidden = Column(BOOLEAN, nullable=False)
   alert_tournaments = relationship("Tournament", secondary=alert_association_table, back_populates="alert_users")

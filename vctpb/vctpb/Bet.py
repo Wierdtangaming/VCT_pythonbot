@@ -1,7 +1,7 @@
 import math
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, BOOLEAN
 from sqlalchemy.orm import relationship
-from sqltypes import JSONList, MsgList
+from sqltypes import JSONList, MsgMutableList
 from sqlalchemy.ext.mutable import MutableList
 from datetime import datetime
 from sqlaobjs import mapper_registry, Session
@@ -30,7 +30,7 @@ class Bet():
   user_id = Column(Integer, ForeignKey("user.code"), nullable=False)
   user = relationship("User", back_populates="bets")
   date_created = Column(DateTime, nullable=False)
-  message_ids = Column(MsgList.as_mutable(JSONList), nullable=False)
+  message_ids = Column(MsgMutableList.as_mutable(JSONList), nullable=False)
   hidden = Column(BOOLEAN, nullable=False)
   
   

@@ -17,7 +17,7 @@ async def show_match_bets(match, user, interaction, bot):
   await send_bet_list_embedded("Bets", match.bets, bot, interaction, user=user, ephemeral=True)
     
 async def show_match(match, interaction, session, bot):
-  if (embedd := create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.", session)) is not None:
+  if (embedd := create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")) is not None:
     await interaction.response.send_message(embed=embedd, ephemeral=True, view=MatchView(bot, match))
   else:
     await interaction.response.send_message("Match not found. Report the bug.", ephemeral=True)

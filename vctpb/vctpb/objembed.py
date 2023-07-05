@@ -12,6 +12,7 @@ from sqlaobjs import Session
 
 async def send_msg(sender, followup=False, **kwargs):
   if isinstance(sender, discord.TextChannel):
+    kwargs.pop("ephemeral", None)
     await sender.send(**kwargs)
   elif isinstance(sender, discord.commands.context.ApplicationContext):
     await sender.respond(**kwargs)
@@ -23,7 +24,7 @@ async def send_msg(sender, followup=False, **kwargs):
   else:
     print("Error: sender is not a valid type", type(sender))
 
-def create_match_embedded(match:Match, title, session):
+def create_match_embedded(match:Match, title):
   
   title = f"{title}: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))

@@ -2,7 +2,7 @@ from decimal import Decimal
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from sqltypes import JSONList, DECIMAL, MsgList
+from sqltypes import JSONList, DECIMAL, MsgMutableList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from utils import mix_colors, get_date, get_random_hex_color
@@ -35,7 +35,7 @@ class Match():
   date_winner = Column(DateTime(timezone = True))
   date_closed = Column(DateTime(timezone = True))
   bets = relationship("Bet", back_populates="match", cascade="all, delete")
-  message_ids = Column(MsgList.as_mutable(JSONList), nullable=False) #array of int
+  message_ids = Column(MsgMutableList.as_mutable(JSONList), nullable=False) #array of int
   alert = Column(Boolean, nullable=False, default=False)
   
   @property
@@ -84,7 +84,7 @@ class Match():
       return
     
     users = self.tournament.alert_users
-    embedd = create_match_embedded(self, f"Last chance for Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    embedd = create_match_embedded(self, f"Last chance for Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
     pings = ""
     bet_users = [bet.user_id for bet in self.bets]
     for user in users:
@@ -140,7 +140,7 @@ class Match():
         bet.hidden = False
         bet.set_color(session)
         old_hidden.append(bet)
-    embedd = create_match_embedded(self, f"Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    embedd = create_match_embedded(self, f"Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
     if ctx is not None:
       msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embed=embedd)
       await self.message_ids.append(msg)
@@ -165,7 +165,7 @@ class Match():
         await ctx.respond(f"Match {self.t1} vs {self.t2} is already open.", ephemeral=True)
       return
     self.date_closed = None
-    embedd = create_match_embedded(self, f"Opened Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.", session)
+    embedd = create_match_embedded(self, f"Opened Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
     if ctx is not None:
       msg = await ctx.respond(f"{self.t1} vs {self.t2} betting has opened.", embed=embedd, view=MatchView(bot, self))
       await self.message_ids.append(msg)
@@ -205,7 +205,7 @@ class Match():
       return
     
     self.winner = team_num
-    m_embedd = create_match_embedded(self, "Placeholder", session)
+    m_embedd = create_match_embedded(self, "Placeholder")
     
     odds = 0.0
     #change when autocomplete
