@@ -471,9 +471,9 @@ async def bet_cancel(ctx, bet: Option(str, "Bet you want to cancel.", autocomple
     
     user = bet.user
     if bet.hidden == 0:
-      embedd = create_bet_embedded(bet, f"Cancelled Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+      embedd = create_bet_embedded(bet, f"Cancelled Bet")
     else:
-      embedd = create_bet_hidden_embedded(bet, f"Cancelled Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}")
+      embedd = create_bet_hidden_embedded(bet, f"Cancelled Bet")
     await ctx.respond(content="", embed=embedd)
     
     await delete_from_db(bet, bot, session=session)
@@ -514,12 +514,12 @@ async def bet_find(ctx, bet: Option(str, "Bet you get embed of.", autocomplete=b
     
     user = bet.user
     if bet.user_id == ctx.user.id or bet.hidden == False:
-      embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+      embedd = create_bet_embedded(bet, f"Bet")
       inter = await ctx.respond(embed=embedd, ephemeral=bet.hidden, view=BetView(bot, bet))
       if not bet.hidden:
         await bet.message_ids.append(inter)
     else:
-      embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}")
+      embedd = create_bet_hidden_embedded(bet, f"Bet")
       ephemeral = (bet.hidden and (bet.user_id == ctx.user.id))
       inter = await ctx.respond(embed=embedd, ephemeral=ephemeral, view=BetView(bot, bet))
       if not(bet.hidden and (bet.user_id == ctx.user.id)):
@@ -548,11 +548,11 @@ async def bet_hide(ctx, bet: Option(str, "Bet you want to hide.", autocomplete=u
     bet.hidden = True
     
     user = bet.user
-    title = f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}"
+    title = f"Bet"
     embedd = create_bet_hidden_embedded(bet, title, session)
     inter = await ctx.respond(embed=embedd)
     await bet.message_ids.append(inter)
-  await edit_all_messages(bot, bet.message_ids, embedd, title)
+  await edit_all_messages(bot, bet.message_ids, embedd)
 #bet hide end
 
 
@@ -578,12 +578,12 @@ async def bet_show(ctx, bet: Option(str, "Bet you want to show.", autocomplete=u
     bet.hidden = False
     
     user = bet.user
-    title = f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}"
+    title = f"Bet"
     embedd = create_bet_embedded(bet, title)
     view = BetView(bot, bet)
     inter = await ctx.respond(embed=embedd, view=view)
     await bet.message_ids.append(inter)
-  await edit_all_messages(bot, bet.message_ids, embedd, title, view=view)
+  await edit_all_messages(bot, bet.message_ids, embedd, view=view)
 #bet show end
 
 
@@ -613,9 +613,9 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
         for i, bet in enumerate(bets):
           user = bet.user
           if bet.hidden:
-            embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}")
+            embedd = create_bet_hidden_embedded(bet, f"Bet")
           else:
-            embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+            embedd = create_bet_embedded(bet, f"Bet")
           view = BetView(bot, bet)
           if i == 0:
             msg = await ctx.respond(embed=embedd, view=view)
@@ -625,7 +625,7 @@ async def bet_list(ctx, type: Option(int, "If type is full it sends the whole em
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
-          embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+          embedd = create_bet_embedded(bet, f"Hidden Bet")
           view = BetView(bot, bet)
           if i == 0:
             await ctx.respond(embed=embedd, ephemeral=True, view=view)
@@ -1061,9 +1061,9 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
         for i, bet in enumerate(bets):
           user = bet.user
           if bet.hidden:
-            embedd = create_bet_hidden_embedded(bet, f"Bet: {user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}")
+            embedd = create_bet_hidden_embedded(bet, f"Bet")
           else:
-            embedd = create_bet_embedded(bet, f"Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+            embedd = create_bet_embedded(bet, f"Bet")
           view = BetView(bot, bet)
           if i == 0:
             msg = await ctx.respond(embed=embedd, view=view)
@@ -1073,7 +1073,7 @@ async def match_bets(ctx, match: Option(str, "Match you want bets of.", autocomp
       if hidden_bets is not None:
         for i, bet in enumerate(hidden_bets):
           user = bet.user
-          embedd = create_bet_embedded(bet, f"Hidden Bet: {user.username}, {bet.amount_bet} on {bet.get_team()}.")
+          embedd = create_bet_embedded(bet, f"Hidden Bet")
           view = BetView(bot, bet)
           if i == 0:
             await ctx.respond(embed=embedd, ephemeral=True, view=view)
@@ -1156,7 +1156,7 @@ async def match_delete(ctx, match: Option(str, "Match you want to delete.", auto
       await ctx.respond(f"Match winner has already been decided, you cannot delete the match.", ephemeral = True)
       return
       
-    embedd = create_match_embedded(match, f"Deleted Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}, and all bets on the match.")
+    embedd = create_match_embedded(match, f"Deleted Match")
     await ctx.respond(embed=embedd, view=MatchView(bot, match))
       
     await delete_from_db(match, bot, session=session)
@@ -1172,7 +1172,7 @@ async def match_find(ctx, match: Option(str, "Match you want embed of.", autocom
         await ctx.respond(f'Match "{match}" not found.', ephemeral = True)
         return
     match = nmatch
-    embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
+    embedd = create_match_embedded(match, f"Match")
     inter = await ctx.respond(embed=embedd, view=MatchView(bot, match))
     await match.message_ids.append(inter)
 #match find end
@@ -1208,7 +1208,7 @@ async def match_list(ctx, type: Option(int, "If type is full it sends the whole 
     elif type == 1:
       #full
       for i, match in enumerate(matches):
-        embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
+        embedd = create_match_embedded(match, f"Match")
         if i == 0:
           msg = await ctx.respond(embed=embedd, view=MatchView(bot, match))
         else:
@@ -1396,7 +1396,7 @@ async def tournament_matches(ctx, tournament: Option(str, "Tournament you want m
     elif type == 1:
       #full
       for i, match in enumerate(matches):
-        embedd = create_match_embedded(match, f"Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
+        embedd = create_match_embedded(match, f"Match")
         if i == 0:
           msg = await ctx.respond(embed=embedd, view=MatchView(bot, match))
         else:

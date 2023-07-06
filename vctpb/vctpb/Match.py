@@ -84,7 +84,7 @@ class Match():
       return
     
     users = self.tournament.alert_users
-    embedd = create_match_embedded(self, f"Last chance for Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
+    embedd = create_match_embedded(self, f"Last chance for Match")
     pings = ""
     bet_users = [bet.user_id for bet in self.bets]
     for user in users:
@@ -140,7 +140,7 @@ class Match():
         bet.hidden = False
         bet.set_color(session)
         old_hidden.append(bet)
-    embedd = create_match_embedded(self, f"Closed Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
+    embedd = create_match_embedded(self, f"Closed Match")
     if ctx is not None:
       msg = await ctx.respond(content=f"{self.t1} vs {self.t2} betting has closed.", embed=embedd)
       await self.message_ids.append(msg)
@@ -165,7 +165,7 @@ class Match():
         await ctx.respond(f"Match {self.t1} vs {self.t2} is already open.", ephemeral=True)
       return
     self.date_closed = None
-    embedd = create_match_embedded(self, f"Opened Match: {self.t1} vs {self.t2}, {self.t1o} / {self.t2o}.")
+    embedd = create_match_embedded(self, f"Opened Match")
     if ctx is not None:
       msg = await ctx.respond(f"{self.t1} vs {self.t2} betting has opened.", embed=embedd, view=MatchView(bot, self))
       await self.message_ids.append(msg)
@@ -255,16 +255,16 @@ class Match():
           await channel.send(f"{new_leader.username} is now the leader.")
         
       if leader != None:
-        print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
+        #print(f"{leader.color_hex} == dbb40c, {leader.has_leader_profile()}")
         if leader.has_leader_profile():
-          print("start")
+          print("start 2")
           leader.set_color(get_random_hex_color(), session)
     if close_session and session is not None:
       session.commit()
       session.close()
     tasks = []
     tasks.append(edit_all_messages(bot, self.message_ids, m_embedd, view=MatchView(bot, self)))
-    [tasks.append(edit_all_messages(bot, tup[0].message_ids, tup[1], (f"Bet: {tup[0].user.username}, {tup[0].amount_bet} on {tup[0].get_team()}"), view=BetView(bot, tup[0]))) for tup in msg_ids]
+    [tasks.append(edit_all_messages(bot, tup[0].message_ids, tup[1], view=BetView(bot, tup[0]))) for tup in msg_ids]
     asyncio.gather(*tasks)
   
 def is_valid_match(code, t1, t2, t1o, t2o, t1oo, t2oo, tournament_name, odds_source, winner, color, creator_id, date_created, date_winner, date_closed, bet_ids, message_ids):
