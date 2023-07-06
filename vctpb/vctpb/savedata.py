@@ -14,7 +14,7 @@ from savefiles import delete_folder
 BUFSIZE = 1024
 
 def backup_full():
-  print("-----------starting backup-----------")
+  #print("-----------starting backup-----------")
   save_to_github("backup")
   
 atexit.register(backup_full)
@@ -116,11 +116,11 @@ def save_to_github(message):
     print("Local and github are the same.")
     return
   
-  print("\n-----------Backing Up-----------\n")
+  #print("\n-----------Backing Up-----------\n")
   
   backup()
   
-  print("\n-----------Uploading-----------\n")
+  #print("\n-----------Uploading-----------\n")
   
   try:
     os.remove("backup.zip")
@@ -139,7 +139,7 @@ def save_to_github(message):
   data = open("backup.zip", "rb").read()
   
   repo.update_file("backup.zip", message, data, content.sha)
-  print("Backed up to git.")
+  #print("Backed up to git.")
   return
   
 def zip_savedata():

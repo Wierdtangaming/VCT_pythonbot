@@ -25,8 +25,7 @@ async def send_msg(sender, followup=False, **kwargs):
     print("Error: sender is not a valid type", type(sender))
 
 def create_match_embedded(match:Match, title):
-  
-  title = f"{title}: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}"
+  title = f"{title}"
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(match.color_hex)))
   embed.add_field(name="Teams:", value=f"{match.t1} vs {match.t2}", inline=True)
   embed.add_field(name="Odds:", value=str(match.t1o) + " / " + str(match.t2o), inline=True)
@@ -122,6 +121,7 @@ async def send_visible_hidden_bet_list_embedded(show_hidden, embed_title, bets, 
   
 
 def create_bet_hidden_embedded(bet, title):
+  title = f"{title}: {bet.user.username}'s Hidden Bet on {bet.t1} vs {bet.t2}."
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   #when teams done this has to be diff color
   embed.add_field(name="User:", value=id_to_mention(bet.user_id), inline=True)
@@ -147,6 +147,7 @@ def create_bet_hidden_embedded(bet, title):
 
 
 def create_bet_embedded(bet: Bet, title):
+  title = f"{title}: {bet.user.username}, {bet.amount_bet} on {bet.get_team()}."
   embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(bet.color_hex)))
   embed.add_field(name="User:", value=id_to_mention(bet.user_id), inline=True)
   embed.add_field(name="Amount Bet:", value=str(bet.amount_bet), inline=True)

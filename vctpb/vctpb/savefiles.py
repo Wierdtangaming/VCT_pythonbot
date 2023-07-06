@@ -50,7 +50,7 @@ def backup():
   make_folder(date_string, f"backup/")
   date_path = f"savedata/backup/{date_string}/"
   copy_db_to(date_path)
-  print("copy done")
+  #print("copy done")
   delete_old_backup()
 
 
@@ -103,7 +103,7 @@ def delete_old_backup():
       delete_folder(time_t[0], "backup/")
     singles.append(times[-1][0])
 
-  print("day delete done")
+  #print("day delete done")
     
   singles.sort(reverse=True)
   day = []
@@ -129,7 +129,7 @@ def delete_old_backup():
       for name in layer[1][:-1]:
         delete_folder(name, "backup/")
 
-  print("done delete backup")
+  #print("done delete backup")
         
         
 

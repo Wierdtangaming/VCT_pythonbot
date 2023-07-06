@@ -216,7 +216,7 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
       # if live match close and continue
       if status.__contains__("live"):
         # check if match is already closed
-        print(f"{match_code} status: {status}")
+        #print(f"{match_code} status: {status}")
         if (match := get_match_from_vlr_code(match_code, session)) is None:
           print(f"live match with code {match_code} not found")
           continue
@@ -487,7 +487,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       add_to_db(match, session)
       
       if match_channel is not None:
-        embedd = create_match_embedded(match, f"New Match: {match.t1} vs {match.t2}, {match.t1o} / {match.t2o}.")
+        embedd = create_match_embedded(match, f"New Match")
         msg = await match_channel.send(embed=embedd, view=MatchView(bot, match))
         await match.message_ids.append(msg)
       matches.append(match)

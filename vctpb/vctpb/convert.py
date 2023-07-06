@@ -364,17 +364,17 @@ def get_tournament_from_vlr_code(vlr_code, session=None):
     return None
   return tournament[0]
 
-async def edit_all_messages(bot, ids, embedd, new_title=None, view : int | discord.ui.View | None = -1):
+async def edit_all_messages(bot, ids, embedd, view : int | discord.ui.View | None = -1):
   async def edit_message(id):
     try:
       channel = await bot.fetch_channel(id[1])
       msg = await channel.fetch_message(id[0])
       title = msg.embeds[0].title.split(":")[0]
-      if new_title is not None:
-        if (":" not in title) or (":" not in new_title):
-          title = new_title
-        else:
-          title = title.split(":")[0] + ":" + ":".join(new_title.split(":")[1:])
+      try:
+        new_title = embedd.title.split(":")[1]
+        title = title + ":" + new_title
+      except:
+        title = msg.embeds[0].title
       embedd.title = title
       args = {}
       args["embed"] = embedd
