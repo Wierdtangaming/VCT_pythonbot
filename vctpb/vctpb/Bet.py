@@ -116,9 +116,9 @@ class Bet():
     match = self.match
     
     if self.team_num == 1:
-      return self.amount_bet * match.t1o
+      return self.amount_bet * match.t1o - self.amount_bet
     elif self.team_num == 2:
-      return self.amount_bet * match.t2o
+      return self.amount_bet * match.t2o - self.amount_bet
     
   def get_team_and_payout(self):
     match = self.match
