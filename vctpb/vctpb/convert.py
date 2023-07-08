@@ -70,7 +70,7 @@ def id_to_mention(id):
     return "Bot"
   return f"<@!{id}>"
   
-async def get_user_from_ctx(ctx, user=None, send=True, session=None):
+async def get_user_from_ctx(ctx, user=None, session=None, send=True):
   us = user
   if us is None:
     us = ctx.author

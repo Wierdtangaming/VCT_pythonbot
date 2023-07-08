@@ -1353,7 +1353,6 @@ async def tournament_alert(ctx, tournament: Option(str, "Tournament you want to 
       await ctx.respond(f'Tournament "{tournament}" not found.', ephemeral = True)
       return
     tournament = ntournament
-    
     has_alert = user.toggle_alert(tournament)
     
     if has_alert:
