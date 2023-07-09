@@ -513,19 +513,16 @@ class BetEditModal(Modal):
         self.hide = bet.hidden
       bet.hidden = self.hide
       
-      if bet.hidden:
-        title = f"Edit Bet"
-        embedd = create_bet_hidden_embedded(bet, title)
-      else:
+      embedd = None
+      if not bet.hidden:
         title = f"Edit Bet"
         embedd = create_bet_embedded(bet, title)
-      view=BetView(self.bot, bet)
-      if not bet.hidden:
-        msg = await interaction.response.send_message(embed=embedd, view=view)
+        msg = await interaction.response.send_message(embed=embedd, view=BetView(self.bot, bet))
         await bet.message_ids.append(msg)
         
       if self.hide:
         embeddd = create_bet_embedded(bet, f"Hidden Bet")
-        inter = await interaction.response.send_message(embed = embeddd, ephemeral = True, view=view) 
-    await edit_all_messages(self.bot, bet.message_ids, embedd, view=view)
+        inter = await interaction.response.send_message(embed = embeddd, ephemeral = True, view=BetView(self.bot, bet))
+    if not bet.hidden:
+      await edit_all_messages(self.bot, bet.message_ids, embedd, view=BetView(self.bot, bet))
 #bet edit modal end
