@@ -1,0 +1,18 @@
+# setup
+cd vctpb
+poetry install
+# run then re-run bot
+# IN DISCORD do /assign for all channels
+# set permissions for commands
+
+
+#run
+tmux new -s vctpb
+cd vctpb
+poetry run python vctpb/main.py
+
+#on reopen
+tmux a -t vctpb
+
+#close
+#ctr-d

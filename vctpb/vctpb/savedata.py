@@ -4,7 +4,6 @@ from zipfile import ZipFile
 import zipfile
 from savefiles import backup, get_days, get_all_names, get_date_string
 from dbinterface import get_setting
-import atexit
 
 from savefiles import delete_folder
 
@@ -16,8 +15,7 @@ BUFSIZE = 1024
 def backup_full():
   #print("-----------starting backup-----------")
   save_to_github("backup")
-  
-atexit.register(backup_full)
+
 
 
 def is_new_day():
@@ -27,18 +25,25 @@ def is_new_day():
   today_day = get_days(get_date_string())
   return last_day != today_day
 
-
+# returns -1 if no token given or no save_repo given
+# returns -2 if error occurs in token or repo
 def pull_from_github():
   token = get_setting("github_token")
   if token is None:
     print("github token not found")
-    return
+    return -1
   g = Github(token)
   if g is None:
     print("github token not valid")
-    return
+    return -2
   repo_name = get_setting("save_repo")
+  if repo is None:
+    print("save_repo not found")
+    return -1
   repo = g.get_user().get_repo(repo_name)
+  if repo is None:
+    print("repo not found on account")
+    return -2
   contents = repo.get_contents("")
   all_files = []
   while contents:
@@ -60,6 +65,7 @@ def pull_from_github():
   #remove savedata.fb
   os.remove("gitbackup.zip")
   print("Pulled from github.")
+  return 1
 
 
 def save_to_github(message):

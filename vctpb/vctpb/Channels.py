@@ -18,4 +18,3 @@ class Channels():
     
   def __repr__(self):
     return f"<Channels {self.bet_channel_id}, {self.match_channel_id}, {self.result_channel_id}>"
-  
