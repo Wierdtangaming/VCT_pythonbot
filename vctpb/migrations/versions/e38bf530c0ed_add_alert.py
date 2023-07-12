@@ -24,8 +24,7 @@ def upgrade():
   with op.batch_alter_table('match') as batch_op:
     batch_op.add_column(Column('alert', Boolean, nullable=False, server_default=false()))
     
-  pass
 
 
 def downgrade():
-  pass
+  op.drop_table("alert_association_table")

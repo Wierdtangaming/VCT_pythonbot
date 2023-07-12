@@ -126,7 +126,6 @@ class User():
     for code in codes:
       if len(code) != 8:
         print(code)
-        quit()
     code = ""
     copy = True
     while copy:

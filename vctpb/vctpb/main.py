@@ -1,4 +1,10 @@
+
 import os
+# check for settings.ini
+if not os.path.exists("settings.ini"):
+  print("settings.ini not found")
+  exit()
+
 # updates the sql library, if you are too out of date it may not work
 if (os.path.exists("savedata/savedata.db")):
   import alembic.config
@@ -8,6 +14,8 @@ if (os.path.exists("savedata/savedata.db")):
   ]
   alembic.config.main(argv=alembicArgs)
 
+from alembic import command
+from alembic.config import Config
 # add moddifacation when no on incorrect match creation
 # test bet list with and without await
 # have it replace by code not by value
@@ -36,6 +44,7 @@ from Bet import Bet
 from User import User, get_multi_graph_image, all_user_unique_code, get_all_unique_balance_ids, num_of_bal_with_name, get_first_place, add_balance_user
 from Team import Team
 from Tournament import Tournament
+from Channels import Channels
 from dbinterface import *
 from colorinterface import *
 import math
@@ -60,7 +69,6 @@ from views import *
 # issue with Option in command function
 # pyright: reportGeneralTypeIssues=false
 
-mapper_registry.metadata.create_all(Engine)
 intents = discord.Intents.all()
 
 bot = commands.Bot(intents=intents)
@@ -144,6 +152,18 @@ def create_user(user_id, username, session):
   add_to_db(user, session)
   return user
 
+def create_db():
+  mapper_registry.metadata.create_all(Engine)
+  # sets to current version
+  alembic_cfg = Config("alembic.ini")
+  command.stamp(alembic_cfg, "head")
+  with Session.begin() as session:
+    # add new row to channels
+    add_to_db(Channels(-1, -1, -1), session)
+  print("\n\n\n\n\n\n\n-----------Created DB, please rerun bot-----------")
+  print("-----------When you rerun the bot set the channels with /assign-----------\n\n\n\n\n\n\n")
+  exit()
+  
 
 @bot.event
 async def on_ready():
@@ -151,37 +171,52 @@ async def on_ready():
     print("Logged in as {0.user}".format(bot))
     print(bot.guilds)
     
-    save_savedata_from_github()
-    zip_savedata()
     #if savedata does not exist pull
     if not os.path.exists("savedata"):
       print("savedata folder does not exist")
-      print("-----------Pulling Savesdata-----------")
-      pull_from_github()
+      os.mkdir("savedata")
+    #check if file savedata.db exists
+    if not os.path.exists("savedata/savedata.db"):
+      print("-----------No File Found-----------")
+      pull_code = pull_from_github()
+      if pull_code == -1:
+        print("-----------Pull Failed-----------")
+        print("creating new savedata")
+        create_db()
+      elif pull_code != 1:
+        print("-----------Invalid Token/Repo-----------")
+        print("-----------Quitting-----------")
+        exit()
+    else:
+      # for compare 
+      save_savedata_from_github() # gets savedata from github
+      zip_savedata() # zips local savedata
+    
+      
+    # if savedata is not synced with github
     if (not are_equivalent("backup.zip", "gitbackup.zip")):
       print("savedata not is not synced with github")
       git_savedata = get_setting("git_savedata")
-      if git_savedata == "override":
-        print("-----------Overriding Savedata-----------")
-      elif git_savedata == "pull":
+      if git_savedata == "pull":
         print("-----------Pulling Savesdata-----------")
         pull_from_github()
       elif git_savedata == "quit":
         print("-----------Missmatch Savedata-----------")
         print("-----------Quitting-----------")
-        atexit.unregister(backup_full)
-        quit()
+        exit()
       elif git_savedata == "once":
         print("-----------pushing then setting to quit-----------")
         set_setting("git_savedata", "quit")
-        
-    
-    auto_backup_timer.start()
-    print("\n-----------Bot Starting-----------\n")
-    auto_generate_matches_from_vlr_timer.start()
+      else:
+        print("-----------Overriding Savedata-----------")
   except:
     print("-----------Bot Failed to Start-----------")
-    quit()
+    exit()
+  
+  atexit.register(backup_full)
+  auto_backup_timer.start()
+  print("\n-----------Bot Starting-----------\n")
+  auto_generate_matches_from_vlr_timer.start()
   bot.add_view(MatchView(bot, None))
   bot.add_view(BetView(bot, None))
   bot.add_view(MatchListView(bot, None))

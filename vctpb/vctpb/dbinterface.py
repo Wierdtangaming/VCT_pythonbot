@@ -122,6 +122,9 @@ def get_channel_from_db(channel_name, session=None):
       return get_channel_from_db(channel_name, session)
     
   channels = session.scalars(select(Channels)).one()
+  if channels.bet_channel_id == -1 or channels.match_channel_id == -1 or channels.result_channel_id == -1:
+    print("\n\n\n\n\n\n\n-----------Set all channels with /assign-----------\n\n\n\n\n\n\n")
+    return None
   if channel_name == "bet":
     return channels.bet_channel_id
   elif channel_name == "match":
@@ -146,12 +149,15 @@ def set_channel_in_db(channel_name, channel_value, session=None):
                           
 def get_setting(setting_name):
   #setting_names: "discord_token", "github_token", "guild_ids", "git_savedata", "save_repo"
-  configur = ConfigParser()
-  configur.read('settings.ini')
-  val = configur.get('settings', setting_name)
-  if setting_name == "guild_ids":
-    return jsonpickle.decode(val)
-  return configur.get("settings", setting_name)
+  try:
+    configur = ConfigParser()
+    configur.read('settings.ini')
+    val = configur.get('settings', setting_name)
+    if setting_name == "guild_ids":
+      return jsonpickle.decode(val)
+    return val
+  except:
+    return None
 
 def set_setting(setting_name, setting_value):
   configur = ConfigParser()
