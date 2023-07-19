@@ -782,7 +782,7 @@ profile = SlashCommandGroup(
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
 async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session=session)) is None: return
     if color_name == "First place gold":
       if user.is_in_first_place(get_all_db("User", session)):
         user.set_color(xkcd_colors["xkcd:gold"][1:], session)
@@ -813,7 +813,7 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
 @profile.command(name = "username", description = "Sets the username for embeds.")
 async def profile_username(ctx, username: Option(str, "New username.", required=False, max_length=32)):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session=session)) is None: return
     if username is None:
       await ctx.respond(f"Your username is {user.username}.", ephemeral = True)
       return
@@ -994,7 +994,7 @@ loanscg = SlashCommandGroup(
 @loanscg.command(name = "create", description = "Gives you 50 and adds a loan that you have to pay 50 to close you need less that 100 to get a loan.")
 async def loan_create(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session=session)) is None: return
 
     if user.get_clean_bal_loan() >= 100:
       await ctx.respond("You must have less than 100 to make a loan", ephemeral = True)
@@ -1017,7 +1017,7 @@ async def loan_count(ctx, user: Option(discord.Member, "User you want to get loa
 @loanscg.command(name = "pay", description = "See how many loans you have active.")
 async def loan_pay(ctx):
   with Session.begin() as session:
-    if (user := await get_user_from_ctx(ctx, session)) is None: return
+    if (user := await get_user_from_ctx(ctx, session=session)) is None: return
       
     loan_amount = user.loan_bal()
     if loan_amount == 0:
