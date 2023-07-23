@@ -77,7 +77,7 @@ class Match():
   async def send_warning(self, bot, session):
     from dbinterface import get_channel_from_db
     from views import MatchView
-    from objembed import create_match_embedded
+    from objembed import create_match_embedded, get_match_title
     from convert import id_to_mention
     self.alert = True
     if (match_channel := await bot.fetch_channel(get_channel_from_db("match", session))) is None:
@@ -85,7 +85,7 @@ class Match():
     
     users = self.tournament.alert_users
     embedd = create_match_embedded(self, f"Last chance for Match")
-    pings = ""
+    pings = f"Last chance for Match: {get_match_title(self)}\n"
     bet_users = [bet.user_id for bet in self.bets]
     for user in users:
       if user.code not in bet_users:
