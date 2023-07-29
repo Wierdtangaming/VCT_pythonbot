@@ -56,6 +56,7 @@ class User():
     #bet_id = start: start balances
     #bet_id = reset_[reset_id]_[reset_name]: changed balances with command
     
+    self.balances = []
     self.balances.append(("start", Decimal(500), date_created))
 
     #a tuple (balances, date created, date paid)

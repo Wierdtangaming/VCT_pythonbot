@@ -6,3 +6,4 @@ settings.ini
 */savedata
 __pycache__/
 .vscode/
+.vscode/settings.json

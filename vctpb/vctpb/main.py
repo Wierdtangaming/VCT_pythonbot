@@ -780,7 +780,9 @@ profile = SlashCommandGroup(
 #profile color start
 # old sync: Option(int, "Changes you discord color to your color.", choices = yes_no_choices, default=None, required=False)
 @profile.command(name = "color", description = "Sets the color of embeds sent with your username.")
-async def profile_color(ctx, color_name: Option(str, "Name of color you want to set as your profile color.", autocomplete=color_profile_autocomplete)):
+async def profile_color(ctx, xkcd_color_name: Option(str, "Name of color you want to add.", autocomplete=xkcd_picker_autocomplete, required=False),
+                             color_name:Option(str, "Name of color you want to add.", autocomplete=color_picker_autocomplete, required=False), 
+                             hex: Option(str, "Hex color code of new color. The 6 numbers/letters.", required=False)):
   with Session.begin() as session:
     if (user := await get_user_from_ctx(ctx, session=session)) is None: return
     if color_name == "First place gold":
@@ -789,23 +791,18 @@ async def profile_color(ctx, color_name: Option(str, "Name of color you want to 
         await ctx.respond(f"Profile color is now GOLD.")
       else:
         await ctx.respond("You are not in the first place.", ephemeral=True)
-        return
+      return
     else:
-      if (color := get_color(color_name, session)) is None:
-        await ctx.respond(f"Color {color_name} not found. You can add a color by using the command /color add", ephemeral = True)
-        return
+      if (color := await get_color_from_options(ctx, hex, xkcd_color_name, color_name, session)) is None: return
       user.set_color(color, session)
-      await ctx.respond(f"Profile color is now {user.color_name}.")
-    
-    author = ctx.author
-    username = user.username
-    sync = 0
-    if sync == 1:
-      await set_role(ctx.interaction.guild, author, username, user.color_hex, bot)
-    elif sync == 0:
-      await unset_role(author, username)
-    else:
-      await edit_role(author, username, user.color_hex)
+      if xkcd_color_name is not None:
+        title = f"Profile color is now {xkcd_color_name}."
+      elif color_name is not None:
+        title = f"Profile color is now {color_name}."
+      else: #hex
+        title = f"Profile color is now #{user.color_hex}."
+      embed = discord.Embed(title=title, color=discord.Color.from_rgb(*hex_to_tuple(user.color_hex)))
+      await ctx.respond(embed=embed, ephemeral=True)
 #profile color end
 
 
