@@ -7,7 +7,8 @@ poetry install
 
 
 #run
-tmux new -s vctpb
+# tmux is terminal multiplexer to allow it to run even after you close the terminal
+tmux new -s vctpb 
 cd vctpb
 poetry run python vctpb/main.py
 
