@@ -17,7 +17,10 @@ async def show_bet_list(interaction, bot):
   
 async def show_available_bets(interaction, bot):
   with Session.begin() as session:
-    user = get_from_db("User", interaction.user.id, session)
+    if (user := get_from_db("User", interaction.user.id, session)) is None:
+      await interaction.response.send_message("User not found. You can make an account with /balance.", ephemeral=True)
+      return
+    
     matches = user.open_matches(session)
     await send_match_list_embedded("Betable Matches", matches, bot, interaction, ephemeral=True, view=AvailableMatchListView(bot, matches), hex=user.color_hex)
 
@@ -33,7 +36,10 @@ async def show_match(match, interaction, session, bot):
 
 async def create_edit_bet(interaction, hide, team, match, session, bot):
     from modals import BetEditModal, BetCreateModal
-    user = get_from_db("User", interaction.user.id, session)
+    if (user := get_from_db("User", interaction.user.id, session)) is None:
+      await interaction.response.send_message("User not found. You can make an account with /balance.", ephemeral=True)
+      return
+    
     if match.date_closed is None:
       if (bet := match.user_bet(interaction.user.id)) != None:
         bet_modal = BetEditModal(int(hide), match, user, bet, session, bot, title="Edit Bet", team=team)
