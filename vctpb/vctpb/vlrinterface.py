@@ -497,10 +497,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       await send_match_list_embedded(f"Generated Matches", matches, bot, match_channel)
 
 
-def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None, activate_on_create=True):
-  if session is None:
-    with Session.begin() as session:
-      get_or_create_tournament(tournament_name, tournament_vlr_code, session)
+async def get_or_create_tournament(tournament_name, tournament_vlr_code, guild, session, activate_on_create=True):
       
   tournament = get_from_db("Tournament", tournament_name, session)
   if tournament is not None:
@@ -518,9 +515,9 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None,
     
   tournament = Tournament(tournament_name, tournament_vlr_code, color)
   if activate_on_create:
-    tournament.active = True
+    await tournament.activate(guild)
   else:
-    tournament.active = False
+    await tournament.deactivate(guild)
   add_to_db(tournament, session)
   return tournament
   

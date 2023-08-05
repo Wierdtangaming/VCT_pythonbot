@@ -6,6 +6,7 @@ from sqltypes import JSONList, DECIMAL, MsgMutableList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from utils import mix_colors, get_date, get_random_hex_color
+from roleinterface import get_role
 import asyncio
 
 @mapper_registry.mapped
@@ -85,11 +86,11 @@ class Match():
     
     users = self.tournament.alert_users
     embedd = create_match_embedded(self, f"Last chance for Match")
-    pings = f"Last chance for Match: {get_match_title(self)}\n"
-    bet_users = [bet.user_id for bet in self.bets]
-    for user in users:
-      if user.code not in bet_users:
-        pings += id_to_mention(user.code) + " "
+    pings = f"Last chance for Match: {get_match_title(self)}"
+    role = get_role(match_channel.guild, f"{self.tournament_name} alert")
+    if role is not None:
+      pings += f" {role.mention}"
+    
     msg = await match_channel.send(content=pings, embed=embedd, view=MatchView(bot, self))
     await self.message_ids.append(msg)
     #await msg.edit(content="")

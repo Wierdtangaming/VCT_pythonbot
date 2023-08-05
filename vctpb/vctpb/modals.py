@@ -99,7 +99,7 @@ class MatchCreateModal(Modal):
       tournament_code = None
       if self.tournament_name == tournament_name:
         tournament_code = self.tournament_code
-      tournament = get_or_create_tournament(tournament_name, tournament_code, session, activate_on_create=False)
+      tournament = await get_or_create_tournament(tournament_name, tournament_code, interaction.guild, session, activate_on_create=False)
       betting_site = self.children[4].value.strip()
       
       

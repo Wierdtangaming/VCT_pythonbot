@@ -56,11 +56,10 @@ from savefiles import backup
 from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
 import secrets
 import atexit
-from roleinterface import set_role, unset_role, edit_role, set_role_name
 from autocompletes import *
 from vlrinterface import get_match_link
 
-from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament, get_or_create_team, get_or_create_tournament, generate_team
+from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament
 
 from sqlaobjs import Session, mapper_registry, Engine
 from utils import *
@@ -741,9 +740,6 @@ async def color_recolor(ctx, color_name: Option(str, "Name of color you want to 
   with Session.begin() as session:
     msg, color = recolor_color(color_name, hex, session)
     await ctx.respond(msg, ephemeral=color is None)
-    if color is not None:
-      for user in color.users:
-        await edit_role(ctx.author, user.username, color.hex)
 #color recolor end
 
   
@@ -820,7 +816,6 @@ async def profile_username(ctx, username: Option(str, "New username.", required=
     old_username = user.username
     user.username = username
     await ctx.respond(f"Username is now {user.username}.")
-    await set_role_name(ctx.author, old_username, username)
 
 
 bot.add_application_command(profile)
@@ -1352,8 +1347,21 @@ async def match_winner(ctx, match: Option(str, "Match you want to reset winner o
   [tasks.append(edit_all_messages(bot, tup[0], tup[1], view=BetView(bot, tup[2]))) for tup in msg_ids]
   await asyncio.gather(*tasks)
 #match reset end
-  
-  
+
+
+#match send_warning start
+@matchscg.command(name = "send_warning", description = "Send warning to users who have not bet on a match.")
+async def match_send_warning(ctx, match: Option(str, "Match you want to send warning of.", autocomplete=match_list_autocomplete)):
+  with Session.begin() as session:
+    if (nmatch := await obj_from_autocomplete_tuple(None, get_open_matches(session), match, "Match", session)) is None:
+      if (nmatch := await obj_from_autocomplete_tuple(ctx, get_all_db("Match", session), match, "Match", session)) is None: 
+        await ctx.respond(f'Match "{match}" not found.', ephemeral = True)
+        return
+    match = nmatch
+    
+    await match.send_warning(bot, session)
+
+
 bot.add_application_command(matchscg)
 #match end
 
@@ -1390,7 +1398,7 @@ async def tournament_alert(ctx, tournament: Option(str, "Tournament you want to 
       await ctx.respond(f'Tournament "{tournament}" not found.', ephemeral = True)
       return
     tournament = ntournament
-    has_alert = user.toggle_alert(tournament)
+    has_alert = await user.toggle_alert(tournament, ctx.guild)
     
     if has_alert:
       await ctx.respond(f"You are added to alerts for {tournament.name}.", ephemeral = True)
@@ -1499,7 +1507,7 @@ async def tournament_activate(ctx, name: Option(str, "Name of tournament.", auto
     if tournament.active:
       await ctx.respond("Tournament already active.", ephemeral = True)
       return
-    tournament.active = True
+    await tournament.activate(ctx.guild)
     embedd = create_tournament_embedded(f"Activated Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament activate end
@@ -1514,7 +1522,7 @@ async def tournament_deactivate(ctx, name: Option(str, "Name of tournament.", au
     if not tournament.active:
       await ctx.respond("Tournament already inactive.", ephemeral = True)
       return
-    tournament.active = False
+    await tournament.deactivate(ctx.guild)
     embedd = create_tournament_embedded(f"Deactivated Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament deactivate end
@@ -1718,13 +1726,13 @@ async def check_balance_order(ctx):
 #clean db start
 @bot.slash_command(name = "clean_db", description = "Do not user command if not Pig, Debugs some stuff.")
 async def clean_db(ctx):
+  await ctx.respond(f"cleaning db.")
   with Session.begin() as session:
     bets = get_all_db("Bet", session)
     for bet in bets:
       match = bet.match
       bet.t1 = match.t1
       bet.t2 = match.t2
-  await ctx.respond(f"clean db done.")
   print(f"clean db done by {ctx.author.name} ")
 
 token = get_setting("discord_token")
