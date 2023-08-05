@@ -1,5 +1,5 @@
 import discord
-from dbinterface import get_from_db, get_condition_db
+from dbinterface import get_from_db, get_condition_db, get_all_db
 from sqlalchemy import literal
 from sqlaobjs import Session
 import asyncio
@@ -327,6 +327,31 @@ def get_users_hidden_current_bets(user, session=None):
 
 def get_users_hidden_match_bets(user, match_code, session=None):
   return get_condition_db("Bet", (Bet.match_id == match_code) & (Bet.user_id == user_id_ambig(user)) & (Bet.hidden == True), session)
+
+def get_users_by_balance(session=None):
+  users = get_condition_db("User", User.hidden == False, session)
+  users.sort(key=lambda x: x.balances[-1][1], reverse=True)
+  return users
+
+def get_top_users(top, session=None):
+  users = get_users_by_balance(session)
+  top = min(top, len(users))
+  return users[:top]
+
+def get_active_users_by_balance(session=None):
+  users = get_users_by_balance(session)
+  new_users = []
+  for user in users:
+    bal1_label = user.balances[-1][0]
+    if not(bal1_label.startswith("reset_") or bal1_label.startswith("start")):
+      new_users.append(user)
+  return new_users
+
+def get_top_active_users(top, session=None):
+  users = get_active_users_by_balance(session)
+  top = min(top, len(users))
+  return users[:top]
+  
 
 def get_current_matches(session=None):
   return get_condition_db("Match", Match.winner == 0, session)

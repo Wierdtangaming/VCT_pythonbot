@@ -433,8 +433,8 @@ class User():
       elif balance_range_ambig == "current":
         reset = self.get_reset_range(-1)
         if reset is None:
-          print("no reset found for:", self)
-          return
+          print("No reset found for:", self)
+          return "No reset found for: " + str(self) + "this is a bug"
         balance = [self.balances[x] for x in reset]
         resets = self.get_resets()
         if len(resets) > 0:
@@ -454,25 +454,6 @@ class User():
     elif isinstance(balance_range_ambig, int):
       balance = self.balances[-balance_range_ambig:]
       xlabel = f"Last {balance_range_ambig}"
-    
-    #print(balance)
-    
-    #if upfrount_pull:
-    #  ids = []
-    #  bets = []
-    #  for balanc in balance:
-    #    if balanc[0].startswith("id_"):
-    #      ids.append(balanc[0][3:])
-    #      bets.append(balanc[0][3:])
-    #  
-    #  bets = get_mult_from_db("Bet", bets, session)
-    #  ordered_bets = []
-    #  for id in ids:
-    #    for bet in bets:
-    #      if bet.code == id:
-    #        ordered_bets.append(bet)
-    #        break 
-    #  bets_i = iter(ordered_bets)
     
     
     labels = []
