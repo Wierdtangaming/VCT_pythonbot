@@ -1,8 +1,9 @@
 from sqlalchemy import Column, String, ForeignKey, Integer, Boolean
 from sqlalchemy.orm import relationship
 from sqlaobjs import mapper_registry, Session
-from utils import get_random_hex_color, mix_colors
+from utils import get_random_hex_color
 from User import alert_association_table
+from roleinterface import get_role, delete_role, create_role, add_to_role
 
 @mapper_registry.mapped
 class Tournament():
@@ -47,4 +48,21 @@ class Tournament():
     if session is not None:
       for match in self.matches:
         match.set_color(session)
+  
+  async def activate(self, guild):
+    self.active = True
+    role = await create_role(guild, f"{self.name} Alert", self.color_hex)
+    for user in self.alert_users:
+      member = guild.get_member(user.code)
+      if member is not None:
+        await add_to_role(member, role)
+    
+  async def deactivate(self, guild):
+    self.active = False
+    while (role := get_role(guild, f"{self.name} Alert")) is not None:
+      if role is not None:
+        await delete_role(role)
+    users = self.alert_users.copy()
+    for user in users:
+      self.alert_users.remove(user)
       

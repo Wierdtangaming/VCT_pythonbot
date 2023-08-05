@@ -14,6 +14,7 @@ from sqltypes import JSONList
 from sqlalchemy.ext.mutable import MutableList
 from sqlaobjs import mapper_registry, Session
 from datetime import datetime
+from roleinterface import get_role, add_to_role, remove_from_role
 
 from time import time
 
@@ -67,12 +68,18 @@ class User():
   def __repr__(self):
     return f"<User {self.code}, {self.username}>"
   
-  def toggle_alert(self, tournament):
+  async def toggle_alert(self, tournament, guild):
+    role = get_role(guild, f"{tournament.name} Alert")
+    member = guild.get_member(self.code)
     if tournament in self.alert_tournaments:
       self.alert_tournaments.remove(tournament)
+      if member is not None:
+        await remove_from_role(member, role)
       return False
     else:
       self.alert_tournaments.append(tournament)
+      if member is not None:
+        await add_to_role(member, role)
       return True
   
   def set_color(self, color, session=None):

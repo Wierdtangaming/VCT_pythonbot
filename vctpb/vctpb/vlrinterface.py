@@ -21,7 +21,28 @@ from objembed import send_match_list_embedded
 from dbinterface import get_channel_from_db, get_from_db, add_to_db, get_unique_code
 from autocompletes import get_team_from_vlr_code, get_match_from_vlr_code, get_tournament_from_vlr_code
 from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit, tuple_to_hex
+import sys
 
+#import webdriver, WebDriverWait, By, and EC
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument("headless")
+driver = webdriver.Chrome(options=chrome_options)
+wait = WebDriverWait(driver, 10)
+
+t1_odds_labels = ["match-bet-item-odds mod-1", "match-bet-item-odds mod- mod-1"]
+t2_odds_labels = ["match-bet-item-odds mod-2", "match-bet-item-odds mod- mod-2"]
+odds_labels = t1_odds_labels + t2_odds_labels
+
+def get_match_response(match_link, odds_timeout=5):
+  driver.get(match_link)
+  if odds_timeout != 0:
+    WebDriverWait(driver, 0.5).until(EC.element_to_be_clickable((By.CLASS_NAME, "match-bet-item-odds")))
+  return driver.page_source
 
 def get_code(link):
   split_link = link.split("/")
@@ -352,21 +373,36 @@ def get_team_codes_from_match_page(soup):
   return t1_vlr_code, t2_vlr_code
 
 def get_odds_from_match_page(soup):
-  t1_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-1")
-  t2_vlr_odds_label = soup.find("span", class_="match-bet-item-odds mod- mod-2")
+  found_odds = False
+  for i in range(len(t1_odds_labels)):
+    t1_vlr_odds_label = soup.find("span", class_=t1_odds_labels[i])
+    t2_vlr_odds_label = soup.find("span", class_=t2_odds_labels[i])
+    
+    if ((t1_vlr_odds_label is None) or (t2_vlr_odds_label is None)):
+      t1_vlr_odds_label = None
+      t2_vlr_odds_label = None
+      continue
+    
+      
+    t1oo = to_float(t1_vlr_odds_label.get_text().strip())
+    t2oo = to_float(t2_vlr_odds_label.get_text().strip())
+    found_odds = True
+    if (t1oo is None) and (t2oo is None):
+      t1oo = None
+      t2oo = None
+      continue
+    
+    if t1oo <= 1 or t2oo <= 1:
+      t1oo = None
+      t2oo = None
+      continue
   
-  if t1_vlr_odds_label is None or t2_vlr_odds_label is None:
+  if not found_odds:
     print(f"label not found odds not found")
     return None, None
   
-  t1oo = to_float(t1_vlr_odds_label.get_text().strip())
-  t2oo = to_float(t2_vlr_odds_label.get_text().strip())
-  
   if t1oo is None or t2oo is None:
     print(f"not valid number odds not found")
-    return None, None
-  if t1oo <= 1 or t2oo <= 1:
-    print(f"{t1oo} to {t2oo} odds not found")
     return None, None
   
   return t1oo, t2oo
@@ -425,9 +461,9 @@ async def vlr_create_match(match_code, tournament, bot, session=None):
     
   match_link = get_match_link(match_code)
   web_session = requests.Session()
-  response = web_session.get(match_link)
+  response = get_match_response(match_link)
   #print("soup 6")
-  soup = BeautifulSoup(response.text, 'lxml')
+  soup = BeautifulSoup(response, 'lxml')
   
   t1oo, t2oo = get_odds_from_match_page(soup)
   if t1oo is None:
@@ -497,10 +533,7 @@ async def generate_matches_from_vlr(bot, session=None, reply_if_none=True):
       await send_match_list_embedded(f"Generated Matches", matches, bot, match_channel)
 
 
-def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None, activate_on_create=True):
-  if session is None:
-    with Session.begin() as session:
-      get_or_create_tournament(tournament_name, tournament_vlr_code, session)
+async def get_or_create_tournament(tournament_name, tournament_vlr_code, guild, session, activate_on_create=True):
       
   tournament = get_from_db("Tournament", tournament_name, session)
   if tournament is not None:
@@ -515,12 +548,12 @@ def get_or_create_tournament(tournament_name, tournament_vlr_code, session=None,
       return tournament
     
   color = get_tournament_color_from_vlr_page(None, tournament_name, tournament_vlr_code)
-    
+  
   tournament = Tournament(tournament_name, tournament_vlr_code, color)
   if activate_on_create:
-    tournament.active = True
+    await tournament.activate(guild)
   else:
-    tournament.active = False
+    await tournament.deactivate(guild)
   add_to_db(tournament, session)
   return tournament
   

@@ -4,7 +4,7 @@ from Bet import Bet
 from Match import Match
 from User import User, get_active_users
 from convert import id_to_mention
-from colorinterface import hex_to_tuple
+from utils import hex_to_tuple
 import math
 import emoji
 from sqlaobjs import Session
