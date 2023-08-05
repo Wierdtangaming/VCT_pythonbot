@@ -1712,13 +1712,20 @@ async def check_balance_order(ctx):
       await ctx.respond(f"{user.code} balance order is wrong", ephemeral = True)
       print(f"{user.code} balance order is wrong")
   await ctx.respond("check order done.", ephemeral = True)
-  print("check order done")
+  print(f"check order done by {ctx.author.name} ")
   
-  bets = get_all_db("Bet")
-  for bet in bets:
-    match = bet.match
-    bet.t1 = match.t1
-    bet.t2 = match.t2
+
+#clean db start
+@bot.slash_command(name = "clean_db", description = "Do not user command if not Pig, Debugs some stuff.")
+async def clean_db(ctx):
+  with Session.begin() as session:
+    bets = get_all_db("Bet", session)
+    for bet in bets:
+      match = bet.match
+      bet.t1 = match.t1
+      bet.t2 = match.t2
+  await ctx.respond(f"clean db done.")
+  print(f"clean db done by {ctx.author.name} ")
 
 token = get_setting("discord_token")
 #print(f"discord: {token}")
