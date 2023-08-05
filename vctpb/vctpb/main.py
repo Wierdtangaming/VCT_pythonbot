@@ -53,14 +53,13 @@ from PIL import Image, ImageDraw, ImageFont
 from convert import *
 from objembed import *
 from savefiles import backup
-from savedata import backup_full, save_savedata_from_github, are_equivalent, zip_savedata, pull_from_github
+from savedata import backup_full
 import secrets
 import atexit
 from autocompletes import *
-from vlrinterface import get_match_link
+from vlrinterface import get_match_link, odds_labels
 
-from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament
-
+from vlrinterface import generate_matches_from_vlr, get_code, generate_tournament, get_match_response
 from sqlaobjs import Session, mapper_registry, Engine
 from utils import *
 from modals import MatchCreateModal, MatchEditModal, BetCreateModal, BetEditModal
@@ -176,42 +175,18 @@ async def on_ready():
       os.mkdir("savedata")
     #check if file savedata.db exists
     if not os.path.exists("savedata/savedata.db"):
-      print("-----------No File Found-----------")
-      pull_code = pull_from_github()
-      if pull_code == -1:
-        print("-----------Pull Failed-----------")
-        print("creating new savedata")
+      print("-----------No Savedata File Found-----------")
+      print("-----------Download from Github if you have it-----------")
+      while ((inp := input("Do you want to create a new database? (y/n) ")) != "y") and inp != "n":
+        print("Invalid input")
+      if inp == "y":
         create_db()
-      elif pull_code != 1:
-        print("-----------Invalid Token/Repo-----------")
-        print("-----------Quitting-----------")
-        exit()
-    else:
-      # for compare 
-      save_savedata_from_github() # gets savedata from github
-      zip_savedata() # zips local savedata
-    
-      
-    # if savedata is not synced with github
-    if (not are_equivalent("backup.zip", "gitbackup.zip")):
-      print("savedata not is not synced with github")
-      git_savedata = get_setting("git_savedata")
-      if git_savedata == "pull":
-        print("-----------Pulling Savesdata-----------")
-        pull_from_github()
-      elif git_savedata == "quit":
-        print("-----------Missmatch Savedata-----------")
-        print("-----------Quitting-----------")
-        exit()
-      elif git_savedata == "once":
-        print("-----------pushing then setting to quit-----------")
-        set_setting("git_savedata", "quit")
       else:
-        print("-----------Overriding Savedata-----------")
-  except:
+        exit()
+      
+  except Exception as e:
     print("-----------Bot Failed to Start-----------")
-    exit()
-  
+    raise e
   atexit.register(backup_full)
   auto_backup_timer.start()
   print("\n-----------Bot Starting-----------\n")
@@ -221,13 +196,15 @@ async def on_ready():
   bot.add_view(MatchListView(bot, None))
   bot.add_view(AvailableMatchListView(bot, None))
   bot.add_view(BetListView(bot))
+  print("\n-----------Bot Started-----------\n")
 
 
 @tasks.loop(hours=1)
 async def auto_backup_timer():
   try:
     backup_full()
-  except:
+  except Exception as e:
+    print(e)
     print("-----------Backup Failed-----------")
 
 @tasks.loop(minutes=5)
@@ -237,7 +214,7 @@ async def auto_generate_matches_from_vlr_timer():
     with Session.begin() as session:
       await generate_matches_from_vlr(bot, session, reply_if_none=False)
   except Exception as e: 
-    print(e.with_traceback())
+    print(e)
     print("-----------Generating Matches Failed-----------")
   
 
@@ -1143,9 +1120,10 @@ async def match_create(ctx):
     await ctx.interaction.response.send_modal(match_modal)
 #match create end
 
+
 #match generate start
-@matchscg.command(name = "generate", description = "Generate a match.")
-async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
+@matchscg.command(name = "generate", description = "Generate a match. (rerun a couple times if it doesn't work)")
+async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match."), pull_odds: Option(int, "Pull odds from vlr? Defualt is Yes.", choices = yes_no_choices, default=1, required=False)):
   vlr_code = get_code(vlr_link)
   
   with Session.begin() as session:
@@ -1153,26 +1131,28 @@ async def match_generate(ctx, vlr_link: Option(str, "Link of vlr match.")):
       await ctx.respond(f"Match {match.t1} vs {match.t2} already exists.", ephemeral=True)
       return
     match_link = get_match_link(vlr_code)
-    time = datetime.now();
-    web_session = requests.Session()
-    response = web_session.get(match_link)
+    print(match_link)
+    time = datetime.now()
+    response = get_match_response(match_link, pull_odds * 3)
+    print(f"time 0: {datetime.now() - time}")
+    time = datetime.now()
     if response is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
       return
     print(f"time 1: {datetime.now() - time}")
-    time = datetime.now();
+    time = datetime.now()
     print("soup 1")
     strainer = SoupStrainer(['div', 'a'], class_=['match-header-vs', "wf-card mod-dark match-bet-item", "match-header-event"])
-    soup = BeautifulSoup(response.text, 'lxml', parse_only=strainer)
+    soup = BeautifulSoup(response, 'lxml')
     print(f"time 2: {datetime.now() - time}")
-    time = datetime.now();
+    time = datetime.now()
     if soup is None:
       await ctx.respond(f"Match {vlr_code} does not exist.", ephemeral=True)
       return
     match_modal = MatchCreateModal(session, vlr_code=vlr_code, soup=soup, title="Generate Match", bot=bot)
     await ctx.interaction.response.send_modal(match_modal)
     print(f"time 3: {datetime.now() - time}")
-    time = datetime.now();
+    time = datetime.now()
 #match generate end
 
 #match delete start
@@ -1422,6 +1402,20 @@ async def tournament_start(ctx, vlr_link: Option(str, "VLR link of tournament.")
     embedd = create_tournament_embedded(f"New Tournament: {tournament.name}", tournament)
     await ctx.respond(embed=embedd)
 #tournament start end
+
+#tournament delete start
+@tournamentsgc.command(name = "delete", description = "Deletes a tournament.")
+async def tournament_delete(ctx, name: Option(str, "Name of tournament.", autocomplete=tournament_autocomplete)):
+  with Session.begin() as session:
+    if (tournament := await obj_from_autocomplete_tuple(ctx, get_all_db("Tournament", session), name, "Tournament", session)) is None:
+      await ctx.respond(f'Tournament "{name}" not found.', ephemeral = True)
+      return
+    if (tournament.matches != []):
+      await ctx.respond(f'Tournament "{tournament.name}" has matches, you cannot delete it.', ephemeral = True)
+      return
+    await tournament.deactivate(ctx.guild)
+    await delete_from_db(tournament, session=session)
+    await ctx.respond(f'Tournament "{tournament.name}" deleted.')
 
 #tournament matches start
 @tournamentsgc.command(name = "matches", description = "What matches.")
