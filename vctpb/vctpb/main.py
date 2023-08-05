@@ -238,7 +238,7 @@ async def auto_generate_matches_from_vlr_timer():
     with Session.begin() as session:
       await generate_matches_from_vlr(bot, session, reply_if_none=False)
   except Exception as e: 
-    print(e)
+    print(e.with_traceback())
     print("-----------Generating Matches Failed-----------")
   
 
@@ -845,24 +845,28 @@ balance_choices = [
 @graph.command(name = "balance", description = "Gives a graph of value over time. No value in type gives you the current season.")
 async def graph_balances(ctx,
   type: Option(int, "What type of graph you want to make.", choices = balance_choices, default = 0, required = False), 
-  amount: Option(int, "How many you want to look back. For last only.", default = None, required = False),
+  amount: Option(int, "How many you want to look back.", default = None, required = False),
   user: Option(discord.Member, "User you want to get balance of.", default = None, required = False),
-  compare: Option(str, "Users you want to compare. For compare only", autocomplete=multi_user_list_autocomplete, default = None, required = False),
+  compare: Option(str, "Users you want to compare.", autocomplete=multi_user_list_autocomplete, default = None, required = False),
+  compare_top: Option(int, "How many users you want to compare.", default = None, required = False),
   high_quality: Option(int, "Do you want the image to be in a higher quality?", choices = yes_no_choices, default=1, required=False)):
   if high_quality == 1:
     dpi = 200
   else:
     dpi = 100
   
-  if (user is not None) and (compare is not None):
+  if (user is not None) and ((compare is not None) or (compare_top is not None)):
     await ctx.respond("You can't use compare and user at the same time.", ephemeral = True)
     return
+  
+  if (compare is not None) and (compare_top is not None):
+    await ctx.respond("You can't use compare and compare_top at the same time.", ephemeral = True)
   
   if (user is None) and (compare is None):
     user = ctx.author
   
   with Session.begin() as session:
-    if compare is None:
+    if (compare is None) and (compare_top is None):
       if (user := await get_user_from_ctx(ctx, user, session)) is None: return
       
       if amount is not None:
@@ -884,32 +888,34 @@ async def graph_balances(ctx,
         gen_msg = await ctx.respond("Generating graph... (this might take a while)")
         image = user.get_graph_image(graph_type, dpi, session)
         if isinstance(image, str):
-          await gen_msg.edit_original_message(content = image)
+          await gen_msg.edit_original_response(content = image)
           return
         image.save(image_binary, 'PNG')
         image_binary.seek(0)
-        await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+        await gen_msg.edit_original_response(content = "", file=discord.File(fp=image_binary, filename='image.png'))
       return
     
     # multi
-    usernames_split = compare.split(" ")
+    if compare_top is not None:
+      if compare_top < 1:
+        await ctx.respond("Compare top needs to be higher.", ephemeral = True)
+        return
+      users = get_top_active_users(compare_top, session)
+    else:
+      usernames_split = compare.split(" ")
     
-    users = usernames_to_users(compare, session)
+      users = usernames_to_users(compare, session)
 
-    
-    if len(users) == 1:
-      await ctx.respond("You need to compare more than one user.", ephemeral = True)
-      return
-
-    
-    usernames = " ".join([user.username for user in users])
-
-    for username_word in usernames_split:
-      if username_word not in usernames:
-        await ctx.respond(f"User {username_word} not found.", ephemeral = True)
+      if len(users) == 1:
+        await ctx.respond("You need to compare more than one user.", ephemeral = True)
         return
 
-    print(users)
+      usernames = " ".join([user.username for user in users])
+
+      for username_word in usernames_split:
+        if username_word not in usernames:
+          await ctx.respond(f"User {username_word} not found.", ephemeral = True)
+          return
 
     
 
@@ -934,16 +940,15 @@ async def graph_balances(ctx,
       gen_msg = await ctx.respond("Generating graph... (this might take a while)")
       image = get_multi_graph_image(users, graph_type, dpi, session)
       if isinstance(image, str):
-        await gen_msg.edit_original_message(content = image)
+        await gen_msg.edit_original_response(content = image)
         return
       image.save(image_binary, 'PNG')
       image_binary.seek(0)
-      await gen_msg.edit_original_message(content = "", file=discord.File(fp=image_binary, filename='image.png'))
+      await gen_msg.edit_original_response(content = "", file=discord.File(fp=image_binary, filename='image.png'))
 #graph balance end
 
 bot.add_application_command(graph)
 #graph end
-
 
 
 #leaderboard start
@@ -1707,7 +1712,20 @@ async def check_balance_order(ctx):
       await ctx.respond(f"{user.code} balance order is wrong", ephemeral = True)
       print(f"{user.code} balance order is wrong")
   await ctx.respond("check order done.", ephemeral = True)
-  print("check order done")
+  print(f"check order done by {ctx.author.name} ")
+  
+
+#clean db start
+@bot.slash_command(name = "clean_db", description = "Do not user command if not Pig, Debugs some stuff.")
+async def clean_db(ctx):
+  with Session.begin() as session:
+    bets = get_all_db("Bet", session)
+    for bet in bets:
+      match = bet.match
+      bet.t1 = match.t1
+      bet.t2 = match.t2
+  await ctx.respond(f"clean db done.")
+  print(f"clean db done by {ctx.author.name} ")
 
 token = get_setting("discord_token")
 #print(f"discord: {token}")
