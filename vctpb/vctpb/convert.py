@@ -76,7 +76,7 @@ async def get_user_from_ctx(ctx, user=None, session=None, send=True):
     us = ctx.author
   us = get_from_db("User", us.id, session)
   if us is None and send:
-    await ctx.respond("User not found. To create an account do /balance", ephemeral = True)
+    await ctx.respond("User not found. To create an account do /createacc", ephemeral = True)
   return us
 
 

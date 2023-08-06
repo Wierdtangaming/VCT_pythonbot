@@ -419,7 +419,10 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
         print("creating_user")
         user = create_user(ctx.author.id, ctx.author.display_name, session)
     else:
-      if (user := await get_user_from_ctx(ctx, user, session)) is None: return
+      temp = user
+      if (user := await get_user_from_ctx(ctx, user, session)) is None: 
+        print("creating_user")
+        user = create_user(temp.id, temp.display_name, session)
     embedd = create_user_embedded(user, session)
     if embedd is None:
       await ctx.respond("User not found.")
@@ -427,11 +430,42 @@ async def balance(ctx, user: Option(discord.Member, "User you want to get balanc
     await ctx.respond(embed=embedd)
 #balance end
 
+@bot.slash_command(name = "points", description = "Shows the last x amount of balance changes (awards, bets, etc).", aliases=["bal"], guild_ids = gid)
+async def points(ctx, user: Option(discord.Member, "User you want to get balance of.", default = None, required = False)):
+  with Session.begin() as session:
+    if user is None:
+      user = get_from_db("User", ctx.author.id, session)
+      if user is None:
+        print("creating_user")
+        user = create_user(ctx.author.id, ctx.author.display_name, session)
+    else:
+      temp = user
+      if (user := await get_user_from_ctx(ctx, user, session)) is None: 
+        print("creating_user")
+        user = create_user(temp.id, temp.display_name, session)
+    embedd = create_user_embedded(user, session)
+    if embedd is None:
+      await ctx.respond("User not found.")
+      return
+    await ctx.respond(embed=embedd)
+
+@bot.slash_command(name="createacc",description="Your account will be created with 500points.",guild_ids = gid)
+async def createacc(ctx, user: Option(discord.Member, "User you want to create account of.", default = None, required = False)):
+  with Session.begin() as session:
+    temp = user
+    if (user := await get_user_from_ctx(ctx, user, session)) is None: 
+        print("creating_user")
+        user = create_user(temp.id, temp.display_name, session)
+    embedd = create_user_embedded(user, session)
+    if embedd is None:
+      await ctx.respond("User not found.")
+      return
+    await ctx.respond(embed=embedd)
 
 
 #bet start
 betscg = SlashCommandGroup(
-  name = "bet", 
+  name = "gamba", 
   description = "Create, edit, and view bets.",
   guild_ids = gid,
 )
