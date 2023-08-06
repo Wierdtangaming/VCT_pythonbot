@@ -23,28 +23,36 @@ from autocompletes import get_team_from_vlr_code, get_match_from_vlr_code, get_t
 from utils import get_random_hex_color, balance_odds, mix_colors, get_date, to_float, to_digit, tuple_to_hex
 import sys
 
-#import webdriver, WebDriverWait, By, and EC
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
-
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument("headless")
-driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
-wait = WebDriverWait(driver, 10)
+try:
+  #import webdriver, WebDriverWait, By, and EC
+  from selenium import webdriver
+  from selenium.webdriver.support.ui import WebDriverWait
+  from selenium.webdriver.common.by import By
+  from selenium.webdriver.support import expected_conditions as EC
+  chrome_options = webdriver.ChromeOptions()
+  chrome_options.add_argument("headless")
+  driver = webdriver.Chrome(options=chrome_options)
+  wait = WebDriverWait(driver, 10)
+except Exception as e:
+  print(e)
+  print("selenium not installed properly, using requests instead (no odds)")
+  driver = None
+  wait = None
 
 t1_odds_labels = ["match-bet-item-odds mod-1", "match-bet-item-odds mod- mod-1"]
 t2_odds_labels = ["match-bet-item-odds mod-2", "match-bet-item-odds mod- mod-2"]
 odds_labels = t1_odds_labels + t2_odds_labels
 
 def get_match_response(match_link, odds_timeout=5):
-  driver.get(match_link)
-  if odds_timeout != 0:
-    WebDriverWait(driver, 0.5).until(EC.element_to_be_clickable((By.CLASS_NAME, "match-bet-item-odds")))
-  return driver.page_source
+  if driver is not None:
+    driver.get(match_link)
+    if odds_timeout != 0:
+      WebDriverWait(driver, 0.5).until(EC.element_to_be_clickable((By.CLASS_NAME, "match-bet-item-odds")))
+    return driver.page_source
+  else:
+    web_session = requests.Session()
+    response = web_session.get(match_link).text
+    return response
 
 def get_code(link):
   split_link = link.split("/")
@@ -141,9 +149,9 @@ def get_tournament_color_from_vlr_page(soup, tournament_name, tournament_code = 
   
   if soup is None:
     web_session = requests.Session()
-    response = web_session.get(get_tournament_link(tournament_code))
+    response = web_session.get(get_tournament_link(tournament_code)).text
     print("soup 2")
-    soup = BeautifulSoup(response.text, 'lxml')
+    soup = BeautifulSoup(response, 'lxml')
   try:
     img_link = get_tournament_logo_img(soup, tournament_name)
     color = get_most_common_color(img_link)
@@ -174,9 +182,9 @@ def update_team_with_vlr_code(team, team_vlr_code, soup = None, session = None, 
     if team_vlr_code is not None:
       if soup is None:
         web_session = requests.Session()
-        response = web_session.get(get_team_link(team_vlr_code))
+        response = web_session.get(get_team_link(team_vlr_code)).text
         print("soup 3")
-        soup = BeautifulSoup(response.text, 'lxml')
+        soup = BeautifulSoup(response, 'lxml')
         name = get_team_name_from_team_vlr(soup)
         if name is not None:
           team.set_name(name, session)
@@ -194,9 +202,9 @@ async def vlr_get_today_matches(bot, tournament_code, session) -> list:
     
   tournament_link = get_tournament_link(tournament_code)
   web_session = requests.Session()
-  response = web_session.get(tournament_link)
+  response = web_session.get(tournament_link).text
   #print("soup 4")
-  soup = BeautifulSoup(response.text, 'lxml')
+  soup = BeautifulSoup(response, 'lxml')
   
   col = soup.find("div", class_="col mod-1")
   #date_labels = col.find_all("div", class_="wf-label mod-large")
@@ -346,9 +354,9 @@ def get_or_create_team(team_name, team_vlr_code, session=None, team_soup=None, m
       if match_soup is None:
         if second_query:
           web_session = requests.Session()
-          response = web_session.get(get_team_link(team_vlr_code))
+          response = web_session.get(get_team_link(team_vlr_code)).text
           print("soup 5")
-          team_soup = BeautifulSoup(response.text, 'lxml')
+          team_soup = BeautifulSoup(response, 'lxml')
       else:
         team_soup = match_soup
     if team_soup is not None:
@@ -572,9 +580,9 @@ def generate_tournament(vlr_code, session=None):
   # get the tournament page from the vlr code
   tournament_link = get_tournament_link(vlr_code)
   web_session = requests.Session()
-  response = web_session.get(tournament_link)
+  response = web_session.get(tournament_link).text
   print("soup 7")
-  soup = BeautifulSoup(response.text, 'lxml')
+  soup = BeautifulSoup(response, 'lxml')
   print(f"generating tournament from link: {tournament_link}")
   
   # get the tournament name and color from the page
@@ -608,9 +616,9 @@ def generate_team(vlr_code, session=None):
   print(f"generating team from link: {team_link}")
   # open team link
   web_session = requests.Session()
-  response = web_session.get(team_link)
+  response = web_session.get(team_link).text
   print("soup 8")
-  team_soup = BeautifulSoup(response.text, 'lxml')
+  team_soup = BeautifulSoup(response, 'lxml')
   # get team name from team link
   team_name = get_team_name_from_team_vlr(team_soup)
   
